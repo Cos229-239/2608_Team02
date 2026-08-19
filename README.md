@@ -97,3 +97,4 @@ Run these commands from the repository root.
 
 Each team member adds only their own name here from their personal branch.
 
+Jeremy Dusablon
