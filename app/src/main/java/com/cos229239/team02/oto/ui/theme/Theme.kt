@@ -9,50 +9,108 @@ import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalView
+import androidx.core.view.WindowCompat
 
-private val DarkColorScheme = darkColorScheme(
-    primary = Purple80,
-    secondary = PurpleGrey80,
-    tertiary = Pink80
+private val OtoDarkColorScheme = darkColorScheme(
+    primary = OtoExplorerGreen,
+    onPrimary = OtoForest950,
+    primaryContainer = OtoForest700,
+    onPrimaryContainer = OtoTextOnDark,
+
+    secondary = OtoExplorerGreenDark,
+    onSecondary = OtoTextOnDark,
+
+    tertiary = OtoWarningAmber,
+    onTertiary = OtoForest950,
+
+    error = OtoCrisisRed,
+    onError = OtoTextOnDark,
+    errorContainer = OtoCrisisRedDark,
+    onErrorContainer = OtoTextOnDark,
+
+    background = OtoForest950,
+    onBackground = OtoTextOnDark,
+
+    surface = OtoForest900,
+    onSurface = OtoTextOnDark,
+
+    surfaceVariant = OtoForest800,
+    onSurfaceVariant = OtoTextOnDark,
+
+    outline = OtoOutlineStrong
 )
 
-private val LightColorScheme = lightColorScheme(
-    primary = Purple40,
-    secondary = PurpleGrey40,
-    tertiary = Pink40
+private val OtoLightColorScheme = lightColorScheme(
+    primary = OtoForest700,
+    onPrimary = OtoTextOnDark,
+    primaryContainer = OtoExplorerGreenContainer,
+    onPrimaryContainer = OtoForest950,
 
-    /* Other default colors to override
-    background = Color(0xFFFFFBFE),
-    surface = Color(0xFFFFFBFE),
-    onPrimary = Color.White,
-    onSecondary = Color.White,
-    onTertiary = Color.White,
-    onBackground = Color(0xFF1C1B1F),
-    onSurface = Color(0xFF1C1B1F),
-    */
+    secondary = OtoExplorerGreenDark,
+    onSecondary = OtoTextOnDark,
+
+    tertiary = OtoWarningAmber,
+    onTertiary = OtoForest950,
+
+    error = OtoCrisisRed,
+    onError = OtoTextOnDark,
+    errorContainer = OtoCrisisRedContainer,
+    onErrorContainer = OtoCrisisRedDark,
+
+    background = OtoBackground,
+    onBackground = OtoTextPrimary,
+
+    surface = OtoSurface,
+    onSurface = OtoTextPrimary,
+
+    surfaceVariant = OtoSurfaceSoft,
+    onSurfaceVariant = OtoTextSecondary,
+
+    outline = OtoOutline
 )
 
 @Composable
 fun OTOTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
-    // Dynamic color is available on Android 12+
-    dynamicColor: Boolean = true,
+    dynamicColor: Boolean = false,
     content: @Composable () -> Unit
 ) {
     val colorScheme = when {
         dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
             val context = LocalContext.current
-            if (darkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
+
+            if (darkTheme) {
+                dynamicDarkColorScheme(context)
+            } else {
+                dynamicLightColorScheme(context)
+            }
         }
 
-        darkTheme -> DarkColorScheme
-        else -> LightColorScheme
+        darkTheme -> OtoDarkColorScheme
+        else -> OtoLightColorScheme
     }
 
+    val view = LocalView.current
+
+    if (!view.isInEditMode) {
+        val window = (view.context as Activity).window
+
+        window.statusBarColor = colorScheme.background.toArgb()
+        window.navigationBarColor = colorScheme.background.toArgb()
+
+        WindowCompat.getInsetsController(window, view).apply {
+            isAppearanceLightStatusBars = !darkTheme
+            isAppearanceLightNavigationBars = !darkTheme
+        }
+    }
     MaterialTheme(
         colorScheme = colorScheme,
         typography = Typography,
+        shapes = OtoShapes,
         content = content
     )
 }
+
