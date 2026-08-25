@@ -13,6 +13,7 @@ import androidx.navigation3.runtime.NavKey
 import androidx.navigation3.runtime.entryProvider
 import androidx.navigation3.runtime.rememberNavBackStack
 import androidx.navigation3.ui.NavDisplay
+import com.cos229239.team02.oto.ui.screens.crisis.CrisisScreen
 import com.cos229239.team02.oto.ui.screens.crisis.FirstAidSurvivalScreen
 import com.cos229239.team02.oto.ui.screens.home.HomeScreen
 
@@ -46,9 +47,13 @@ fun OtoNavigation() {
             }
 
             entry<OtoRoute.Crisis> {
-                ModePlaceholder(
-                    title = "Crisis Mode",
-                    backStack = backStack
+                CrisisScreen(
+                    onFirstAidSurvivalClick = {
+                        backStack.add(OtoRoute.FirstAidSurvival)
+                    },
+                    onBackClick = {
+                        backStack.removeLastOrNull()
+                    }
                 )
             }
 
