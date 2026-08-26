@@ -4,6 +4,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Button
@@ -24,43 +25,61 @@ fun ExplorerScreen(
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
+
         Text(text = "Explorer Mode")
 
         Spacer(modifier = Modifier.height(24.dp))
 
-        Button(onClick = { }) {
+        Button(
+            onClick = { },
+            modifier = Modifier.fillMaxWidth()
+        ) {
             Text(text = "Plan Trip")
         }
 
         Spacer(modifier = Modifier.height(12.dp))
 
-        Button(onClick = { }) {
+        Button(
+            onClick = { },
+            modifier = Modifier.fillMaxWidth()
+        ) {
             Text(text = "Create New Route")
         }
 
         Spacer(modifier = Modifier.height(12.dp))
 
-        Button(onClick = { }) {
+        Button(
+            onClick = { },
+            modifier = Modifier.fillMaxWidth()
+        ) {
             Text(text = "Offline Maps")
         }
 
         Spacer(modifier = Modifier.height(12.dp))
 
-        Button(onClick = { }) {
+        Button(
+            onClick = { },
+            modifier = Modifier.fillMaxWidth()
+        ) {
             Text(text = "Area Safety")
         }
 
         Spacer(modifier = Modifier.height(12.dp))
 
-        Button(onClick = { }) {
+        Button(
+            onClick = { },
+            modifier = Modifier.fillMaxWidth()
+        ) {
             Text(text = "Report Hazard")
         }
 
         Spacer(modifier = Modifier.height(24.dp))
 
-        Button(onClick = onBackClick) {
+        Button(
+            onClick = onBackClick,
+            modifier = Modifier.fillMaxWidth()
+        ) {
             Text(text = "Back")
         }
     }
 }
-

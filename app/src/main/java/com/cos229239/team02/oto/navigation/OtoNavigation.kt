@@ -23,7 +23,9 @@ fun OtoNavigation() {
     NavDisplay(
         backStack = backStack,
         onBack = {
-            backStack.removeLastOrNull()
+            if (backStack.size > 1) {
+                backStack.removeLastOrNull()
+            }
         },
         entryProvider = entryProvider {
 
