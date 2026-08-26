@@ -1,0 +1,39 @@
+{
+  "version": "v2",
+  "cycle": "2608",
+  "teams": [
+    {
+      "label": "Team 02 (Greybeards)",
+      "students": [
+        {
+          "name": "Chris B",
+          "github_id": "yetti8541",
+          "github_email": "CSBowen@student.fullsail.edu",
+          "trello_email": "CSBowen@student.fullsail.edu",
+          "discord_id": "chris_22161"
+        },
+        {
+          "name": "Eric L",
+          "github_id": "Emoni23",
+          "github_email": "langeric83@gmail.com",
+          "trello_email": "langeric83@gmail.com",
+          "discord_id": "emoni23_26999"
+        },
+        {
+          "name": "David P",
+          "github_id": "Dpatterson-Fullsail",
+          "github_email": "Dpatterson3@student.fullsail.edu",
+          "trello_email": "Dpatterson3@student.fullsail.edu",
+          "discord_id": "215dave"
+        },
+        {
+          "name": "Jeremy D",
+          "github_id": "JPDeuce",
+          "github_email": "JeremyDusablon@gmail.com",
+          "trello_email": "JeremyDusablon@gmail.com",
+          "discord_id": "EODeuce"
+        }
+      ]
+    }
+  ]
+}
