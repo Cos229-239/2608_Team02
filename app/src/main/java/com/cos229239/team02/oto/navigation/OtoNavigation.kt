@@ -14,6 +14,7 @@ import androidx.navigation3.runtime.entryProvider
 import androidx.navigation3.runtime.rememberNavBackStack
 import androidx.navigation3.ui.NavDisplay
 import com.cos229239.team02.oto.ui.screens.home.HomeScreen
+import com.cos229239.team02.oto.ui.screens.explorer.ExplorerScreen
 
 @Composable
 fun OtoNavigation() {
@@ -38,9 +39,10 @@ fun OtoNavigation() {
             }
 
             entry<OtoRoute.Explorer> {
-                ModePlaceholder(
-                    title = "Explorer Mode",
-                    backStack = backStack
+                ExplorerScreen(
+                    onBackClick = {
+                        backStack.removeLastOrNull()
+                    }
                 )
             }
 
