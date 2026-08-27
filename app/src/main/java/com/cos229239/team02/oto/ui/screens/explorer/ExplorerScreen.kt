@@ -16,6 +16,7 @@ import androidx.compose.ui.unit.dp
 
 @Composable
 fun ExplorerScreen(
+    onPlanTripClick: () -> Unit,
     onBackClick: () -> Unit
 ) {
     Column(
@@ -31,7 +32,7 @@ fun ExplorerScreen(
         Spacer(modifier = Modifier.height(24.dp))
 
         Button(
-            onClick = { },
+            onClick = onPlanTripClick,
             modifier = Modifier.fillMaxWidth()
         ) {
             Text(text = "Plan Trip")

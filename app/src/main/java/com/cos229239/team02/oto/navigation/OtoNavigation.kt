@@ -13,8 +13,9 @@ import androidx.navigation3.runtime.NavKey
 import androidx.navigation3.runtime.entryProvider
 import androidx.navigation3.runtime.rememberNavBackStack
 import androidx.navigation3.ui.NavDisplay
-import com.cos229239.team02.oto.ui.screens.home.HomeScreen
 import com.cos229239.team02.oto.ui.screens.explorer.ExplorerScreen
+import com.cos229239.team02.oto.ui.screens.explorer.PlanTripScreen
+import com.cos229239.team02.oto.ui.screens.home.HomeScreen
 
 @Composable
 fun OtoNavigation() {
@@ -42,7 +43,21 @@ fun OtoNavigation() {
 
             entry<OtoRoute.Explorer> {
                 ExplorerScreen(
+                    onPlanTripClick = {
+                        backStack.add(OtoRoute.PlanTrip)
+                    },
                     onBackClick = {
+                        backStack.removeLastOrNull()
+                    }
+                )
+            }
+
+            entry<OtoRoute.PlanTrip> {
+                PlanTripScreen(
+                    onBackClick = {
+                        backStack.removeLastOrNull()
+                    },
+                    onSaveClick = {
                         backStack.removeLastOrNull()
                     }
                 )
