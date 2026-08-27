@@ -15,21 +15,21 @@ enum class SafetyLevel {
     UNKNOWN
 }
 
-data class SafetyNotify (
+data class SafetyNotification (
     val id: String,
     val title: String,
     val details: String,
     val instruct: String,
-    val affected_area: String,
+    val affectedArea: String,
     val category: SafetyCategory,
     val level: SafetyLevel,
 
     val sourceID: String,
     val sourceURL: String,
-    val retrived_time: String,
-    val last_verfication: String,
+    val retrievedTime: String,
+    val lastVerification: String,
     val expires: String?, //null value declared if no expiration on data (offline mode)
 
-    val data_expired: Boolean = false,
-    val sample_data: Boolean = false
+    val dataExpired: Boolean = false,
+    val sampleData: Boolean = false
 )
