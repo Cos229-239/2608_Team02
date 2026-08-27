@@ -8,3 +8,16 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+
+class SafetyView : ViewModel() {
+    private val repo: AreaSafetyRepo = DummyAreaSafetyRepo()
+
+    private val uiState = MutableStateFlow(
+        AreaSafetyUIState()
+
+    )
+
+    val uiState: StateFlow<AreaSafetyUIState> = uiState.asStateFlow()
+
+    private
+}
