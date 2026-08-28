@@ -13,9 +13,11 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.cos229239.team02.oto.navigation.OtoRoute
 
 @Composable
 fun ExplorerScreen(
+    onAreaSafetyClick: () -> Unit,
     onBackClick: () -> Unit
 ) {
     Column(
@@ -58,7 +60,7 @@ fun ExplorerScreen(
         Spacer(modifier = Modifier.height(12.dp))
 
         Button(
-            onClick = { },
+            onClick = onAreaSafetyClick,
             modifier = Modifier.fillMaxWidth()
         ) {
             Text(text = "Area Safety")

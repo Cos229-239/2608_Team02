@@ -1,8 +1,5 @@
 package com.cos229239.team02.oto.ui.features
 
-import com.cos229239.team02.oto.ui.screens.explorer.SafetyCategory
-import com.cos229239.team02.oto.ui.screens.explorer.SafetyLevel
-import com.cos229239.team02.oto.ui.screens.explorer.SafetyNotification
 import kotlinx.coroutines.delay
 
 interface AreaSafetyRepo {
@@ -30,8 +27,8 @@ class DummyAreaSafetyRepo : AreaSafetyRepo {
                 affectedArea = areaName,
                 category = SafetyCategory.WEATHER,
                 level = SafetyLevel.MODERATE,
-                sourceURL = "Weather Channel - TEST",
                 sourceID = "weather.com",
+                sourceURL = "Weather Channel - TEST",
                 retrievedTime = "25AUG26 7:48am",
                 lastVerification = "25AUG26 6:42am",
                 expires = "25AUG26 10:00am",
@@ -51,8 +48,8 @@ class DummyAreaSafetyRepo : AreaSafetyRepo {
                 affectedArea = areaName,
                 category = SafetyCategory.COMMUNITY,
                 level = SafetyLevel.SEVERE,
-                sourceURL = "OTO Community Report - TEST",
                 sourceID = "https://sample.com",
+                sourceURL = "OTO Community Report - TEST",
                 retrievedTime = "25AUG26 7:48am",
                 lastVerification = "25AUG26 6:42am",
                 expires = "25AUG26 10:00am",

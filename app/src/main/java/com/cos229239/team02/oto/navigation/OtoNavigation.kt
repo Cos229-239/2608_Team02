@@ -15,6 +15,7 @@ import androidx.navigation3.runtime.rememberNavBackStack
 import androidx.navigation3.ui.NavDisplay
 import com.cos229239.team02.oto.ui.screens.crisis.CrisisScreen
 import com.cos229239.team02.oto.ui.screens.crisis.FirstAidSurvivalScreen
+import com.cos229239.team02.oto.ui.screens.explorer.AreaSafetyRoute
 import com.cos229239.team02.oto.ui.screens.home.HomeScreen
 import com.cos229239.team02.oto.ui.screens.explorer.ExplorerScreen
 
@@ -44,9 +45,20 @@ fun OtoNavigation() {
 
             entry<OtoRoute.Explorer> {
                 ExplorerScreen(
+                    onAreaSafetyClick = {
+                        backStack.add(OtoRoute.AreaSafety)
+                    },
                     onBackClick = {
                         backStack.removeLastOrNull()
                     }
+                )
+            }
+            entry<OtoRoute.AreaSafety> {
+                AreaSafetyRoute(
+                onBackClick = {
+                    backStack.removeLastOrNull()
+                }
+
                 )
             }
 
