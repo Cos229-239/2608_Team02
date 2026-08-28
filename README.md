@@ -100,3 +100,4 @@ Each team member adds only their own name here from their personal branch.
 Jeremy Dusablon
 Christoper Bowen
 David Patterson
+Eric Lang
