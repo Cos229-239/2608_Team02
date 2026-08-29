@@ -13,6 +13,7 @@ class MainActivity : ComponentActivity() {
             OTOTheme {
                 OTOApp()
             }
+
         }
     }
 }
