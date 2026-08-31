@@ -2,7 +2,7 @@ package com.cos229239.team02.oto.navigation
 
 import androidx.navigation3.runtime.NavKey
 import kotlinx.serialization.Serializable
-
+import com.cos229239.team02.oto.ui.screens.explorer.AreaSafetyRoute
 @Serializable
 sealed interface OtoRoute : NavKey {
 
@@ -11,7 +11,8 @@ sealed interface OtoRoute : NavKey {
 
     @Serializable
     data object Explorer : OtoRoute
-
+    @Serializable
+    data object AreaSafety : OtoRoute
     @Serializable
     data object ExplorerMap : OtoRoute
 
