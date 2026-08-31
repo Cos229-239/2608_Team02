@@ -76,11 +76,11 @@ fun NearbyResourceScreen(
     }
     var showUnnamed by remember { mutableStateOf(false) }
 
-    fun loadResources(target: OtoLocation) {
+    fun loadResources(target: OtoLocation, forceRefresh: Boolean = false) {
         scope.launch {
             loading = true
-            statusText = "Finding resources near you..."
-            val loaded = resourceRepository.getNearby(target)
+            statusText = if (forceRefresh) "Refreshing resources..." else "Finding resources near you..."
+            val loaded = resourceRepository.getNearby(target, forceRefresh = forceRefresh)
             location = target
             result = loaded
             loading = false
@@ -111,14 +111,14 @@ fun NearbyResourceScreen(
         }
     }
 
-    fun loadLocation() {
+    fun loadLocation(forceRefresh: Boolean = false) {
         scope.launch {
             loading = true
             statusText = "Finding your location..."
             val current = locationRepository.getCurrentLocation()
             loading = false
             if (current != null) {
-                loadResources(current)
+                loadResources(current, forceRefresh)
             } else {
                 statusText = "Location unavailable — check signal and try again"
             }
@@ -140,7 +140,7 @@ fun NearbyResourceScreen(
             }
         }
 
-    fun requestLocation() {
+    fun requestLocation(forceRefresh: Boolean = false) {
         val fineGranted =
             ContextCompat.checkSelfPermission(
                 context,
@@ -154,7 +154,7 @@ fun NearbyResourceScreen(
             ) == PackageManager.PERMISSION_GRANTED
 
         if (fineGranted || coarseGranted) {
-            loadLocation()
+            loadLocation(forceRefresh)
         } else {
             locationPermissionLauncher.launch(
                 arrayOf(
@@ -198,7 +198,7 @@ fun NearbyResourceScreen(
             )
 
             Button(
-                onClick = ::requestLocation,
+                onClick = { requestLocation(forceRefresh = result != null) },
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Text(

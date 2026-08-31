@@ -22,26 +22,33 @@ class OverpassResourceRepository(
     private val connectivityManager =
         context.applicationContext.getSystemService(CONNECTIVITY_SERVICE) as ConnectivityManager
 
-    override suspend fun getNearby(location: OtoLocation): ResourceResult =
-        getNearby(location, defaultRadiusMeters, autoExpand = true)
+    override suspend fun getNearby(
+        location: OtoLocation,
+        forceRefresh: Boolean
+    ): ResourceResult =
+        getNearby(location, defaultRadiusMeters, autoExpand = true, forceRefresh = forceRefresh)
 
     override suspend fun getNearby(
         location: OtoLocation,
-        radiusMeters: Int
+        radiusMeters: Int,
+        forceRefresh: Boolean
     ): ResourceResult =
-        getNearby(location, radiusMeters, autoExpand = false)
+        getNearby(location, radiusMeters, autoExpand = false, forceRefresh = forceRefresh)
 
     private suspend fun getNearby(
         location: OtoLocation,
         radiusMeters: Int,
-        autoExpand: Boolean
+        autoExpand: Boolean,
+        forceRefresh: Boolean = false
     ): ResourceResult {
-        cache.readCached(location, radiusMeters, cacheTtlMillis)?.let { cached ->
-            return ResourceResult(
-                resources = cached,
-                fromCache = true,
-                radiusMeters = radiusMeters
-            )
+        if (!forceRefresh) {
+            cache.readCached(location, radiusMeters, cacheTtlMillis)?.let { cached ->
+                return ResourceResult(
+                    resources = cached,
+                    fromCache = true,
+                    radiusMeters = radiusMeters
+                )
+            }
         }
 
         if (isOnline()) {
@@ -52,7 +59,7 @@ class OverpassResourceRepository(
                     if (fetched.isEmpty() && autoExpand) {
                         // No results at the default radius while online —
                         // automatically widen the search for better coverage.
-                        return getNearby(location, expandedRadiusMeters, autoExpand = false)
+                        return getNearby(location, expandedRadiusMeters, autoExpand = false, forceRefresh = forceRefresh)
                     }
                     cache.write(location, radiusMeters, fetched)
                     ResourceResult(

@@ -15,16 +15,26 @@ interface ResourceRepository {
      * stale. If the default radius returns nothing and the device is
      * online, implementations may automatically widen the search.
      *
+     * @param forceRefresh when `true`, skip the cache and fetch from the
+     *        network first, only falling back to cached data if the
+     *        request fails.  The normal path is cache-first.
      * @return a [ResourceResult] describing whether data came from cache
      *         or network and the radius that was used.
      */
-    suspend fun getNearby(location: OtoLocation): ResourceResult
+    suspend fun getNearby(
+        location: OtoLocation,
+        forceRefresh: Boolean = false
+    ): ResourceResult
 
     /**
      * Returns nearby resources for [location] at an explicit search
      * radius (in meters). Useful for a manual "expand search" action.
      */
-    suspend fun getNearby(location: OtoLocation, radiusMeters: Int): ResourceResult
+    suspend fun getNearby(
+        location: OtoLocation,
+        radiusMeters: Int,
+        forceRefresh: Boolean = false
+    ): ResourceResult
 }
 
 /**
