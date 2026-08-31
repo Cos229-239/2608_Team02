@@ -15,9 +15,6 @@ import androidx.navigation3.runtime.rememberNavBackStack
 import androidx.navigation3.ui.NavDisplay
 import com.cos229239.team02.oto.ui.screens.crisis.CrisisScreen
 import com.cos229239.team02.oto.ui.screens.crisis.FirstAidSurvivalScreen
-import androidx.navigation3.ui.NavDisplay
-import com.cos229239.team02.oto.ui.screens.crisis.CrisisScreen
-import com.cos229239.team02.oto.ui.screens.crisis.FirstAidSurvivalScreen
 import com.cos229239.team02.oto.ui.screens.crisis.NearbyResourceScreen
 import com.cos229239.team02.oto.ui.screens.explorer.AreaSafetyRoute
 import com.cos229239.team02.oto.ui.screens.crisis.ShareStatusLocationScreen
