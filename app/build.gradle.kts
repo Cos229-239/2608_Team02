@@ -59,5 +59,7 @@ dependencies {
     debugImplementation(libs.androidx.compose.ui.test.manifest)
     debugImplementation(libs.androidx.compose.ui.tooling)
     implementation(libs.kotlinx.serialization.core)
+    implementation(libs.kotlinx.serialization.json)
+    implementation(libs.okhttp)
     implementation("androidx.lifecycle:lifecycle-runtime-compose:2.11.0")
 }

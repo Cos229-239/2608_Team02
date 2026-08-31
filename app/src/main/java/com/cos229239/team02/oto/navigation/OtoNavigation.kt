@@ -15,6 +15,7 @@ import androidx.navigation3.runtime.rememberNavBackStack
 import androidx.navigation3.ui.NavDisplay
 import com.cos229239.team02.oto.ui.screens.crisis.CrisisScreen
 import com.cos229239.team02.oto.ui.screens.crisis.FirstAidSurvivalScreen
+import com.cos229239.team02.oto.ui.screens.crisis.NearbyResourceScreen
 import com.cos229239.team02.oto.ui.screens.explorer.AreaSafetyRoute
 import com.cos229239.team02.oto.ui.screens.crisis.ShareStatusLocationScreen
 import com.cos229239.team02.oto.ui.screens.home.HomeScreen
@@ -71,6 +72,9 @@ fun OtoNavigation() {
                     onShareStatusLocationClick = {
                         backStack.add(OtoRoute.ShareStatusLocation)
                     },
+                    onNearbyResourcesClick = {
+                        backStack.add(OtoRoute.NearbyResources)
+                    },
                     onBackClick = {
                         backStack.removeLastOrNull()
                     }
@@ -87,6 +91,14 @@ fun OtoNavigation() {
 
             entry<OtoRoute.FirstAidSurvival> {
                 FirstAidSurvivalScreen(
+                    onBackClick = {
+                        backStack.removeLastOrNull()
+                    }
+                )
+            }
+
+            entry<OtoRoute.NearbyResources> {
+                NearbyResourceScreen(
                     onBackClick = {
                         backStack.removeLastOrNull()
                     }
