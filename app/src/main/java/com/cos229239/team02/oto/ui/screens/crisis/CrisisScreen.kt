@@ -17,6 +17,7 @@ import androidx.compose.ui.unit.dp
 fun CrisisScreen(
     onFirstAidSurvivalClick: () -> Unit,
     onShareStatusLocationClick: () -> Unit,
+    onNearbyResourcesClick: () -> Unit,
     onBackClick: () -> Unit
 ) {
     Column(
@@ -38,6 +39,12 @@ fun CrisisScreen(
 
         Button(onClick = onShareStatusLocationClick) {
             Text(text = "Share Status and Location")
+        }
+
+        Spacer(modifier = Modifier.height(12.dp))
+
+        Button(onClick = onNearbyResourcesClick) {
+            Text(text = "Nearby Resources")
         }
 
         Spacer(modifier = Modifier.height(12.dp))
