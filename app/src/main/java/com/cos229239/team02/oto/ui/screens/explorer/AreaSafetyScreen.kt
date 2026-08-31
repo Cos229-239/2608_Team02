@@ -76,7 +76,7 @@ fun AreaSafetyScreen(
         topBar = {
             TopAppBar(
                 title = {
-                    Text("Area Safety")
+                    Text("Area Alerts")
                         },
                 navigationIcon = { TextButton(
                     onClick = onBackClick

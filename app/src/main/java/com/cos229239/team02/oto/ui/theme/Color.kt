@@ -1,5 +1,7 @@
 package com.cos229239.team02.oto.ui.theme
 
+import androidx.compose.material3.NavigationBarItemDefaults
+import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 
 /*
@@ -56,6 +58,7 @@ val OtoLocationBlueContainer = Color(0xFFDCEBFF)
 val OtoBackground = Color(0xFFF7F7F2)
 val OtoSurface = Color(0xFFFFFFFF)
 val OtoSurfaceSoft = Color(0xFFF1F3ED)
+
 val OtoSurfaceDark = OtoForest950
 
 // -----------------------------------------------------------------------------
@@ -82,3 +85,4 @@ val OtoSuccess = Color(0xFF2E7D32)
 val OtoInfo = OtoLocationBlue
 val OtoWarning = OtoWarningAmber
 val OtoError = OtoCrisisRed
+
