@@ -1,25 +1,17 @@
 package com.cos229239.team02.oto.navigation
 
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.material3.Button
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.Modifier
-import androidx.navigation3.runtime.NavBackStack
-import androidx.navigation3.runtime.NavKey
 import androidx.navigation3.runtime.entryProvider
 import androidx.navigation3.runtime.rememberNavBackStack
 import androidx.navigation3.ui.NavDisplay
 import com.cos229239.team02.oto.ui.screens.crisis.CrisisScreen
 import com.cos229239.team02.oto.ui.screens.crisis.FirstAidSurvivalScreen
 import com.cos229239.team02.oto.ui.screens.crisis.NearbyResourceScreen
-import com.cos229239.team02.oto.ui.screens.explorer.AreaSafetyRoute
 import com.cos229239.team02.oto.ui.screens.crisis.ShareStatusLocationScreen
-import com.cos229239.team02.oto.ui.screens.home.HomeScreen
+import com.cos229239.team02.oto.ui.screens.explorer.AreaSafetyRoute
 import com.cos229239.team02.oto.ui.screens.explorer.ExplorerScreen
+import com.cos229239.team02.oto.ui.screens.explorer.PlanTripScreen
+import com.cos229239.team02.oto.ui.screens.home.HomeScreen
 
 @Composable
 fun OtoNavigation() {
@@ -34,6 +26,7 @@ fun OtoNavigation() {
         },
         entryProvider = entryProvider {
 
+            // Home screen
             entry<OtoRoute.Home> {
                 HomeScreen(
                     onExplorerClick = {
@@ -45,25 +38,43 @@ fun OtoNavigation() {
                 )
             }
 
+            // Explorer main screen
             entry<OtoRoute.Explorer> {
                 ExplorerScreen(
                     onAreaSafetyClick = {
                         backStack.add(OtoRoute.AreaSafety)
+                    },
+                    onPlanTripClick = {
+                        backStack.add(OtoRoute.PlanTrip)
                     },
                     onBackClick = {
                         backStack.removeLastOrNull()
                     }
                 )
             }
-            entry<OtoRoute.AreaSafety> {
-                AreaSafetyRoute(
-                onBackClick = {
-                    backStack.removeLastOrNull()
-                }
 
+            // Plan Trip screen
+            entry<OtoRoute.PlanTrip> {
+                PlanTripScreen(
+                    onBackClick = {
+                        backStack.removeLastOrNull()
+                    },
+                    onSaveClick = {
+                        backStack.removeLastOrNull()
+                    }
                 )
             }
 
+            // Area Safety screen
+            entry<OtoRoute.AreaSafety> {
+                AreaSafetyRoute(
+                    onBackClick = {
+                        backStack.removeLastOrNull()
+                    }
+                )
+            }
+
+            // Crisis main screen
             entry<OtoRoute.Crisis> {
                 CrisisScreen(
                     onFirstAidSurvivalClick = {
@@ -81,6 +92,7 @@ fun OtoNavigation() {
                 )
             }
 
+            // Crisis - Share Status & Location
             entry<OtoRoute.ShareStatusLocation> {
                 ShareStatusLocationScreen(
                     onBackClick = {
@@ -89,6 +101,7 @@ fun OtoNavigation() {
                 )
             }
 
+            // Crisis - First Aid & Survival
             entry<OtoRoute.FirstAidSurvival> {
                 FirstAidSurvivalScreen(
                     onBackClick = {
@@ -97,6 +110,7 @@ fun OtoNavigation() {
                 )
             }
 
+            // Crisis - Nearby Resources
             entry<OtoRoute.NearbyResources> {
                 NearbyResourceScreen(
                     onBackClick = {
@@ -106,26 +120,4 @@ fun OtoNavigation() {
             }
         }
     )
-}
-
-@Composable
-private fun ModePlaceholder(
-    title: String,
-    backStack: NavBackStack<NavKey>
-) {
-    Column(
-        modifier = Modifier.fillMaxSize(),
-        verticalArrangement = Arrangement.Center,
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        Text(text = title)
-
-        Button(
-            onClick = {
-                backStack.removeLastOrNull()
-            }
-        ) {
-            Text(text = "Back")
-        }
-    }
 }

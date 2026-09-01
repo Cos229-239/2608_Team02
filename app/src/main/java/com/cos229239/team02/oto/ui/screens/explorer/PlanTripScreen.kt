@@ -61,11 +61,12 @@ fun PlanTripScreen(
             verticalAlignment = Alignment.CenterVertically
         ) {
 
+            // Back button.
             TextButton(
                 onClick = onBackClick
             ) {
                 Text(
-                    text = "<",
+                    text = "←",
                     color = Color.White,
                     fontSize = 24.sp
                 )
@@ -157,7 +158,7 @@ fun PlanTripScreen(
 
             Spacer(modifier = Modifier.height(12.dp))
 
-            // Distance and estimated time share one row.
+            // Distance and estimated 50time share one row.
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(12.dp)
@@ -259,4 +260,3 @@ fun PlanTripScreen(
         }
     }
 }
-

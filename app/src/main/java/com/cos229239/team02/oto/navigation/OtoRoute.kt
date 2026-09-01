@@ -14,6 +14,9 @@ sealed interface OtoRoute : NavKey {
     @Serializable
     data object AreaSafety : OtoRoute
     @Serializable
+    data object PlanTrip : OtoRoute
+
+    @Serializable
     data object ExplorerMap : OtoRoute
 
     @Serializable
