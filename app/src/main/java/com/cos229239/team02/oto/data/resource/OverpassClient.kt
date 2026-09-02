@@ -96,14 +96,12 @@ class OverpassClient(
         val r = radiusMeters
 
         return """
-            [out:json][timeout:25];
+            [out:json][timeout:15];
             (
-              node(around:$r,$lat,$lon)["amenity"~"hospital|clinic|doctors|dentist|pharmacy|veterinary|nursing_home|fire_station|police|shelter|social_facility|place_of_worship|community_centre|drinking_water|fountain|restaurant|fast_food|cafe|pub|mall|marketplace|school|library"];
-              way(around:$r,$lat,$lon)["amenity"~"hospital|clinic|doctors|dentist|pharmacy|veterinary|nursing_home|fire_station|police|shelter|social_facility|place_of_worship|community_centre|restaurant|fast_food|cafe|pub|mall|marketplace|school|library"];
-              node(around:$r,$lat,$lon)["emergency"~"hospital|ambulance_station|drinking_water|fire_hydrant"];
-              way(around:$r,$lat,$lon)["emergency"~"hospital|ambulance_station"];
-              node(around:$r,$lat,$lon)["tourism"~"camp_site|information"];
-              node(around:$r,$lat,$lon)["shop"~"supermarket|convenience"];
+              nwr(around:$r,$lat,$lon)["amenity"~"hospital|clinic|doctors|dentist|pharmacy|veterinary|nursing_home|fire_station|police|shelter|social_facility|place_of_worship|community_centre|drinking_water|fountain|restaurant|fast_food|cafe|pub|mall|marketplace|school|library"];
+              nwr(around:$r,$lat,$lon)["emergency"~"hospital|ambulance_station|drinking_water|fire_hydrant"];
+              nwr(around:$r,$lat,$lon)["tourism"~"camp_site|information"];
+              nwr(around:$r,$lat,$lon)["shop"~"supermarket|convenience"];
             );
             out center tags;
         """.trimIndent()

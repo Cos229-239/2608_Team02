@@ -26,6 +26,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -76,38 +77,31 @@ fun NearbyResourceScreen(
         )
     }
     var showUnnamed by remember { mutableStateOf(false) }
+    var selectedRadius by remember {
+        mutableIntStateOf(OverpassResourceRepository.DEFAULT_RADIUS_METERS)
+    }
 
-    fun loadResources(target: OtoLocation, forceRefresh: Boolean = false) {
+    fun loadResources(
+        target: OtoLocation,
+        radiusMeters: Int? = null,
+        forceRefresh: Boolean = false
+    ) {
         scope.launch {
             loading = true
             statusText = if (forceRefresh) "Refreshing resources..." else "Finding resources near you..."
-            val loaded = resourceRepository.getNearby(target, forceRefresh = forceRefresh)
-            location = target
-            result = loaded
-            loading = false
-            statusText = loaded.error ?: if (loaded.fromCache) {
-                "Showing saved results. Connect to refresh."
+            val loaded = if (radiusMeters != null) {
+                resourceRepository.getNearby(target, radiusMeters, forceRefresh = forceRefresh)
             } else {
-                "Showing resources near you."
+                resourceRepository.getNearby(target, forceRefresh = forceRefresh)
             }
-        }
-    }
-
-    fun loadExpanded(target: OtoLocation) {
-        scope.launch {
-            loading = true
-            statusText = "Expanding search..."
-            val loaded = resourceRepository.getNearby(
-                target,
-                OverpassResourceRepository.EXPANDED_RADIUS_METERS
-            )
             location = target
             result = loaded
+            selectedRadius = loaded.radiusMeters
             loading = false
             statusText = loaded.error ?: if (loaded.fromCache) {
                 "Showing saved results. Connect to refresh."
             } else {
-                "Showing expanded results (${formatKm(loaded.radiusMeters)})."
+                "Showing resources within ${formatKm(loaded.radiusMeters)}."
             }
         }
     }
@@ -119,7 +113,7 @@ fun NearbyResourceScreen(
             val current = locationRepository.getCurrentLocation()
             loading = false
             if (current != null) {
-                loadResources(current, forceRefresh)
+                loadResources(current, forceRefresh = forceRefresh)
             } else {
                 statusText = "Location unavailable — check signal and try again"
             }
@@ -233,37 +227,21 @@ fun NearbyResourceScreen(
             val resources = result?.resources ?: emptyList()
             val currentRadius = result?.radiusMeters
 
-            if (currentRadius != null &&
-                currentRadius < OverpassResourceRepository.EXPANDED_RADIUS_METERS
-            ) {
-                Button(
-                    onClick = { location?.let(::loadExpanded) },
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Text(
-                        text = "Expand search to ${formatKm(OverpassResourceRepository.EXPANDED_RADIUS_METERS)}"
-                    )
-                }
-            }
-
-            if (resources.isNotEmpty() &&
-                currentRadius != null &&
-                currentRadius >= OverpassResourceRepository.EXPANDED_RADIUS_METERS
-            ) {
-                Text(
-                    text = "Showing results from an expanded search (${formatKm(currentRadius)})",
-                    style = MaterialTheme.typography.bodySmall
-                )
-            }
-
             if (result != null && result?.error == null && resources.isEmpty()) {
                 Text(
-                    text = "No resources found within range of your location. Use Expand search for wider coverage.",
+                    text = "No resources found within ${formatKm(currentRadius ?: selectedRadius)}. Try a larger radius.",
                     style = MaterialTheme.typography.bodyMedium
                 )
             }
 
             if (resources.isNotEmpty()) {
+                RadiusFilterRow(
+                    selectedRadius = selectedRadius,
+                    onSelectRadius = { radius ->
+                        location?.let { loadResources(it, radiusMeters = radius) }
+                    }
+                )
+
                 FilterRow(
                     activeFilters = activeFilters,
                     showUnnamed = showUnnamed,
@@ -293,6 +271,32 @@ fun NearbyResourceScreen(
                     }
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun RadiusFilterRow(
+    selectedRadius: Int,
+    onSelectRadius: (Int) -> Unit
+) {
+    val radiusOptions = listOf(
+        OverpassResourceRepository.DEFAULT_RADIUS_METERS,
+        OverpassResourceRepository.INTERMEDIATE_RADIUS_METERS,
+        OverpassResourceRepository.EXPANDED_RADIUS_METERS
+    )
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .horizontalScroll(rememberScrollState()),
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        radiusOptions.forEach { radius ->
+            FilterChip(
+                selected = radius == selectedRadius,
+                onClick = { onSelectRadius(radius) },
+                label = { Text(text = formatKm(radius)) }
+            )
         }
     }
 }
