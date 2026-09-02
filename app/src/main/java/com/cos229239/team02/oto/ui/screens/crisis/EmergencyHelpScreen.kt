@@ -45,8 +45,11 @@ import android.net.Uri
 
 @Composable
 fun EmergencyHelpScreen(
-    onBackClick: () -> Unit
-) {
+        //Open OTO's existing Share Status & Location screen.
+        onShareStatusLocationClick: () -> Unit,
+
+        onBackClick: () -> Unit //Return to Crisis Mode.
+    ) {
     //Get the current Android screen/app context so we can check permissions.
     val context = LocalContext.current
 
@@ -256,6 +259,13 @@ fun EmergencyHelpScreen(
                         "Refresh Location"
                     }
                 )
+            }
+            //Reuse the existing Share Status/Location feature for emergency help.//
+            Button(
+                onClick = onShareStatusLocationClick,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text(text = "Share Status & Location")
             }
 
             //Keep Back available as a clearly labeled action in addition to the arrow.

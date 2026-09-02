@@ -69,7 +69,7 @@ fun OtoNavigation() {
 
             entry<OtoRoute.Crisis> {
                 CrisisScreen(
-                    //When Emergency Help is tapped on the Crisis screen,add the Emergency Help destination to the navigation stack.//
+                    //When Emergency Help is tapped on the Crisis screen,add the Emergency Help destination to the navigation stack.
                     onEmergencyHelpClick = {
                         backStack.add(OtoRoute.EmergencyHelp)
                     },
@@ -87,19 +87,21 @@ fun OtoNavigation() {
                     }
                 )
             }
-    //This tells Android what screen to show when the Emergency Help route is added to the navigation stack.//
+            //This tells Android what screen to show for the Emergency Help route.
             entry<OtoRoute.EmergencyHelp> {
-
-                //Open the Emergency Help screen.
                 EmergencyHelpScreen(
 
-                    //When the user taps Back, remove this screen from the navigation stack and return to Crisis Mode.//
+                    //Open the already-existing Share Status & Location screen.
+                    onShareStatusLocationClick = {
+                        backStack.add(OtoRoute.ShareStatusLocation)
+                    },
+
+                    //Remove Emergency Help from the navigation stack and return to Crisis Mode.
                     onBackClick = {
                         backStack.removeLastOrNull()
                     }
                 )
             }
-
 
 
 
