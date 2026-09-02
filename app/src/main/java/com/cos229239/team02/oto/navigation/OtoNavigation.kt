@@ -20,6 +20,9 @@ import com.cos229239.team02.oto.ui.screens.explorer.AreaSafetyRoute
 import com.cos229239.team02.oto.ui.screens.crisis.ShareStatusLocationScreen
 import com.cos229239.team02.oto.ui.screens.home.HomeScreen
 import com.cos229239.team02.oto.ui.screens.explorer.ExplorerScreen
+import com.cos229239.team02.oto.ui.screens.crisis.EmergencyHelpScreen
+
+
 
 @Composable
 fun OtoNavigation() {
@@ -66,6 +69,10 @@ fun OtoNavigation() {
 
             entry<OtoRoute.Crisis> {
                 CrisisScreen(
+                    //When Emergency Help is tapped on the Crisis screen,add the Emergency Help destination to the navigation stack.//
+                    onEmergencyHelpClick = {
+                        backStack.add(OtoRoute.EmergencyHelp)
+                    },
                     onFirstAidSurvivalClick = {
                         backStack.add(OtoRoute.FirstAidSurvival)
                     },
@@ -80,6 +87,22 @@ fun OtoNavigation() {
                     }
                 )
             }
+    //This tells Android what screen to show when the Emergency Help route is added to the navigation stack.//
+            entry<OtoRoute.EmergencyHelp> {
+
+                //Open the Emergency Help screen.
+                EmergencyHelpScreen(
+
+                    //When the user taps Back, remove this screen from the navigation stack and return to Crisis Mode.//
+                    onBackClick = {
+                        backStack.removeLastOrNull()
+                    }
+                )
+            }
+
+
+
+
 
             entry<OtoRoute.ShareStatusLocation> {
                 ShareStatusLocationScreen(
