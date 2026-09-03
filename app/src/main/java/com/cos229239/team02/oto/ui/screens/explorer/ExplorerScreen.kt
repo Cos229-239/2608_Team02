@@ -1,9 +1,25 @@
 package com.cos229239.team02.oto.ui.screens.explorer
 
-
-import android.R
+import android.Manifest
+import android.content.pm.PackageManager
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -16,13 +32,12 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBarsPadding
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Assignment
 import androidx.compose.material.icons.filled.AddCircleOutline
@@ -47,19 +62,35 @@ import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material.icons.filled.WbSunny
 import androidx.compose.material3.Badge
 import androidx.compose.material3.BadgedBox
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
-import androidx.compose.material3.NavigationBarItemColors
 import androidx.compose.material3.NavigationBarItemDefaults
+import androidx.compose.material3.NavigationBarItemColors
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -68,9 +99,18 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.core.content.ContextCompat
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.cos229239.team02.oto.data.location.AndroidLocationRepository
+import com.cos229239.team02.oto.data.location.OtoLocation
+import com.cos229239.team02.oto.ui.features.AreaSafetyView
+import com.cos229239.team02.oto.ui.features.SafetyLevel
 import com.cos229239.team02.oto.ui.theme.OtoBackground
 import com.cos229239.team02.oto.ui.theme.OtoCrisisRed
 import com.cos229239.team02.oto.ui.theme.OtoExplorerGreen
@@ -82,79 +122,169 @@ import com.cos229239.team02.oto.ui.theme.OtoLocationBlue
 import com.cos229239.team02.oto.ui.theme.OtoSurface
 import com.cos229239.team02.oto.ui.theme.OtoWarningAmber
 import com.cos229239.team02.oto.ui.theme.OtoWarningContainer
+import kotlinx.coroutines.launch
+import java.util.Locale
 
 @Composable
 fun ExplorerScreen(
     onAreaSafetyClick: () -> Unit,
+@Composable
+fun ExplorerScreen(
+    onAreaSafetyClick: () -> Unit,
+    onPlanTripClick: () -> Unit,
     onBackClick: () -> Unit,
-    onPlanTripClick: () -> Unit = {},
     onCreateRouteClick: () -> Unit = {},
     onOfflineMapsClick: () -> Unit = {},
     onReportHazardClick: () -> Unit = {},
-    onFieldReportsClick: () -> Unit = {}
-
+    onFieldReportsClick: () -> Unit = {},
+    safetyView: AreaSafetyView = viewModel()
 ) {
-    Scaffold(
-        containerColor = OtoBackground,
-        topBar = {
-            ExplorerHeader(
-                onMenuClick = onBackClick
-            )
-        },
-        bottomBar = {
-            ExplorerBottomBar (
-                onHomeClick = onBackClick,
-                onAlertsClick = onAreaSafetyClick
-            )
-        }
-        ) { paddingValues ->
 
-        LazyColumn(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(paddingValues),
-            contentPadding = PaddingValues(bottom = 20.dp),
-            verticalArrangement = Arrangement.spacedBy(14.dp)
-        ) {
-            item {
-                ExplorerMapPreview()
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+
+    val darkGreen = Color(0xFF063D24)
+    val mediumGreen = Color(0xFF0B5D1E)
+    val lightGreen = Color(0xFFEAF4EC)
+    val lightBackground = Color(0xFFF7F8F6)
+
+    // Uses the same Area Safety ViewModel as the full Area Safety screen.
+    val safetyState by safetyView.uiState.collectAsStateWithLifecycle()
+
+    // Uses the location system already created for Crisis Mode.
+    val locationRepository = remember(context) {
+        AndroidLocationRepository(
+            context.applicationContext
+        )
+    }
+
+    var currentLocation by remember {
+        mutableStateOf<OtoLocation?>(null)
+    }
+
+    var locationStatus by remember {
+        mutableStateOf("Location not loaded")
+    }
+
+    var loadingLocation by remember {
+        mutableStateOf(false)
+    }
+
+    /**
+     * Loads the device's current GPS location.
+     */
+    fun loadCurrentLocation() {
+        scope.launch {
+
+            loadingLocation = true
+            locationStatus = "Finding your location..."
+
+            val location =
+                locationRepository.getCurrentLocation()
+
+            if (location != null) {
+
+                currentLocation = location
+                locationStatus = "Current location found"
+
+            } else {
+
+                locationStatus =
+                    "Unable to determine current location"
             }
 
-            item {
-                QuickActionsRow(
-                    onPlanTripClick = onPlanTripClick,
-                    onCreateRouteClick = onCreateRouteClick,
-                    onOfflineMapsClick = onOfflineMapsClick
-                )
-            }
-
-            item {
-                SafetyOverviewCard(
-                    onAreaSafetyClick = onAreaSafetyClick
-                )
-            }
-
-            item {
-                ReportHazardCard(
-                    onClick = onReportHazardClick
-                )
-            }
-            item {
-                FieldReportsCard(
-                    onClick = onFieldReportsClick
-                    )
-                }
-            }
+            loadingLocation = false
         }
     }
 
-@Composable
-private fun ExplorerHeader(
-    onMenuClick: () -> Unit
-){
-    Surface(
-        color = OtoExplorerGreen,
-        contentColor = Color.White
+    /**
+     * Handles Android's location permission request.
+     */
+    val locationPermissionLauncher =
+        rememberLauncherForActivityResult(
+            contract =
+                ActivityResultContracts.RequestMultiplePermissions()
+        ) { permissions ->
+
+            val granted =
+                permissions[
+                    Manifest.permission.ACCESS_FINE_LOCATION
+                ] == true ||
+                        permissions[
+                            Manifest.permission.ACCESS_COARSE_LOCATION
+                        ] == true
+
+            if (granted) {
+
+                loadCurrentLocation()
+
+            } else {
+
+                locationStatus =
+                    "Location permission denied"
+            }
+        }
+
+    /**
+     * Checks permission before trying to locate the user.
+     */
+    fun requestLocation() {
+
+        val fineGranted =
+            ContextCompat.checkSelfPermission(
+                context,
+                Manifest.permission.ACCESS_FINE_LOCATION
+            ) == PackageManager.PERMISSION_GRANTED
+
+        val coarseGranted =
+            ContextCompat.checkSelfPermission(
+                context,
+                Manifest.permission.ACCESS_COARSE_LOCATION
+            ) == PackageManager.PERMISSION_GRANTED
+
+        if (fineGranted || coarseGranted) {
+
+            loadCurrentLocation()
+
+        } else {
+
+            locationPermissionLauncher.launch(
+                arrayOf(
+                    Manifest.permission.ACCESS_FINE_LOCATION,
+                    Manifest.permission.ACCESS_COARSE_LOCATION
+                )
+            )
+        }
+    }
+
+    /**
+     * If the user already granted location permission elsewhere
+     * in the app, automatically populate Explorer when it opens.
+     */
+    LaunchedEffect(Unit) {
+
+        val fineGranted =
+            ContextCompat.checkSelfPermission(
+                context,
+                Manifest.permission.ACCESS_FINE_LOCATION
+            ) == PackageManager.PERMISSION_GRANTED
+
+        val coarseGranted =
+            ContextCompat.checkSelfPermission(
+                context,
+                Manifest.permission.ACCESS_COARSE_LOCATION
+            ) == PackageManager.PERMISSION_GRANTED
+
+        if (fineGranted || coarseGranted) {
+            loadCurrentLocation()
+        }
+    }
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(lightBackground)
+    ) {
     ) {
         Row(
             modifier = Modifier
@@ -190,545 +320,609 @@ private fun ExplorerHeader(
             }
             Spacer(modifier = Modifier.width(12.dp))
 
-            Column(
-                modifier = Modifier.weight(1f)
-            ) {
-                Text(
-                    text = "EXPLORER MODE",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = Color.White.copy(alpha = 0.82f)
-                )
-            }
-
-            BadgedBox(
-                badge = {
-                    Badge {
-                        Text("2")
-                    }
-                }
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Notifications,
-                    contentDescription = "Notifications",
-                    modifier = Modifier.size(30.dp)
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun ExplorerMapPreview(){
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(310.dp)
-            .background(OtoSurface)
-    ){
-        Canvas(
-            modifier = Modifier.fillMaxSize()
-        ){
-            repeat(7) { index ->
-                val y = size.height * (index + 1) / 8f
-
-                drawLine(
-                    color = Color(0xFFB5C99A),
-                    start = androidx.compose.ui.geometry.Offset(0f, y),
-                    end = androidx.compose.ui.geometry.Offset(
-                        size.width,
-                        y - 35f
-                    ),
-                    strokeWidth = 2f
-                )
-            }
-
-            val routePath = Path().apply {
-                moveTo(
-                    size.width * 0.15f,
-                    size.height * 0.90f
-                )
-
-                cubicTo(
-                    size.width * 0.55f,
-                    size.height * 0.72f,
-                    size.width * 0.42f,
-                    size.height * 0.64f,
-                    size.width * 0.48f,
-                    size.height * 0.48f
-                )
-
-                cubicTo(
-                    size.width * 0.55f,
-                    size.height * 0.28f,
-                    size.width * 0.67f,
-                    size.height * 0.24f,
-                    size.width * 0.72f,
-                    size.height * 0.06f
-                )
-            }
-
-            drawPath(
-                path = routePath,
-                color = OtoExplorerGreen,
-                style = Stroke(
-                    width = 9f,
-                    cap = StrokeCap.Round
-                )
-            )
-
-            val userPosition = androidx.compose.ui.geometry.Offset(
-                size.width * 0.45f,
-                size.height * 0.61f
-            )
-            drawCircle(
-                color = Color(0x552197F3),
-                radius = 42f,
-                center = userPosition
-            )
-            drawCircle(
-                color = Color.White,
-                radius = 21f,
-                center = userPosition
-            )
-        }
-
-        TrailInformationCard(
-            modifier = Modifier
-                .align(Alignment.TopStart)
-                .padding(16.dp)
-        )
+        /*
+         * ---------------------------------------------------------
+         * EXPLORER HEADER
+         * ---------------------------------------------------------
+         */
 
         Column(
             modifier = Modifier
-                .align(Alignment.TopEnd)
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp)
-        ){
-            MapControlButton(
-                icon = Icons.Default.Explore,
-                description = "Compass"
-            )
-
-            MapControlButton(
-                icon = Icons.Default.Layers,
-                description = "Map layers"
-            )
-
-            MapControlButton(
-                icon = Icons.Default.MyLocation,
-                description = "Current location"
-            )
-        }
-            Surface(
-                modifier = Modifier
-                    .align(Alignment.TopCenter)
-                    .padding(top = 38.dp),
-                color = OtoExplorerGreen,
-                shape = CircleShape
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Terrain,
-                    contentDescription = "TrailHead",
-                    tint = Color.White,
-                    modifier = Modifier.padding(9.dp)
+                .fillMaxWidth()
+                .background(darkGreen)
+                .statusBarsPadding()
+                .padding(
+                    horizontal = 18.dp,
+                    vertical = 14.dp
                 )
-            }
-        }
-}
-@Composable
-private fun TrailInformationCard(
-    modifier: Modifier = Modifier
-){
-    Surface(
-        modifier = modifier,
-        color = OtoExplorerGreen.copy(alpha = 0.96f),
-        contentColor = Color.White,
-        shape = RoundedCornerShape(16.dp),
-        shadowElevation = 6.dp
-    ) {
-        Column(
-            modifier = Modifier.padding(14.dp)
         ) {
+
             Row(
+                modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically
-            ){
-                Icon(
-                    imageVector = Icons.Default.LocationOn,
-                    contentDescription = null
-                )
+            ) {
 
-                Spacer(modifier = Modifier.width(8.dp))
-
-                Column{
+                TextButton(
+                    onClick = onBackClick
+                ) {
                     Text(
-                        text = "Pine Ridge Tail",
+                        text = "←",
+                        color = Color.White,
+                        fontSize = 26.sp
+                    )
+                }
+
+                Column(
+                    modifier = Modifier.weight(1f)
+                ) {
+
+                    Text(
+                        text = "EXPLORER MODE",
+                        color = Color.White,
+                        fontSize = 24.sp,
                         fontWeight = FontWeight.Bold
                     )
 
                     Text(
-                        text = "Sequoia National Park",
-                        style = MaterialTheme.typography.bodySmall
+                        text = "Plan • Navigate • Report • Stay Safe",
+                        color = Color.White,
+                        fontSize = 14.sp
                     )
-
                 }
+
+                Text(
+                    text = "🔔",
+                    fontSize = 24.sp
+                )
             }
-
-            Spacer(modifier = Modifier.height(12.dp))
-
-            Text(
-                text = "Elevation: 6,240 ft",
-                style = MaterialTheme.typography.bodySmall
-            )
-
-            Text(
-                text = "* 72F Sunny",
-                style = MaterialTheme.typography.bodyMedium
-            )
-        }
-    }
-}
-@Composable
-private fun MapControlButton(
-    icon: ImageVector,
-    description: String
-){
-    Surface(
-        modifier = Modifier.size(32.dp),
-        shape = CircleShape,
-        color = Color.White,
-        shadowElevation = 6.dp
-    ) {
-        IconButton(
-            onClick = { }
-        ) {
-            Icon(
-                imageVector = icon,
-                contentDescription = description,
-                tint = OtoExplorerGreenDark
-            )
-        }
-    }
-}
-
-@Composable
-private fun QuickActionsRow(
-    onPlanTripClick: () -> Unit,
-    onCreateRouteClick: () -> Unit,
-    onOfflineMapsClick: () -> Unit
-){
-    LazyRow(
-        contentPadding = PaddingValues(horizontal = 16.dp),
-        horizontalArrangement = Arrangement.spacedBy(12.dp)
-    ) {
-        item {
-            ExplorerActionCard(
-                icon = Icons.Default.Map,
-                title = "PLAN TRIP",
-                description = "Plan or edit an existing trip",
-                onClick = onPlanTripClick
-            )
         }
 
-        item {
-            ExplorerActionCard(
-                icon = Icons.Default.AddCircleOutline,
-                title = "CREATE NEW ROUTE",
-                description = "Build a custom route",
-                onClick = onCreateRouteClick
-            )
-        }
-        item {
-            ExplorerActionCard(
-                icon = Icons.Default.Download,
-                title = "OFFLINE MAPS",
-                description = "Download maps for offline use",
-                onClick = onOfflineMapsClick
-            )
-        }
-    }
-}
+        /*
+         * ---------------------------------------------------------
+         * SCROLLABLE DASHBOARD
+         * ---------------------------------------------------------
+         */
 
-@Composable
-private fun ExplorerActionCard(
-    icon: ImageVector,
-    title: String,
-    description: String,
-    onClick: () -> Unit
-){
-    Card(
-        modifier = Modifier
-            .width(155.dp)
-            .height(180.dp)
-            .clickable(onClick = onClick),
-        colors = CardDefaults.cardColors(
-            containerColor = Color.White
-        ),
-        elevation = CardDefaults.cardElevation(
-            defaultElevation = 3.dp
-        )
-    ){
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(14.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center
+                .verticalScroll(
+                    rememberScrollState()
+                )
         ) {
-            Icon(
-                imageVector = icon,
-                contentDescription = null,
-                tint = OtoExplorerGreenDark,
-                modifier = Modifier.size(42.dp)
 
+            /*
+             * -----------------------------------------------------
+             * MAP AREA
+             * -----------------------------------------------------
+             *
+             * This will later be replaced by the actual interactive
+             * map component.
+             */
+
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(280.dp)
+                    .background(lightGreen)
+                    .padding(18.dp)
+            ) {
+
+                Column(
+                    modifier = Modifier
+                        .align(
+                            Alignment.Center
+                        ),
+                    horizontalAlignment =
+                        Alignment.CenterHorizontally
+                ) {
+
+                    Text(
+                        text = "🗺️",
+                        fontSize = 48.sp
+                    )
+
+                    Spacer(
+                        modifier =
+                            Modifier.height(8.dp)
+                    )
+
+                    Text(
+                        text = "Explorer Map",
+                        fontSize = 22.sp,
+                        fontWeight =
+                            FontWeight.Bold,
+                        color = darkGreen
+                    )
+
+                    Spacer(
+                        modifier =
+                            Modifier.height(8.dp)
+                    )
+
+                    if (loadingLocation) {
+
+                        CircularProgressIndicator()
+
+                    } else {
+
+                        currentLocation?.let { location ->
+
+                            Text(
+                                text =
+                                    formatExplorerLocation(
+                                        location
+                                    ),
+                                textAlign =
+                                    TextAlign.Center,
+                                color = darkGreen
+                            )
+
+                        } ?: Text(
+                            text = locationStatus,
+                            textAlign =
+                                TextAlign.Center
+                        )
+                    }
+
+                    Spacer(
+                        modifier =
+                            Modifier.height(12.dp)
+                    )
+
+                    Button(
+                        onClick = {
+                            requestLocation()
+                        },
+                        colors =
+                            ButtonDefaults.buttonColors(
+                                containerColor =
+                                    mediumGreen
+                            )
+                    ) {
+
+                        Text(
+                            text =
+                                "📍 Locate Me"
+                        )
+                    }
+                }
+            }
+
+            Column(
+                modifier = Modifier
+                    .padding(16.dp)
+            ) {
+
+                /*
+                 * -------------------------------------------------
+                 * QUICK ACTION CARDS
+                 * -------------------------------------------------
+                 */
+
+                Row(
+                    modifier =
+                        Modifier.fillMaxWidth(),
+                    horizontalArrangement =
+                        Arrangement.spacedBy(
+                            10.dp
+                        )
+                ) {
+
+                    ExplorerActionCard(
+                        title = "PLAN TRIP",
+                        description =
+                            "Plan or edit a trip",
+                        icon = "📍",
+                        modifier =
+                            Modifier.weight(1f),
+                        onClick =
+                            onPlanTripClick
+                    )
+
+                    ExplorerActionCard(
+                        title =
+                            "CREATE ROUTE",
+                        description =
+                            "Build a custom route",
+                        icon = "➕",
+                        modifier =
+                            Modifier.weight(1f),
+                        onClick = {
+                            // Future feature.
+                        }
+                    )
+
+                    ExplorerActionCard(
+                        title =
+                            "OFFLINE MAPS",
+                        description =
+                            "Save maps offline",
+                        icon = "⬇️",
+                        modifier =
+                            Modifier.weight(1f),
+                        onClick = {
+                            // Future feature.
+                        }
+                    )
+                }
+
+                Spacer(
+                    modifier =
+                        Modifier.height(16.dp)
+                )
+
+                /*
+                 * -------------------------------------------------
+                 * LIVE SAFETY OVERVIEW
+                 * -------------------------------------------------
+                 */
+                )
+            }
+        }
+    }
+}
+
+/**
+ * Small action card used for Plan Trip,
+ * Create Route and Offline Maps.
+ */
+@Composable
+private fun ExplorerActionCard(
+    title: String,
+    description: String,
+    icon: String,
+    modifier: Modifier,
+    onClick: () -> Unit
+) {
+
+    val darkGreen =
+        Color(0xFF063D24)
+
+    Card(
+        modifier = modifier
+            .height(150.dp)
+            .clickable {
+                onClick()
+            },
+        colors =
+            CardDefaults.cardColors(
+                containerColor =
+                    Color.White
+            ),
+        shape =
+            RoundedCornerShape(
+                14.dp
+            )
+    ) {
+
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(12.dp),
+            horizontalAlignment =
+                Alignment.CenterHorizontally,
+            verticalArrangement =
+                Arrangement.Center
+        ) {
+
+            Text(
+                text = icon,
+                fontSize = 30.sp
             )
 
-            Spacer(modifier = Modifier.height(10.dp))
+            Spacer(
+                modifier =
+                    Modifier.height(6.dp)
+            )
 
             Text(
                 text = title,
-                color = OtoExplorerGreenDark,
-                fontWeight = FontWeight.Bold,
-                textAlign = TextAlign.Center
+                color = darkGreen,
+                fontWeight =
+                    FontWeight.Bold,
+                fontSize = 14.sp,
+                textAlign =
+                    TextAlign.Center
             )
 
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(
+                modifier =
+                    Modifier.height(4.dp)
+            )
 
             Text(
                 text = description,
-                style = MaterialTheme.typography.bodySmall,
-                textAlign = TextAlign.Center
+                style =
+                    MaterialTheme
+                        .typography
+                        .bodySmall,
+                textAlign =
+                    TextAlign.Center
+            )
+        }
+    }
+}
             )
         }
     }
 }
 
+/**
+ * Displays live information from AreaSafetyView.
+ */
 @Composable
 private fun SafetyOverviewCard(
-    onAreaSafetyClick: () -> Unit
-){
+    areaName: String,
+    alertCount: Int,
+    severeCount: Int,
+    moderateCount: Int,
+    isLoading: Boolean,
+    isOffline: Boolean,
+    isSample: Boolean,
+    onClick: () -> Unit
+) {
+
+    val darkGreen =
+        Color(0xFF063D24)
+
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = Color.White
-        ),
-        elevation = CardDefaults.cardElevation(
-            defaultElevation = 3.dp
-        )
+            .clickable {
+                onClick()
+            },
+        colors =
+            CardDefaults.cardColors(
+                containerColor =
+                    Color.White
+            ),
+        shape =
+            RoundedCornerShape(
+                14.dp
+            )
     ) {
+
         Column(
-            modifier = Modifier.padding(16.dp)
+            modifier =
+                Modifier.padding(18.dp)
         ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable(onClick = onAreaSafetyClick),
-                verticalAlignment = Alignment.CenterVertically
-            ){
-                Icon(
-                    imageVector = Icons.Default.Shield,
-                    contentDescription = null,
-                    tint = OtoExplorerGreenDark,
-                    modifier = Modifier.size(30.dp)
-                )
 
-                Spacer(modifier = Modifier.width(10.dp))
+            Row(
+                modifier =
+                    Modifier.fillMaxWidth(),
+                horizontalArrangement =
+                    Arrangement.SpaceBetween,
+                verticalAlignment =
+                    Alignment.CenterVertically
+            ) {
 
                 Text(
-                    text = "SAFETY OVERVIEW",
-                    color = OtoExplorerGreenDark,
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier.weight(1f)
+                    text =
+                        "🛡️  SAFETY OVERVIEW",
+                    color = darkGreen,
+                    fontSize = 18.sp,
+                    fontWeight =
+                        FontWeight.Bold
                 )
 
+                Text(
+                    text =
+                        "View Area Safety ›",
+                    color = darkGreen,
+                    fontWeight =
+                        FontWeight.Bold
+                )
             }
 
-            Spacer(modifier = Modifier.height(18.dp))
+            Spacer(
+                modifier =
+                    Modifier.height(12.dp)
+            )
 
-            Row(
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                SafetyMetric(
-                    modifier = Modifier.weight(1f),
-                    title = "WEATHER",
-                    icon = Icons.Default.WbSunny,
-                    iconColor = Color(0xFFFFB000),
-                    mainValue = "72F",
-                    detail = "Sunny\n0% rain"
+            Text(
+                text = areaName,
+                fontWeight =
+                    FontWeight.Bold
+            )
+
+            Spacer(
+                modifier =
+                    Modifier.height(12.dp)
+            )
+
+            if (isLoading) {
+
+                CircularProgressIndicator()
+
+            } else {
+
+                Row(
+                    modifier =
+                        Modifier.fillMaxWidth(),
+                    horizontalArrangement =
+                        Arrangement.SpaceEvenly
+                ) {
+
+                    SafetyStat(
+                        value =
+                            alertCount.toString(),
+                        label =
+                            "Active Alerts"
+                    )
+
+                    SafetyStat(
+                        value =
+                            severeCount.toString(),
+                        label =
+                            "Severe"
+                    )
+
+                    SafetyStat(
+                        value =
+                            moderateCount.toString(),
+                        label =
+                            "Moderate"
+                    )
+                }
+            }
+
+            if (isOffline) {
+
+                Spacer(
+                    modifier =
+                        Modifier.height(
+                            12.dp
+                        )
                 )
 
-                SafetyMetric(
-                    modifier = Modifier.weight(1f),
-                    title = "HAZARDS",
-                    icon = Icons.Default.Warning,
-                    iconColor = OtoWarningAmber,
-                    mainValue = "2",
-                    detail = "Reported\nnearby"
+                Text(
+                    text =
+                        "⚠ Offline — showing saved safety information",
+                    color =
+                        MaterialTheme
+                            .colorScheme
+                            .error,
+                    fontWeight =
+                        FontWeight.Bold
+                )
+            }
+
+            if (isSample) {
+
+                Spacer(
+                    modifier =
+                        Modifier.height(
+                            8.dp
+                        )
                 )
 
-                SafetyMetric(
-                    modifier = Modifier.weight(1f),
-                    title = "CLOSURES",
-                    icon = Icons.Default.Block,
-                    iconColor = OtoCrisisRed,
-                    mainValue = "1",
-                    detail = "Trail closure\nnearby"
+                Text(
+                    text =
+                        "Sample safety data",
+                    style =
+                        MaterialTheme
+                            .typography
+                            .bodySmall
                 )
-
-                SafetyMetric(
-                    modifier = Modifier.weight(1f),
-                    title = "AIR QUALITY",
-                    icon = Icons.Default.Eco,
-                    iconColor = Color(0xFF67A832),
-                    mainValue = "Good",
-                    detail = "AQI 28"
+            }
+        }
+    }
+}
                 )
             }
         }
     }
 }
 
+/**
+ * One statistic inside Safety Overview.
+ */
 @Composable
-private fun SafetyMetric(
-    modifier: Modifier,
-    title: String,
-    icon: ImageVector,
-    iconColor: Color,
-    mainValue: String,
-    detail: String
-){
+private fun SafetyStat(
+    value: String,
+    label: String
+) {
+
     Column(
-        modifier = modifier.padding(horizontal = 4.dp),
-        horizontalAlignment = Alignment.CenterHorizontally
-    ){
+        horizontalAlignment =
+            Alignment.CenterHorizontally
+    ) {
+
         Text(
-            text = title,
-            style = MaterialTheme.typography.labelSmall,
-            textAlign = TextAlign.Center
-        )
-
-        Spacer(modifier = Modifier.height(8.dp))
-
-        Icon(
-            imageVector = icon,
-            contentDescription = null,
-            tint = iconColor,
-            modifier = Modifier.size(32.dp)
+            text = value,
+            fontSize = 26.sp,
+            fontWeight =
+                FontWeight.Bold
         )
 
         Text(
-            text = mainValue,
-            fontWeight = FontWeight.Bold,
-            textAlign = TextAlign.Center
+            text = label,
+            style =
+                MaterialTheme
+                    .typography
+                    .bodySmall,
+            textAlign =
+                TextAlign.Center
         )
-
-        Text(
-            text = detail,
-            style = MaterialTheme.typography.bodySmall,
-            textAlign = TextAlign.Center
+    }
+}
         )
     }
 }
 
+/**
+ * Large full-width dashboard action.
+ */
 @Composable
-private fun ReportHazardCard(
+private fun DashboardWideCard(
+    title: String,
+    subtitle: String,
     onClick: () -> Unit
-){
+) {
+
+    val darkGreen =
+        Color(0xFF063D24)
+
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp)
-            .clickable(onClick = onClick),
-        colors = CardDefaults.cardColors(
-            containerColor = OtoWarningContainer
-        )
-    ) {
-        Row(
-            modifier = Modifier.padding(18.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ){
-            Icon(
-                imageVector = Icons.Default.Warning,
-                contentDescription = null,
-                tint = Color(0xFF6F4300),
-                modifier = Modifier.size(42.dp)
+            .clickable {
+                onClick()
+            },
+        colors =
+            CardDefaults.cardColors(
+                containerColor =
+                    Color.White
+            ),
+        shape =
+            RoundedCornerShape(
+                14.dp
             )
+    ) {
 
-            Spacer(modifier = Modifier.width(16.dp))
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(18.dp),
+            verticalAlignment =
+                Alignment.CenterVertically
+        ) {
 
             Column(
-                modifier = Modifier.weight(1f)
-            ){
+                modifier =
+                    Modifier.weight(1f)
+            ) {
+
                 Text(
-                    text = "REPORT HAZARD / ROUTE CHANGE",
-                    color = OtoExplorerGreenDark,
-                    fontWeight = FontWeight.Bold
+                    text = title,
+                    color = darkGreen,
+                    fontWeight =
+                        FontWeight.Bold,
+                    fontSize = 17.sp
+                )
+
+                Spacer(
+                    modifier =
+                        Modifier.height(4.dp)
                 )
 
                 Text(
-                    text = "Help keep the trails safe for everyone",
-                    style = MaterialTheme.typography.bodySmall
+                    text = subtitle
                 )
             }
-
-            Text(
-                text = ">",
-                color = OtoExplorerGreenDark,
-                style = MaterialTheme.typography.headlineMedium
-            )
         }
     }
 }
-
-@Composable
-private fun FieldReportsCard(
-    onClick: () -> Unit
-){
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp)
-            .clickable(onClick = onClick),
-        colors = CardDefaults.cardColors(
-            containerColor = Color.White
-        ),
-        elevation = CardDefaults.cardElevation(
-            defaultElevation = 3.dp
-        )
-    ) {
-        Row(
-            modifier = Modifier.padding(18.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ){
-            Icon(
-                imageVector = Icons.AutoMirrored.Filled.Assignment,
-                contentDescription = null,
-                tint = OtoExplorerGreenDark,
-                modifier = Modifier.size(40.dp)
-            )
-
-            Spacer(modifier = Modifier.width(16.dp))
-
-            Column(
-                modifier = Modifier.weight(1f)
-            ) {
-                Text(
-                    text = "FIELD REPORTS",
-                    color = OtoExplorerGreenDark,
-                    fontWeight = FontWeight.Bold
-                )
-
-                Text(
-                    text = "Recent Reports in the Area",
-                    style = MaterialTheme.typography.bodySmall
                 )
             }
 
             Text(
-                text = ">",
-                color = OtoExplorerGreenDark,
-                style = MaterialTheme.typography.headlineMedium
+                Text(
+                text = "›",
+                fontSize = 28.sp,
+                color = darkGreen
+            )
             )
         }
     }
@@ -822,67 +1016,25 @@ private fun explorerNavigationColors() =
 
     )
 
-//        modifier = Modifier
-//            .fillMaxSize()
-//            .padding(24.dp),
-//        verticalArrangement = Arrangement.Center,
-//        horizontalAlignment = Alignment.CenterHorizontally
-//    ) {
-//
-//        Text(text = "Explorer Mode")
-//
-//        Spacer(modifier = Modifier.height(24.dp))
-//
-//        Button(
-//            onClick = { },
-//            modifier = Modifier.fillMaxWidth()
-//        ) {
-//            Text(text = "Plan Trip")
-//        }
-//
-//        Spacer(modifier = Modifier.height(12.dp))
-//
-//        Button(
-//            onClick = { },
-//            modifier = Modifier.fillMaxWidth()
-//        ) {
-//            Text(text = "Create New Route")
-//        }
-//
-//        Spacer(modifier = Modifier.height(12.dp))
-//
-//        Button(
-//            onClick = { },
-//            modifier = Modifier.fillMaxWidth()
-//        ) {
-//            Text(text = "Offline Maps")
-//        }
-//
-//        Spacer(modifier = Modifier.height(12.dp))
-//
-//        Button(
-//            onClick = onAreaSafetyClick,
-//            modifier = Modifier.fillMaxWidth()
-//        ) {
-//            Text(text = "Area Safety")
-//        }
-//
-//        Spacer(modifier = Modifier.height(12.dp))
-//
-//        Button(
-//            onClick = { },
-//            modifier = Modifier.fillMaxWidth()
-//        ) {
-//            Text(text = "Report Hazard")
-//        }
-//
-//        Spacer(modifier = Modifier.height(24.dp))
-//
-//        Button(
-//            onClick = onBackClick,
-//            modifier = Modifier.fillMaxWidth()
-//        ) {
-//            Text(text = "Back")
-//        }
-//    }
-//}
+/**
+ * Formats the GPS coordinates shown in
+ * the Explorer map placeholder.
+ */
+private fun formatExplorerLocation(
+    location: OtoLocation
+): String {
+
+    return "Latitude: ${
+        String.format(
+            Locale.US,
+            "%.5f",
+            location.latitude
+        )
+    }\nLongitude: ${
+        String.format(
+            Locale.US,
+            "%.5f",
+            location.longitude
+        )
+    }"
+}
