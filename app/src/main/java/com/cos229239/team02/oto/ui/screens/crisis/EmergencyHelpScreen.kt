@@ -170,7 +170,8 @@ fun EmergencyHelpScreen(
             ) {
                 //Use a text button so Back has a larger and clearer touch target.
                 TextButton(
-                    onClick = onBackClick
+                    onClick = onBackClick,
+                    modifier = Modifier.heightIn(min = 48.dp)
                 ) {
                     Text(text = "← Back")
                 }
@@ -202,6 +203,7 @@ fun EmergencyHelpScreen(
                 text = "If you have service, contact emergency services first. Your location can help you communicate where you are.",
                 style = MaterialTheme.typography.bodyMedium
             )
+            //Give user a clear emergency-services action without placing a call automatically.
             //Give user a clear emergency-services action without placing a call automatically.
             Button(
                 onClick = ::openEmergencyDialer,
@@ -253,7 +255,9 @@ fun EmergencyHelpScreen(
             //The first tap gets location. Later taps refresh the same information.
             Button(
                 onClick = ::requestLocation,
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = 48.dp)
             ) {
                 Text(
                     text = if (location == null) {
@@ -266,15 +270,18 @@ fun EmergencyHelpScreen(
             //Reuse the existing Share Status/Location feature for emergency help.//
             Button(
                 onClick = onShareStatusLocationClick,
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = 48.dp)
             ) {
                 Text(text = "Share Status & Location")
             }
-
             //Keep Back available as a clearly labeled action in addition to the arrow.
             Button(
                 onClick = onBackClick,
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = 48.dp)
             ) {
                 Text(text = "Back")
             }
