@@ -1,9 +1,11 @@
 package com.cos229239.team02.oto.navigation
 
 import androidx.compose.runtime.Composable
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation3.runtime.entryProvider
 import androidx.navigation3.runtime.rememberNavBackStack
 import androidx.navigation3.ui.NavDisplay
+import com.cos229239.team02.oto.ui.features.PlanTripViewModel
 import com.cos229239.team02.oto.ui.screens.crisis.CrisisScreen
 import com.cos229239.team02.oto.ui.screens.crisis.FirstAidSurvivalScreen
 import com.cos229239.team02.oto.ui.screens.crisis.NearbyResourceScreen
@@ -15,109 +17,171 @@ import com.cos229239.team02.oto.ui.screens.home.HomeScreen
 
 @Composable
 fun OtoNavigation() {
-    val backStack = rememberNavBackStack(OtoRoute.Home)
+
+    val backStack =
+        rememberNavBackStack(
+            OtoRoute.Home
+        )
+
+    // Shared Plan Trip ViewModel.
+    // This keeps trip data available while navigating
+    // and reloads the saved trip from local storage.
+    val planTripViewModel:
+            PlanTripViewModel =
+        viewModel()
 
     NavDisplay(
         backStack = backStack,
+
         onBack = {
             if (backStack.size > 1) {
                 backStack.removeLastOrNull()
             }
         },
-        entryProvider = entryProvider {
 
-            // Home screen
-            entry<OtoRoute.Home> {
-                HomeScreen(
-                    onExplorerClick = {
-                        backStack.add(OtoRoute.Explorer)
-                    },
-                    onCrisisClick = {
-                        backStack.add(OtoRoute.Crisis)
-                    }
-                )
-            }
+        entryProvider =
+            entryProvider {
 
-            // Explorer main screen
-            entry<OtoRoute.Explorer> {
-                ExplorerScreen(
-                    onAreaSafetyClick = {
-                        backStack.add(OtoRoute.AreaSafety)
-                    },
-                    onPlanTripClick = {
-                        backStack.add(OtoRoute.PlanTrip)
-                    },
-                    onBackClick = {
-                        backStack.removeLastOrNull()
-                    }
-                )
-            }
+                /*
+                 * HOME
+                 */
+                entry<OtoRoute.Home> {
 
-            // Plan Trip screen
-            entry<OtoRoute.PlanTrip> {
-                PlanTripScreen(
-                    onBackClick = {
-                        backStack.removeLastOrNull()
-                    },
-                    onSaveClick = {
-                        backStack.removeLastOrNull()
-                    }
-                )
-            }
+                    HomeScreen(
+                        onExplorerClick = {
+                            backStack.add(
+                                OtoRoute.Explorer
+                            )
+                        },
 
-            // Area Safety screen
-            entry<OtoRoute.AreaSafety> {
-                AreaSafetyRoute(
-                    onBackClick = {
-                        backStack.removeLastOrNull()
-                    }
-                )
-            }
+                        onCrisisClick = {
+                            backStack.add(
+                                OtoRoute.Crisis
+                            )
+                        }
+                    )
+                }
 
-            // Crisis main screen
-            entry<OtoRoute.Crisis> {
-                CrisisScreen(
-                    onFirstAidSurvivalClick = {
-                        backStack.add(OtoRoute.FirstAidSurvival)
-                    },
-                    onShareStatusLocationClick = {
-                        backStack.add(OtoRoute.ShareStatusLocation)
-                    },
-                    onNearbyResourcesClick = {
-                        backStack.add(OtoRoute.NearbyResources)
-                    },
-                    onBackClick = {
-                        backStack.removeLastOrNull()
-                    }
-                )
-            }
+                /*
+                 * EXPLORER
+                 */
+                entry<OtoRoute.Explorer> {
 
-            // Crisis - Share Status & Location
-            entry<OtoRoute.ShareStatusLocation> {
-                ShareStatusLocationScreen(
-                    onBackClick = {
-                        backStack.removeLastOrNull()
-                    }
-                )
-            }
+                    ExplorerScreen(
+                        onAreaSafetyClick = {
+                            backStack.add(
+                                OtoRoute.AreaSafety
+                            )
+                        },
 
-            // Crisis - First Aid & Survival
-            entry<OtoRoute.FirstAidSurvival> {
-                FirstAidSurvivalScreen(
-                    onBackClick = {
-                        backStack.removeLastOrNull()
-                    }
-                )
-            }
+                        onPlanTripClick = {
+                            backStack.add(
+                                OtoRoute.PlanTrip
+                            )
+                        },
 
-            // Crisis - Nearby Resources
-            entry<OtoRoute.NearbyResources> {
-                NearbyResourceScreen(
-                    onBackClick = {
-                        backStack.removeLastOrNull()
-                    }
-                )
+                        onBackClick = {
+                            backStack.removeLastOrNull()
+                        }
+                    )
+                }
+
+                /*
+                 * PLAN TRIP
+                 */
+                entry<OtoRoute.PlanTrip> {
+
+                    PlanTripScreen(
+                        onBackClick = {
+                            backStack.removeLastOrNull()
+                        },
+
+                        onSaveClick = {
+                            backStack.removeLastOrNull()
+                        },
+
+                        tripViewModel =
+                            planTripViewModel
+                    )
+                }
+
+                /*
+                 * AREA SAFETY
+                 */
+                entry<OtoRoute.AreaSafety> {
+
+                    AreaSafetyRoute(
+                        onBackClick = {
+                            backStack.removeLastOrNull()
+                        }
+                    )
+                }
+
+                /*
+                 * CRISIS MODE
+                 */
+                entry<OtoRoute.Crisis> {
+
+                    CrisisScreen(
+                        onFirstAidSurvivalClick = {
+                            backStack.add(
+                                OtoRoute.FirstAidSurvival
+                            )
+                        },
+
+                        onShareStatusLocationClick = {
+                            backStack.add(
+                                OtoRoute.ShareStatusLocation
+                            )
+                        },
+
+                        onNearbyResourcesClick = {
+                            backStack.add(
+                                OtoRoute.NearbyResources
+                            )
+                        },
+
+                        onBackClick = {
+                            backStack.removeLastOrNull()
+                        }
+                    )
+                }
+
+                /*
+                 * CRISIS - SHARE STATUS / LOCATION
+                 */
+                entry<OtoRoute.ShareStatusLocation> {
+
+                    ShareStatusLocationScreen(
+                        onBackClick = {
+                            backStack.removeLastOrNull()
+                        }
+                    )
+                }
+
+                /*
+                 * CRISIS - FIRST AID / SURVIVAL
+                 */
+                entry<OtoRoute.FirstAidSurvival> {
+
+                    FirstAidSurvivalScreen(
+                        onBackClick = {
+                            backStack.removeLastOrNull()
+                        }
+                    )
+                }
+
+                /*
+                 * CRISIS - NEARBY RESOURCES
+                 */
+                entry<OtoRoute.NearbyResources> {
+
+                    NearbyResourceScreen(
+                        onBackClick = {
+                            backStack.removeLastOrNull()
+                        }
+                    )
+                }
             }
-        }
     )
 }
