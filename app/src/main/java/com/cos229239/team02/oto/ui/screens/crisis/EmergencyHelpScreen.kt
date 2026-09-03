@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.heightIn
 
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -204,7 +205,9 @@ fun EmergencyHelpScreen(
             //Give user a clear emergency-services action without placing a call automatically.
             Button(
                 onClick = ::openEmergencyDialer,
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = 56.dp)
             ) {
                 Text(text = "Call 911")
             }
