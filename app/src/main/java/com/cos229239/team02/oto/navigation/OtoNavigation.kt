@@ -7,6 +7,7 @@ import androidx.navigation3.runtime.rememberNavBackStack
 import androidx.navigation3.ui.NavDisplay
 import com.cos229239.team02.oto.ui.features.PlanTripViewModel
 import com.cos229239.team02.oto.ui.screens.crisis.CrisisScreen
+import com.cos229239.team02.oto.ui.screens.crisis.EmergencyHelpScreen
 import com.cos229239.team02.oto.ui.screens.crisis.FirstAidSurvivalScreen
 import com.cos229239.team02.oto.ui.screens.crisis.NearbyResourceScreen
 import com.cos229239.team02.oto.ui.screens.crisis.ShareStatusLocationScreen
@@ -27,7 +28,7 @@ fun OtoNavigation() {
     // This keeps trip data available while navigating
     // and reloads the saved trip from local storage.
     val planTripViewModel:
-            PlanTripViewModel =
+        PlanTripViewModel =
         viewModel()
 
     NavDisplay(
@@ -123,6 +124,12 @@ fun OtoNavigation() {
                 entry<OtoRoute.Crisis> {
 
                     CrisisScreen(
+                        onEmergencyHelpClick = {
+                            backStack.add(
+                                OtoRoute.EmergencyHelp
+                            )
+                        },
+
                         onFirstAidSurvivalClick = {
                             backStack.add(
                                 OtoRoute.FirstAidSurvival
@@ -138,6 +145,24 @@ fun OtoNavigation() {
                         onNearbyResourcesClick = {
                             backStack.add(
                                 OtoRoute.NearbyResources
+                            )
+                        },
+
+                        onBackClick = {
+                            backStack.removeLastOrNull()
+                        }
+                    )
+                }
+
+                /*
+                 * CRISIS - EMERGENCY HELP
+                 */
+                entry<OtoRoute.EmergencyHelp> {
+
+                    EmergencyHelpScreen(
+                        onShareStatusLocationClick = {
+                            backStack.add(
+                                OtoRoute.ShareStatusLocation
                             )
                         },
 

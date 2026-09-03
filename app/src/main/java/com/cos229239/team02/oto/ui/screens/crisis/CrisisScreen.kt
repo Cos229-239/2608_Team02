@@ -15,6 +15,7 @@ import androidx.compose.ui.unit.dp
 
 @Composable
 fun CrisisScreen(
+    onEmergencyHelpClick: () -> Unit,
     onFirstAidSurvivalClick: () -> Unit,
     onShareStatusLocationClick: () -> Unit,
     onNearbyResourcesClick: () -> Unit,
@@ -30,6 +31,12 @@ fun CrisisScreen(
         Text(text = "Crisis Mode")
 
         Spacer(modifier = Modifier.height(24.dp))
+
+        Button(onClick = onEmergencyHelpClick) {
+            Text(text = "Emergency Help")
+        }
+
+        Spacer(modifier = Modifier.height(12.dp))
 
         Button(onClick = onFirstAidSurvivalClick) {
             Text(text = "First Aid & Survival")
