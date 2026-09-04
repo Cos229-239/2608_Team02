@@ -49,6 +49,9 @@ import com.cos229239.team02.oto.data.location.AndroidLocationRepository
 import com.cos229239.team02.oto.data.location.OtoLocation
 import com.cos229239.team02.oto.ui.features.AreaSafetyView
 import com.cos229239.team02.oto.ui.features.SafetyLevel
+//Use OTO's shared MapLibre map component.
+import com.cos229239.team02.oto.ui.components.map.OtoMap
+
 import kotlinx.coroutines.launch
 import java.util.Locale
 
@@ -65,7 +68,6 @@ fun ExplorerScreen(
 
     val darkGreen = Color(0xFF063D24)
     val mediumGreen = Color(0xFF0B5D1E)
-    val lightGreen = Color(0xFFEAF4EC)
     val lightBackground = Color(0xFFF7F8F6)
 
     // Uses the same Area Safety ViewModel as the full Area Safety screen.
@@ -281,105 +283,83 @@ fun ExplorerScreen(
              * -----------------------------------------------------
              * MAP AREA
              * -----------------------------------------------------
-             *
-             * This will later be replaced by the actual interactive
-             * map component.
              */
 
+        //Show OTO's shared interactive MapLibre map.
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(280.dp)
-                    .background(lightGreen)
-                    .padding(18.dp)
             ) {
 
-                Column(
+                OtoMap(
+                    modifier = Modifier.fillMaxSize()
+                )
+
+                //Keep Explorer's existing location information and Locate Me control over the map.
+                Card(
                     modifier = Modifier
-                        .align(
-                            Alignment.Center
-                        ),
-                    horizontalAlignment =
-                        Alignment.CenterHorizontally
+                        .align(Alignment.BottomCenter)
+                        .padding(12.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = Color.White.copy(alpha = 0.92f)
+                    ),
+                    shape = RoundedCornerShape(14.dp)
                 ) {
 
-                    Text(
-                        text = "🗺️",
-                        fontSize = 48.sp
-                    )
-
-                    Spacer(
-                        modifier =
-                            Modifier.height(8.dp)
-                    )
-
-                    Text(
-                        text = "Explorer Map",
-                        fontSize = 22.sp,
-                        fontWeight =
-                            FontWeight.Bold,
-                        color = darkGreen
-                    )
-
-                    Spacer(
-                        modifier =
-                            Modifier.height(8.dp)
-                    )
-
-                    if (loadingLocation) {
-
-                        CircularProgressIndicator()
-
-                    } else {
-
-                        currentLocation?.let { location ->
-
-                            Text(
-                                text =
-                                    formatExplorerLocation(
-                                        location
-                                    ),
-                                textAlign =
-                                    TextAlign.Center,
-                                color = darkGreen
-                            )
-
-                        } ?: Text(
-                            text = locationStatus,
-                            textAlign =
-                                TextAlign.Center
-                        )
-                    }
-
-                    Spacer(
-                        modifier =
-                            Modifier.height(12.dp)
-                    )
-
-                    Button(
-                        onClick = {
-                            requestLocation()
-                        },
-                        colors =
-                            ButtonDefaults.buttonColors(
-                                containerColor =
-                                    mediumGreen
-                            )
+                    Column(
+                        modifier = Modifier.padding(12.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
                     ) {
 
-                        Text(
-                            text =
-                                "📍 Locate Me"
+                        if (loadingLocation) {
+
+                            CircularProgressIndicator()
+
+                        } else {
+
+                            currentLocation?.let { location ->
+
+                                Text(
+                                    text = formatExplorerLocation(location),
+                                    textAlign = TextAlign.Center,
+                                    color = darkGreen
+                                )
+
+                            } ?: Text(
+                                text = locationStatus,
+                                textAlign = TextAlign.Center,
+                                color = darkGreen
+                            )
+                        }
+
+                        Spacer(
+                            modifier = Modifier.height(8.dp)
                         )
+
+                        Button(
+                            onClick = {
+                                requestLocation()
+                            },
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = mediumGreen
+                            )
+                        ) {
+
+                            Text(
+                                text = "📍 Locate Me"
+                            )
+                        }
                     }
                 }
             }
 
-            Column(
-                modifier = Modifier
-                    .padding(16.dp)
-            ) {
 
+        //Keep the rest of the Explorer dashboard padded below the map.
+        Column(
+            modifier = Modifier
+                .padding(16.dp)
+        ) {
                 /*
                  * -------------------------------------------------
                  * QUICK ACTION CARDS
