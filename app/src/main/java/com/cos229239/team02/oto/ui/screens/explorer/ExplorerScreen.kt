@@ -293,8 +293,8 @@ fun ExplorerScreen(
             ) {
 
                 OtoMap(
-                    modifier = Modifier.fillMaxSize()
-                )
+                    modifier = Modifier.fillMaxSize(), latitude = currentLocation?.latitude,
+                    longitude = currentLocation?.longitude )
 
                 //Keep Explorer's existing location information and Locate Me control over the map.
                 Card(
