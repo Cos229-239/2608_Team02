@@ -4,8 +4,6 @@ import android.Manifest
 import android.content.pm.PackageManager
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.animation.animateContentSize
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -17,68 +15,16 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.Assignment
-import androidx.compose.material.icons.filled.AddCircleOutline
-import androidx.compose.material.icons.filled.Block
-import androidx.compose.material.icons.filled.Campaign
-import androidx.compose.material.icons.filled.CrisisAlert
-import androidx.compose.material.icons.filled.Download
-import androidx.compose.material.icons.filled.Eco
-import androidx.compose.material.icons.filled.Explore
-import androidx.compose.material.icons.filled.Gif
-import androidx.compose.material.icons.filled.Home
-import androidx.compose.material.icons.filled.Layers
-import androidx.compose.material.icons.filled.LocationOn
-import androidx.compose.material.icons.filled.Map
-import androidx.compose.material.icons.filled.Menu
-import androidx.compose.material.icons.filled.MyLocation
-import androidx.compose.material.icons.filled.Notifications
-import androidx.compose.material.icons.filled.Person
-import androidx.compose.material.icons.filled.Shield
-import androidx.compose.material.icons.filled.Terrain
-import androidx.compose.material.icons.filled.Warning
-import androidx.compose.material.icons.filled.WbSunny
-import androidx.compose.material3.Badge
-import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.NavigationBar
-import androidx.compose.material3.NavigationBarItem
-import androidx.compose.material3.NavigationBarItemDefaults
-import androidx.compose.material3.NavigationBarItemColors
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
-import androidx.compose.runtime.Composable
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -91,14 +37,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.ColorMatrixColorFilter
-import androidx.compose.ui.graphics.Path
-import androidx.compose.ui.graphics.StrokeCap
-import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -128,15 +66,8 @@ import java.util.Locale
 @Composable
 fun ExplorerScreen(
     onAreaSafetyClick: () -> Unit,
-@Composable
-fun ExplorerScreen(
-    onAreaSafetyClick: () -> Unit,
     onPlanTripClick: () -> Unit,
     onBackClick: () -> Unit,
-    onCreateRouteClick: () -> Unit = {},
-    onOfflineMapsClick: () -> Unit = {},
-    onReportHazardClick: () -> Unit = {},
-    onFieldReportsClick: () -> Unit = {},
     safetyView: AreaSafetyView = viewModel()
 ) {
 
@@ -145,7 +76,6 @@ fun ExplorerScreen(
 
     val darkGreen = Color(0xFF063D24)
     val mediumGreen = Color(0xFF0B5D1E)
-    val lightGreen = Color(0xFFEAF4EC)
     val lightBackground = Color(0xFFF7F8F6)
 
     // Uses the same Area Safety ViewModel as the full Area Safety screen.
@@ -285,40 +215,6 @@ fun ExplorerScreen(
             .fillMaxSize()
             .background(lightBackground)
     ) {
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .statusBarsPadding()
-                .height(92.dp)
-                .padding(horizontal = 16.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ){
-            IconButton(
-                onClick = onMenuClick
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Menu,
-                    contentDescription = "Open Menu",
-                    modifier = Modifier.size(32.dp)
-                )
-            }
-            Surface(
-                modifier = Modifier.size(54.dp),
-                shape = CircleShape,
-                color = Color.White.copy(alpha = 0.12f)
-            ) {
-                Box(
-                    contentAlignment = Alignment.Center
-                ){
-                    Icon(
-                        imageVector = Icons.Default.Gif,
-                        contentDescription = null,
-                        modifier = Modifier.size(34.dp)
-                    )
-                }
-            }
-            Spacer(modifier = Modifier.width(12.dp))
 
         /*
          * ---------------------------------------------------------
@@ -395,58 +291,42 @@ fun ExplorerScreen(
              * -----------------------------------------------------
              * MAP AREA
              * -----------------------------------------------------
-             *
-             * This will later be replaced by the actual interactive
-             * map component.
              */
 
+        //Show OTO's shared interactive MapLibre map.
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(280.dp)
-                    .background(lightGreen)
-                    .padding(18.dp)
             ) {
 
-                Column(
+                OtoMap(
+                    modifier = Modifier.fillMaxSize(), latitude = currentLocation?.latitude,
+                    longitude = currentLocation?.longitude )
+
+                //Keep Explorer's existing location information and Locate Me control over the map.
+                Card(
                     modifier = Modifier
-                        .align(
-                            Alignment.Center
-                        ),
-                    horizontalAlignment =
-                        Alignment.CenterHorizontally
+                        .align(Alignment.BottomCenter)
+                        .padding(12.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = Color.White.copy(alpha = 0.92f)
+                    ),
+                    shape = RoundedCornerShape(14.dp)
                 ) {
 
-                    Text(
-                        text = "🗺️",
-                        fontSize = 48.sp
-                    )
-
-                    Spacer(
-                        modifier =
-                            Modifier.height(8.dp)
-                    )
-
-                    Text(
-                        text = "Explorer Map",
-                        fontSize = 22.sp,
-                        fontWeight =
-                            FontWeight.Bold,
-                        color = darkGreen
-                    )
-
-                    Spacer(
-                        modifier =
-                            Modifier.height(8.dp)
-                    )
+                    Column(
+                        modifier = Modifier.padding(12.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
 
                     if (loadingLocation) {
 
-                        CircularProgressIndicator()
+                            CircularProgressIndicator()
 
-                    } else {
+                        } else {
 
-                        currentLocation?.let { location ->
+                            currentLocation?.let { location ->
 
                             Text(
                                 text =
@@ -458,42 +338,40 @@ fun ExplorerScreen(
                                 color = darkGreen
                             )
 
-                        } ?: Text(
-                            text = locationStatus,
-                            textAlign =
-                                TextAlign.Center
-                        )
-                    }
-
-                    Spacer(
-                        modifier =
-                            Modifier.height(12.dp)
-                    )
-
-                    Button(
-                        onClick = {
-                            requestLocation()
-                        },
-                        colors =
-                            ButtonDefaults.buttonColors(
-                                containerColor =
-                                    mediumGreen
+                            } ?: Text(
+                                text = locationStatus,
+                                textAlign = TextAlign.Center,
+                                color = darkGreen
                             )
-                    ) {
+                        }
 
-                        Text(
-                            text =
-                                "📍 Locate Me"
+                        Spacer(
+                            modifier = Modifier.height(8.dp)
                         )
+
+                        Button(
+                            onClick = {
+                                requestLocation()
+                            },
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = mediumGreen
+                            )
+                        ) {
+
+                            Text(
+                                text = "📍 Locate Me"
+                            )
+                        }
                     }
                 }
             }
 
-            Column(
-                modifier = Modifier
-                    .padding(16.dp)
-            ) {
 
+        //Keep the rest of the Explorer dashboard padded below the map.
+        Column(
+            modifier = Modifier
+                .padding(16.dp)
+        ) {
                 /*
                  * -------------------------------------------------
                  * QUICK ACTION CARDS
@@ -557,11 +435,174 @@ fun ExplorerScreen(
                  * LIVE SAFETY OVERVIEW
                  * -------------------------------------------------
                  */
+
+                SafetyOverviewCard(
+                    areaName =
+                        safetyState.areaName,
+                    alertCount =
+                        safetyState.notifications.size,
+                    severeCount =
+                        safetyState.notifications.count {
+                            it.level ==
+                                    SafetyLevel.SEVERE
+                        },
+                    moderateCount =
+                        safetyState.notifications.count {
+                            it.level ==
+                                    SafetyLevel.MODERATE
+                        },
+                    isLoading =
+                        safetyState.isLoading,
+                    isOffline =
+                        safetyState.isOffline,
+                    isSample =
+                        safetyState.isSampleData,
+                    onClick =
+                        onAreaSafetyClick
+                )
+
+                Spacer(
+                    modifier =
+                        Modifier.height(16.dp)
+                )
+
+                /*
+                 * -------------------------------------------------
+                 * REPORT HAZARD
+                 * -------------------------------------------------
+                 */
+
+                DashboardWideCard(
+                    title =
+                        "⚠️  REPORT HAZARD / ROUTE CHANGE",
+                    subtitle =
+                        "Help keep trails safe for everyone",
+                    onClick = {
+                        // Future feature.
+                    }
+                )
+
+                Spacer(
+                    modifier =
+                        Modifier.height(12.dp)
+                )
+
+                /*
+                 * -------------------------------------------------
+                 * CHECK-IN
+                 * -------------------------------------------------
+                 */
+
+                Card(
+                    modifier =
+                        Modifier.fillMaxWidth(),
+                    colors =
+                        CardDefaults.cardColors(
+                            containerColor =
+                                Color.White
+                        ),
+                    shape =
+                        RoundedCornerShape(
+                            14.dp
+                        )
+                ) {
+
+                    Column(
+                        modifier =
+                            Modifier.padding(
+                                18.dp
+                            )
+                    ) {
+
+                        Text(
+                            text = "👥  CHECK-IN",
+                            fontSize = 18.sp,
+                            fontWeight =
+                                FontWeight.Bold,
+                            color = darkGreen
+                        )
+
+                        Spacer(
+                            modifier =
+                                Modifier.height(
+                                    6.dp
+                                )
+                        )
+
+                        Text(
+                            text =
+                                "Trusted Contact",
+                            fontSize = 14.sp
+                        )
+
+                        Text(
+                            text =
+                                "Not checked in",
+                            color =
+                                Color(
+                                    0xFFE67E22
+                                ),
+                            fontWeight =
+                                FontWeight.Bold
+                        )
+
+                        Spacer(
+                            modifier =
+                                Modifier.height(
+                                    10.dp
+                                )
+                        )
+
+                        Button(
+                            onClick = {
+                                // Future Check-In feature.
+                            },
+                            modifier =
+                                Modifier.fillMaxWidth(),
+                            colors =
+                                ButtonDefaults.buttonColors(
+                                    containerColor =
+                                        mediumGreen
+                                )
+                        ) {
+
+                            Text(
+                                "CHECK IN"
+                            )
+                        }
+                    }
+                }
+
+                Spacer(
+                    modifier =
+                        Modifier.height(12.dp)
+                )
+
+                /*
+                 * -------------------------------------------------
+                 * FIELD REPORTS
+                 * -------------------------------------------------
+                 */
+
+                DashboardWideCard(
+                    title =
+                        "📋  FIELD REPORTS",
+                    subtitle =
+                        "View recent reports from this area",
+                    onClick = {
+                        // Future feature.
+                    }
+                )
+
+                Spacer(
+                    modifier =
+                        Modifier.height(30.dp)
                 )
             }
         }
     }
 }
+
 
 /**
  * Small action card used for Plan Trip,
@@ -643,10 +684,7 @@ private fun ExplorerActionCard(
         }
     }
 }
-            )
-        }
-    }
-}
+
 
 /**
  * Displays live information from AreaSafetyView.
@@ -809,11 +847,7 @@ private fun SafetyOverviewCard(
         }
     }
 }
-                )
-            }
-        }
-    }
-}
+
 
 /**
  * One statistic inside Safety Overview.
@@ -847,9 +881,7 @@ private fun SafetyStat(
         )
     }
 }
-        )
-    }
-}
+
 
 /**
  * Large full-width dashboard action.
@@ -911,110 +943,16 @@ private fun DashboardWideCard(
                     text = subtitle
                 )
             }
-        }
-    }
-}
-                )
-            }
 
             Text(
-                Text(
                 text = "›",
                 fontSize = 28.sp,
                 color = darkGreen
             )
-            )
         }
     }
 }
 
-@Composable
-private fun ExplorerBottomBar(
-    onHomeClick: () -> Unit,
-    onAlertsClick: () -> Unit
-){
-    NavigationBar(
-        containerColor = OtoExplorerGreen
-    ) {
-        NavigationBarItem(
-            selected = false,
-            onClick = onHomeClick,
-            icon = {
-                Icon(
-                    imageVector = Icons.Default.Home,
-                    contentDescription = "Home",
-
-                )
-            },
-            label = {
-                Text("HOME")
-            },
-            colors = explorerNavigationColors()
-        )
-
-        NavigationBarItem(
-            selected = false,
-            onClick = { },
-            icon = {
-                Icon(
-                    imageVector = Icons.Default.Map,
-                    contentDescription = "Explorer",
-
-                )
-
-            },
-            label = {
-                Text("EXPLORER")
-            },
-            colors = explorerNavigationColors()
-        )
-        NavigationBarItem(
-            selected = false,
-            onClick = onAlertsClick,
-            icon = {
-                Icon(
-                    imageVector = Icons.Default.Warning,
-                    contentDescription = "Alerts",
-
-                )
-            },
-
-            label = {
-                Text("AREA ALERTS")
-            },
-            colors = explorerNavigationColors()
-        )
-
-        NavigationBarItem(
-            selected = false,
-            onClick = { },
-            icon = {
-                Icon(
-                    imageVector = Icons.Default.Person,
-                    contentDescription = "Profile",
-
-                )
-            },
-            label = {
-                Text("PROFILE")
-            },
-            colors = explorerNavigationColors()
-        )
-    }
-}
-@Composable
-private fun explorerNavigationColors() =
-
-    NavigationBarItemDefaults.colors(
-        selectedIconColor = OtoLocationBlue,
-        selectedTextColor = OtoForest700,
-        unselectedIconColor =
-            Color.White.copy(alpha = 0.75f),
-        unselectedTextColor =
-            Color.White.copy(alpha = 0.75f),
-        indicatorColor = OtoExplorerGreenDark
-
-    )
 
 /**
  * Formats the GPS coordinates shown in
