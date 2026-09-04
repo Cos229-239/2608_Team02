@@ -13,6 +13,13 @@ kotlinxSerializationCore = "1.9.0"
 playServicesLocation = "21.4.0"
 okhttp = "4.12.0"
 
+#Pin MapLibre to a version compatible with OTO's current Kotlin version.
+maplibreCompose = "0.12.1"
+
+#Pin the Android map engine used by this MapLibre Compose release.
+maplibreAndroid = "12.0.1"
+
+
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
 junit = { group = "junit", name = "junit", version.ref = "junit" }
@@ -34,6 +41,18 @@ kotlinx-serialization-core = { module = "org.jetbrains.kotlinx:kotlinx-serializa
 kotlinx-serialization-json = { module = "org.jetbrains.kotlinx:kotlinx-serialization-json", version.ref = "kotlinxSerializationCore" }
 okhttp = { module = "com.squareup.okhttp3:okhttp", version.ref = "okhttp" }
 google-play-services-location = { module = "com.google.android.gms:play-services-location", version.ref = "playServicesLocation" }
+
+#Add MapLibre Compose so OTO can display and control maps using Jetpack Compose.
+maplibre-compose = { module = "org.maplibre.compose:maplibre-compose", version.ref = "maplibreCompose" }
+
+
+
+#Use MapLibre's OpenGL Android engine for broad emulator and device compatibility.
+maplibre-android-opengl = { module = "org.maplibre.gl:android-sdk-opengl", version.ref = "maplibreAndroid" }
+
+
+
+
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
