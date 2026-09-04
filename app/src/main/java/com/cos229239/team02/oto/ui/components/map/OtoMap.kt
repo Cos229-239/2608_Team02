@@ -20,7 +20,7 @@ import org.maplibre.spatialk.geojson.Position
 //Display OTO's shared interactive map.
 @Composable
 fun OtoMap(
-    modifier: Modifier = Modifier,
+    modifier: Modifier = Modifier.Companion,
     latitude: Double? = null,
     longitude: Double? = null
 ) {
