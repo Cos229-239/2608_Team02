@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.heightIn
 
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -169,7 +170,8 @@ fun EmergencyHelpScreen(
             ) {
                 //Use a text button so Back has a larger and clearer touch target.
                 TextButton(
-                    onClick = onBackClick
+                    onClick = onBackClick,
+                    modifier = Modifier.heightIn(min = 48.dp)
                 ) {
                     Text(text = "← Back")
                 }
@@ -202,9 +204,12 @@ fun EmergencyHelpScreen(
                 style = MaterialTheme.typography.bodyMedium
             )
             //Give user a clear emergency-services action without placing a call automatically.
+            //Give user a clear emergency-services action without placing a call automatically.
             Button(
                 onClick = ::openEmergencyDialer,
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = 56.dp)
             ) {
                 Text(text = "Call 911")
             }
@@ -250,7 +255,9 @@ fun EmergencyHelpScreen(
             //The first tap gets location. Later taps refresh the same information.
             Button(
                 onClick = ::requestLocation,
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = 48.dp)
             ) {
                 Text(
                     text = if (location == null) {
@@ -263,15 +270,18 @@ fun EmergencyHelpScreen(
             //Reuse the existing Share Status/Location feature for emergency help.//
             Button(
                 onClick = onShareStatusLocationClick,
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = 48.dp)
             ) {
                 Text(text = "Share Status & Location")
             }
-
             //Keep Back available as a clearly labeled action in addition to the arrow.
             Button(
                 onClick = onBackClick,
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = 48.dp)
             ) {
                 Text(text = "Back")
             }
