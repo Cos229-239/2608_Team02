@@ -59,6 +59,7 @@ fun PlanTripScreen(
     }
 
     val darkGreen = Color(0xFF0B5D1E)
+    val dangerRed = Color(0xFFB3261E)
 
     val placeSearchClient = remember {
         PlaceSearchClient()
@@ -81,6 +82,11 @@ fun PlanTripScreen(
     }
 
     var showCalendar by remember {
+        mutableStateOf(false)
+    }
+
+    // Controls the confirmation box before deleting a saved trip.
+    var showClearTripDialog by remember {
         mutableStateOf(false)
     }
 
@@ -540,7 +546,7 @@ fun PlanTripScreen(
                 )
 
                 /*
-                 * Save
+                 * Save / Update Trip
                  */
                 Button(
                     onClick = {
@@ -604,6 +610,41 @@ fun PlanTripScreen(
                             "UPDATE TRIP"
                         }
                     )
+                }
+
+                /*
+                 * Clear Trip only appears when
+                 * a saved trip currently exists.
+                 */
+                if (
+                    tripViewModel.savedTrip != null
+                ) {
+
+                    Spacer(
+                        modifier =
+                            Modifier.height(
+                                8.dp
+                            )
+                    )
+
+                    TextButton(
+                        onClick = {
+                            showClearTripDialog =
+                                true
+                        },
+
+                        modifier =
+                            Modifier.fillMaxWidth()
+                    ) {
+
+                        Text(
+                            text =
+                                "CLEAR TRIP",
+
+                            color =
+                                dangerRed
+                        )
+                    }
                 }
 
                 Spacer(
@@ -787,6 +828,80 @@ fun PlanTripScreen(
                 )
             }
         }
+    }
+
+    /*
+     * Confirm Clear Trip.
+     */
+    if (
+        showClearTripDialog
+    ) {
+
+        AlertDialog(
+            onDismissRequest = {
+                showClearTripDialog =
+                    false
+            },
+
+            title = {
+                Text(
+                    "Clear Saved Trip?"
+                )
+            },
+
+            text = {
+                Text(
+                    "This will permanently delete the saved trip and clear all Plan Trip information."
+                )
+            },
+
+            confirmButton = {
+
+                TextButton(
+                    onClick = {
+
+                        tripViewModel
+                            .clearTrip()
+
+                        showClearTripDialog =
+                            false
+
+                        /*
+                         * Return to Explorer after clearing.
+                         *
+                         * This also avoids the old calendar selection
+                         * visually remaining on this screen until it
+                         * is recreated.
+                         */
+                        onBackClick()
+                    }
+                ) {
+
+                    Text(
+                        text =
+                            "Clear Trip",
+
+                        color =
+                            dangerRed
+                    )
+                }
+            },
+
+            dismissButton = {
+
+                TextButton(
+                    onClick = {
+                        showClearTripDialog =
+                            false
+                    }
+                ) {
+
+                    Text(
+                        "Keep Trip"
+                    )
+                }
+            }
+        )
     }
 }
 

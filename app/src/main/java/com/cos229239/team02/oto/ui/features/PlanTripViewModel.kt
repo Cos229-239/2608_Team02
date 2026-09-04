@@ -58,7 +58,6 @@ class PlanTripViewModel(
     fun updateStartingPoint(value: String) {
         startingPoint = value
 
-        // Editing a verified location means it must be verified again.
         if (verifiedStartingPoint?.name != value) {
             verifiedStartingPoint = null
         }
@@ -119,15 +118,14 @@ class PlanTripViewModel(
     }
 
     /**
-     * Validates and saves the trip.
-     *
-     * Returns true when the trip was saved successfully.
+     * Validates and saves the active trip.
      */
     fun saveTrip(): Boolean {
 
         val start = verifiedStartingPoint
 
-        if (start == null ||
+        if (
+            start == null ||
             start.latitude == null ||
             start.longitude == null
         ) {
@@ -139,7 +137,8 @@ class PlanTripViewModel(
 
         val end = verifiedDestination
 
-        if (end == null ||
+        if (
+            end == null ||
             end.latitude == null ||
             end.longitude == null
         ) {
@@ -149,7 +148,8 @@ class PlanTripViewModel(
             return false
         }
 
-        val departure = departureDateMillis
+        val departure =
+            departureDateMillis
 
         if (departure == null) {
             saveError =
@@ -170,35 +170,20 @@ class PlanTripViewModel(
 
         val trip =
             TripPlan(
-                startingPointName =
-                    start.name,
+                startingPointName = start.name,
+                startingLatitude = start.latitude,
+                startingLongitude = start.longitude,
 
-                startingLatitude =
-                    start.latitude,
+                destinationName = end.name,
+                destinationLatitude = end.latitude,
+                destinationLongitude = end.longitude,
 
-                startingLongitude =
-                    start.longitude,
+                isRoundTrip = isRoundTrip,
 
-                destinationName =
-                    end.name,
+                departureDateMillis = departure,
+                returnDateMillis = returnDateMillis,
 
-                destinationLatitude =
-                    end.latitude,
-
-                destinationLongitude =
-                    end.longitude,
-
-                isRoundTrip =
-                    isRoundTrip,
-
-                departureDateMillis =
-                    departure,
-
-                returnDateMillis =
-                    returnDateMillis,
-
-                notes =
-                    notes
+                notes = notes
             )
 
         savedTrip = trip
@@ -243,7 +228,8 @@ class PlanTripViewModel(
             )
             .putLong(
                 KEY_RETURN,
-                trip.returnDateMillis ?: NO_RETURN_DATE
+                trip.returnDateMillis
+                    ?: NO_RETURN_DATE
             )
             .putString(
                 KEY_NOTES,
@@ -257,7 +243,35 @@ class PlanTripViewModel(
     }
 
     /**
-     * Loads the previous saved trip when the app starts.
+     * Permanently removes the saved trip and
+     * resets Plan Trip back to a blank form.
+     */
+    fun clearTrip() {
+
+        preferences
+            .edit()
+            .clear()
+            .apply()
+
+        savedTrip = null
+
+        startingPoint = ""
+        destination = ""
+        notes = ""
+
+        isRoundTrip = true
+
+        verifiedStartingPoint = null
+        verifiedDestination = null
+
+        departureDateMillis = null
+        returnDateMillis = null
+
+        saveError = null
+    }
+
+    /**
+     * Loads a previously saved trip.
      */
     private fun loadSavedTrip() {
 
@@ -382,7 +396,6 @@ class PlanTripViewModel(
 
         savedTrip = trip
 
-        // Repopulate the form.
         startingPoint =
             trip.startingPointName
 
@@ -405,8 +418,10 @@ class PlanTripViewModel(
             PlaceSuggestion(
                 name =
                     trip.startingPointName,
+
                 latitude =
                     trip.startingLatitude,
+
                 longitude =
                     trip.startingLongitude
             )
@@ -415,8 +430,10 @@ class PlanTripViewModel(
             PlaceSuggestion(
                 name =
                     trip.destinationName,
+
                 latitude =
                     trip.destinationLatitude,
+
                 longitude =
                     trip.destinationLongitude
             )
