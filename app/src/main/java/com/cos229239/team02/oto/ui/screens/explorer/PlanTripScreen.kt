@@ -36,6 +36,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.cos229239.team02.oto.data.location.PlaceSearchClient
@@ -512,6 +513,11 @@ fun PlanTripScreen(
                             120.dp
                         ),
 
+                    textStyle =
+                        TextStyle(
+                            color = Color.Black
+                        ),
+
                     placeholder = {
                         Text(
                             "Add notes about your trip"
@@ -866,13 +872,6 @@ fun PlanTripScreen(
                         showClearTripDialog =
                             false
 
-                        /*
-                         * Return to Explorer after clearing.
-                         *
-                         * This also avoids the old calendar selection
-                         * visually remaining on this screen until it
-                         * is recreated.
-                         */
                         onBackClick()
                     }
                 ) {
@@ -926,6 +925,11 @@ private fun LocationAutocompleteField(
 
             modifier =
                 Modifier.fillMaxWidth(),
+
+            textStyle =
+                TextStyle(
+                    color = Color.Black
+                ),
 
             placeholder = {
                 Text(
