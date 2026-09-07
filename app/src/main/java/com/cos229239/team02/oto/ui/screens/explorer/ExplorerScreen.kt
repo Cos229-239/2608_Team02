@@ -1,5 +1,8 @@
 package com.cos229239.team02.oto.ui.screens.explorer
 
+//Use OTO's shared MapLibre map component.
+
+
 import android.Manifest
 import android.content.pm.PackageManager
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -47,11 +50,9 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.cos229239.team02.oto.data.location.AndroidLocationRepository
 import com.cos229239.team02.oto.data.location.OtoLocation
+import com.cos229239.team02.oto.ui.components.map.OtoMap
 import com.cos229239.team02.oto.ui.features.AreaSafetyView
 import com.cos229239.team02.oto.ui.features.SafetyLevel
-//Use OTO's shared MapLibre map component.
-import com.cos229239.team02.oto.ui.components.map.OtoMap
-
 import kotlinx.coroutines.launch
 import java.util.Locale
 
@@ -312,6 +313,34 @@ fun ExplorerScreen(
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
 
+
+                    if (loadingLocation) {
+
+                            CircularProgressIndicator()
+
+                        } else {
+
+                            currentLocation?.let { location ->
+
+                            Text(
+                                text =
+                                    formatExplorerLocation(
+                                        location
+                                    ),
+                                textAlign =
+                                    TextAlign.Center,
+                                color = darkGreen
+                            )
+
+                            } ?: Text(
+                                text = locationStatus,
+                                textAlign = TextAlign.Center,
+                                color = darkGreen
+                            )
+                        }
+
+
+
                         if (loadingLocation) {
 
                             CircularProgressIndicator()
@@ -332,6 +361,7 @@ fun ExplorerScreen(
                                 color = darkGreen
                             )
                         }
+
 
                         Spacer(
                             modifier = Modifier.height(8.dp)

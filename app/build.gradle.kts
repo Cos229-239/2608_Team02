@@ -73,4 +73,5 @@ dependencies {
     implementation(libs.kotlinx.serialization.json)
     implementation(libs.okhttp)
     implementation("androidx.lifecycle:lifecycle-runtime-compose:2.11.0")
+    implementation(libs.androidx.compose.material.icons.extended)
 }
