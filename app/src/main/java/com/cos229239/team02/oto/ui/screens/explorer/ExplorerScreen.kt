@@ -49,6 +49,10 @@ import com.cos229239.team02.oto.data.location.AndroidLocationRepository
 import com.cos229239.team02.oto.data.location.OtoLocation
 import com.cos229239.team02.oto.ui.features.AreaSafetyView
 import com.cos229239.team02.oto.ui.features.SafetyLevel
+import com.cos229239.team02.oto.data.location.OtoLocation
+import com.cos229239.team02.oto.ui.components.map.OtoMap
+import com.cos229239.team02.oto.ui.features.AreaSafetyView
+import com.cos229239.team02.oto.ui.features.SafetyLevel
 import com.cos229239.team02.oto.ui.theme.OtoBackground
 import com.cos229239.team02.oto.ui.theme.OtoCrisisRed
 import com.cos229239.team02.oto.ui.theme.OtoExplorerGreen
@@ -319,8 +323,7 @@ fun ExplorerScreen(
                         modifier = Modifier.padding(12.dp),
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
-
-                    if (loadingLocation) {
+                        if (loadingLocation) {
 
                             CircularProgressIndicator()
 
@@ -328,15 +331,11 @@ fun ExplorerScreen(
 
                             currentLocation?.let { location ->
 
-                            Text(
-                                text =
-                                    formatExplorerLocation(
-                                        location
-                                    ),
-                                textAlign =
-                                    TextAlign.Center,
-                                color = darkGreen
-                            )
+                                Text(
+                                    text = formatExplorerLocation(location),
+                                    textAlign = TextAlign.Center,
+                                    color = darkGreen
+                                )
 
                             } ?: Text(
                                 text = locationStatus,
@@ -344,7 +343,6 @@ fun ExplorerScreen(
                                 color = darkGreen
                             )
                         }
-
                         Spacer(
                             modifier = Modifier.height(8.dp)
                         )
