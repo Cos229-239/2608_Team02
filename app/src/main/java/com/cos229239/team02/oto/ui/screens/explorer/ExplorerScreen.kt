@@ -1,5 +1,8 @@
 package com.cos229239.team02.oto.ui.screens.explorer
 
+//Use OTO's shared MapLibre map component.
+
+
 import android.Manifest
 import android.content.pm.PackageManager
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -47,23 +50,9 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.cos229239.team02.oto.data.location.AndroidLocationRepository
 import com.cos229239.team02.oto.data.location.OtoLocation
-import com.cos229239.team02.oto.ui.features.AreaSafetyView
-import com.cos229239.team02.oto.ui.features.SafetyLevel
-import com.cos229239.team02.oto.data.location.OtoLocation
 import com.cos229239.team02.oto.ui.components.map.OtoMap
 import com.cos229239.team02.oto.ui.features.AreaSafetyView
 import com.cos229239.team02.oto.ui.features.SafetyLevel
-import com.cos229239.team02.oto.ui.theme.OtoBackground
-import com.cos229239.team02.oto.ui.theme.OtoCrisisRed
-import com.cos229239.team02.oto.ui.theme.OtoExplorerGreen
-import com.cos229239.team02.oto.ui.theme.OtoExplorerGreenContainer
-import com.cos229239.team02.oto.ui.theme.OtoExplorerGreenDark
-import com.cos229239.team02.oto.ui.theme.OtoForest700
-import com.cos229239.team02.oto.ui.theme.OtoForest800
-import com.cos229239.team02.oto.ui.theme.OtoLocationBlue
-import com.cos229239.team02.oto.ui.theme.OtoSurface
-import com.cos229239.team02.oto.ui.theme.OtoWarningAmber
-import com.cos229239.team02.oto.ui.theme.OtoWarningContainer
 import kotlinx.coroutines.launch
 import java.util.Locale
 
@@ -323,6 +312,35 @@ fun ExplorerScreen(
                         modifier = Modifier.padding(12.dp),
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
+
+
+                    if (loadingLocation) {
+
+                            CircularProgressIndicator()
+
+                        } else {
+
+                            currentLocation?.let { location ->
+
+                            Text(
+                                text =
+                                    formatExplorerLocation(
+                                        location
+                                    ),
+                                textAlign =
+                                    TextAlign.Center,
+                                color = darkGreen
+                            )
+
+                            } ?: Text(
+                                text = locationStatus,
+                                textAlign = TextAlign.Center,
+                                color = darkGreen
+                            )
+                        }
+
+
+
                         if (loadingLocation) {
 
                             CircularProgressIndicator()
@@ -343,6 +361,8 @@ fun ExplorerScreen(
                                 color = darkGreen
                             )
                         }
+
+
                         Spacer(
                             modifier = Modifier.height(8.dp)
                         )
