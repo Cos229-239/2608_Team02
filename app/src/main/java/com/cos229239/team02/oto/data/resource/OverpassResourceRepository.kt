@@ -15,6 +15,7 @@ class OverpassResourceRepository(
     private val cache: ResourceCache = ResourceCache(context),
     private val client: OverpassClient = OverpassClient(),
     private val defaultRadiusMeters: Int = DEFAULT_RADIUS_METERS,
+    private val intermediateRadiusMeters: Int = INTERMEDIATE_RADIUS_METERS,
     private val expandedRadiusMeters: Int = EXPANDED_RADIUS_METERS,
     private val cacheTtlMillis: Long = DEFAULT_CACHE_TTL_MILLIS
 ) : ResourceRepository {
@@ -58,7 +59,9 @@ class OverpassResourceRepository(
                 onSuccess = { fetched ->
                     if (fetched.isEmpty() && autoExpand) {
                         // No results at the default radius while online —
-                        // automatically widen the search for better coverage.
+                        // try intermediate, then expanded radius for better coverage.
+                        val intermediate = getNearby(location, intermediateRadiusMeters, autoExpand = false, forceRefresh = forceRefresh)
+                        if (intermediate.resources.isNotEmpty()) return intermediate
                         return getNearby(location, expandedRadiusMeters, autoExpand = false, forceRefresh = forceRefresh)
                     }
                     cache.write(location, radiusMeters, fetched)
@@ -112,7 +115,8 @@ class OverpassResourceRepository(
     }
 
     companion object {
-        const val DEFAULT_RADIUS_METERS = 10_000
+        const val DEFAULT_RADIUS_METERS = 5_000
+        const val INTERMEDIATE_RADIUS_METERS = 10_000
         const val EXPANDED_RADIUS_METERS = 25_000
         const val DEFAULT_CACHE_TTL_MILLIS = 24L * 60 * 60 * 1000
     }

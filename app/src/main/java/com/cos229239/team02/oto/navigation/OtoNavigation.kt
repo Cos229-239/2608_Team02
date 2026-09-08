@@ -10,6 +10,7 @@ import com.cos229239.team02.oto.ui.screens.crisis.CrisisScreen
 import com.cos229239.team02.oto.ui.screens.crisis.EmergencyHelpScreen
 import com.cos229239.team02.oto.ui.screens.crisis.FirstAidSurvivalScreen
 import com.cos229239.team02.oto.ui.screens.crisis.NearbyResourceScreen
+import com.cos229239.team02.oto.ui.screens.crisis.OfflineMapBacktrackScreen
 import com.cos229239.team02.oto.ui.screens.crisis.ShareStatusLocationScreen
 import com.cos229239.team02.oto.ui.screens.explorer.AreaSafetyRoute
 import com.cos229239.team02.oto.ui.screens.explorer.ExplorerScreen
@@ -150,6 +151,12 @@ fun OtoNavigation() {
                             )
                         },
 
+                        onOfflineMapBacktrackClick = {
+                            backStack.add(
+                                OtoRoute.OfflineMapBacktrack
+                            )
+                        },
+
                         onBackClick = {
                             backStack.removeLastOrNull()
                         }
@@ -204,6 +211,18 @@ fun OtoNavigation() {
                 entry<OtoRoute.NearbyResources> {
 
                     NearbyResourceScreen(
+                        onBackClick = {
+                            backStack.removeLastOrNull()
+                        }
+                    )
+                }
+
+                /*
+                 * CRISIS - OFFLINE MAPS & BACKTRACK
+                 */
+                entry<OtoRoute.OfflineMapBacktrack> {
+
+                    OfflineMapBacktrackScreen(
                         onBackClick = {
                             backStack.removeLastOrNull()
                         }

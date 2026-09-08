@@ -13,18 +13,22 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilterChip
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -75,38 +79,37 @@ fun NearbyResourceScreen(
         )
     }
     var showUnnamed by remember { mutableStateOf(false) }
+    var selectedRadius by remember {
+        mutableIntStateOf(OverpassResourceRepository.DEFAULT_RADIUS_METERS)
+    }
 
-    fun loadResources(target: OtoLocation, forceRefresh: Boolean = false) {
+    fun loadResources(
+        target: OtoLocation,
+        radiusMeters: Int? = null,
+        forceRefresh: Boolean = false
+    ) {
         scope.launch {
             loading = true
             statusText = if (forceRefresh) "Refreshing resources..." else "Finding resources near you..."
-            val loaded = resourceRepository.getNearby(target, forceRefresh = forceRefresh)
-            location = target
-            result = loaded
-            loading = false
-            statusText = loaded.error ?: if (loaded.fromCache) {
-                "Showing saved results. Connect to refresh."
+            val loaded = if (radiusMeters != null) {
+                resourceRepository.getNearby(target, radiusMeters, forceRefresh = forceRefresh)
             } else {
-                "Showing resources near you."
+                // Refreshes follow the currently-selected radius chip. Keep the
+                // default radius' auto-expand only for the initial find.
+                if (selectedRadius == OverpassResourceRepository.DEFAULT_RADIUS_METERS) {
+                    resourceRepository.getNearby(target, forceRefresh = forceRefresh)
+                } else {
+                    resourceRepository.getNearby(target, selectedRadius, forceRefresh = forceRefresh)
+                }
             }
-        }
-    }
-
-    fun loadExpanded(target: OtoLocation) {
-        scope.launch {
-            loading = true
-            statusText = "Expanding search..."
-            val loaded = resourceRepository.getNearby(
-                target,
-                OverpassResourceRepository.EXPANDED_RADIUS_METERS
-            )
             location = target
             result = loaded
+            selectedRadius = loaded.radiusMeters
             loading = false
             statusText = loaded.error ?: if (loaded.fromCache) {
                 "Showing saved results. Connect to refresh."
             } else {
-                "Showing expanded results (${formatKm(loaded.radiusMeters)})."
+                "Showing resources within ${formatKm(loaded.radiusMeters)}."
             }
         }
     }
@@ -118,7 +121,7 @@ fun NearbyResourceScreen(
             val current = locationRepository.getCurrentLocation()
             loading = false
             if (current != null) {
-                loadResources(current, forceRefresh)
+                loadResources(current, forceRefresh = forceRefresh)
             } else {
                 statusText = "Location unavailable — check signal and try again"
             }
@@ -170,11 +173,12 @@ fun NearbyResourceScreen(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
+                    .statusBarsPadding()
                     .padding(horizontal = 4.dp, vertical = 12.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                IconButton(onClick = onBackClick) {
-                    Text("\u2190", style = MaterialTheme.typography.titleLarge)
+                TextButton(onClick = onBackClick) {
+                    Text("Back")
                 }
                 Text(
                     text = "Nearby Resources",
@@ -184,113 +188,142 @@ fun NearbyResourceScreen(
             }
         }
     ) { paddingValues ->
-        Column(
+        val resources = result?.resources ?: emptyList()
+        val currentRadius = result?.radiusMeters
+        val filtered = remember(resources, activeFilters, showUnnamed) {
+            resources.filter { resource ->
+                (showUnnamed || !resource.name.startsWith("Unnamed")) &&
+                    resource.types.any { it in activeFilters }
+            }
+        }
+
+        LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues)
-                .padding(16.dp)
-                .verticalScroll(rememberScrollState()),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+                .padding(horizontal = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
+            contentPadding = PaddingValues(vertical = 16.dp)
         ) {
-            Text(
-                text = "Find emergency resources near you using OpenStreetMap. Results are cached so you can view them offline.",
-                style = MaterialTheme.typography.bodyMedium
-            )
-
-            Button(
-                onClick = { requestLocation(forceRefresh = result != null) },
-                modifier = Modifier.fillMaxWidth()
-            ) {
+            item(key = "intro") {
                 Text(
-                    text = if (result == null) "Find Nearby Resources" else "Refresh Resources"
-                )
-            }
-
-            if (loading) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.Center,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    CircularProgressIndicator()
-                }
-            }
-
-            if (location != null) {
-                Text(
-                    text = formatLocation(location!!),
-                    style = MaterialTheme.typography.bodySmall
-                )
-            }
-
-            Text(
-                text = statusText,
-                style = MaterialTheme.typography.bodyMedium
-            )
-
-            val resources = result?.resources ?: emptyList()
-            val currentRadius = result?.radiusMeters
-
-            if (currentRadius != null &&
-                currentRadius < OverpassResourceRepository.EXPANDED_RADIUS_METERS
-            ) {
-                Button(
-                    onClick = { location?.let(::loadExpanded) },
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Text(
-                        text = "Expand search to ${formatKm(OverpassResourceRepository.EXPANDED_RADIUS_METERS)}"
-                    )
-                }
-            }
-
-            if (resources.isNotEmpty() &&
-                currentRadius != null &&
-                currentRadius >= OverpassResourceRepository.EXPANDED_RADIUS_METERS
-            ) {
-                Text(
-                    text = "Showing results from an expanded search (${formatKm(currentRadius)})",
-                    style = MaterialTheme.typography.bodySmall
-                )
-            }
-
-            if (result != null && result?.error == null && resources.isEmpty()) {
-                Text(
-                    text = "No resources found within range of your location. Use Expand search for wider coverage.",
+                    text = "Find emergency resources near you using OpenStreetMap. Results are cached so you can view them offline.",
                     style = MaterialTheme.typography.bodyMedium
                 )
             }
 
-            if (resources.isNotEmpty()) {
-                FilterRow(
-                    activeFilters = activeFilters,
-                    showUnnamed = showUnnamed,
-                    onToggle = { type ->
-                        activeFilters = if (type in activeFilters) {
-                            activeFilters - type
-                        } else {
-                            activeFilters + type
-                        }
-                    },
-                    onToggleUnnamed = { showUnnamed = !showUnnamed }
-                )
+            item(key = "action") {
+                Button(
+                    onClick = { requestLocation(forceRefresh = result != null) },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(
+                        text = if (result == null) "Find Nearby Resources" else "Refresh Resources"
+                    )
+                }
+            }
 
-                val filtered = resources.filter { resource ->
-                    (showUnnamed || !resource.name.startsWith("Unnamed")) &&
-                        resource.types.any { it in activeFilters }
+            if (loading) {
+                item(key = "loading") {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.Center,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        CircularProgressIndicator()
+                    }
+                }
+            }
+
+            if (location != null) {
+                item(key = "location") {
+                    Text(
+                        text = formatLocation(location!!),
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                }
+            }
+
+            item(key = "status") {
+                Text(
+                    text = statusText,
+                    style = MaterialTheme.typography.bodyMedium
+                )
+            }
+
+            if (result != null && result?.error == null && resources.isEmpty()) {
+                item(key = "empty") {
+                    Text(
+                        text = "No resources found within ${formatKm(currentRadius ?: selectedRadius)}. Try a larger radius.",
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                }
+            }
+
+            if (resources.isNotEmpty()) {
+                item(key = "radius") {
+                    RadiusFilterRow(
+                        selectedRadius = selectedRadius,
+                        onSelectRadius = { radius ->
+                            location?.let { loadResources(it, radiusMeters = radius) }
+                        }
+                    )
+                }
+
+                item(key = "filters") {
+                    FilterRow(
+                        activeFilters = activeFilters,
+                        showUnnamed = showUnnamed,
+                        onToggle = { type ->
+                            activeFilters = if (type in activeFilters) {
+                                activeFilters - type
+                            } else {
+                                activeFilters + type
+                            }
+                        },
+                        onToggleUnnamed = { showUnnamed = !showUnnamed }
+                    )
                 }
 
                 if (filtered.isEmpty()) {
-                    Text(
-                        text = "No resources match the selected filters.",
-                        style = MaterialTheme.typography.bodyMedium
-                    )
+                    item(key = "noMatch") {
+                        Text(
+                            text = "No resources match the selected filters.",
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                    }
                 } else {
-                    filtered.forEach { resource ->
+                    items(filtered) { resource ->
                         ResourceCard(resource = resource)
                     }
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun RadiusFilterRow(
+    selectedRadius: Int,
+    onSelectRadius: (Int) -> Unit
+) {
+    val radiusOptions = listOf(
+        OverpassResourceRepository.DEFAULT_RADIUS_METERS,
+        OverpassResourceRepository.INTERMEDIATE_RADIUS_METERS,
+        OverpassResourceRepository.EXPANDED_RADIUS_METERS
+    )
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .horizontalScroll(rememberScrollState()),
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        radiusOptions.forEach { radius ->
+            FilterChip(
+                selected = radius == selectedRadius,
+                onClick = { onSelectRadius(radius) },
+                label = { Text(text = formatKm(radius)) }
+            )
         }
     }
 }

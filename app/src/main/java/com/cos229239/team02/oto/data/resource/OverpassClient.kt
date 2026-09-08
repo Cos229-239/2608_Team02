@@ -93,17 +93,34 @@ class OverpassClient(
     private fun buildQuery(location: OtoLocation, radiusMeters: Int): String {
         val lat = String.format(Locale.US, "%.6f", location.latitude)
         val lon = String.format(Locale.US, "%.6f", location.longitude)
-        val r = radiusMeters
 
+        // The full NWR query is too heavy for dense metros at the expanded
+        // radius: on public Overpass instances it exceeds the server-side
+        // timeout and returns an empty "timed out" response. Use a lighter
+        // node-only query there that keeps the crisis-relevant categories
+        // (medical, emergency, water, shelter including camp sites) and drops
+        // the highest-volume, lowest-urgency ones (supermarket/convenience
+        // shops and information boards).
+        if (radiusMeters >= OverpassResourceRepository.EXPANDED_RADIUS_METERS) {
+            return """
+                [out:json][timeout:25];
+                (
+                  node(around:$radiusMeters,$lat,$lon)["amenity"~"hospital|clinic|doctors|dentist|pharmacy|veterinary|nursing_home|fire_station|police|shelter|social_facility|place_of_worship|community_centre|drinking_water|fountain|restaurant|fast_food|cafe|pub|mall|marketplace|school|library"];
+                  node(around:$radiusMeters,$lat,$lon)["emergency"~"hospital|ambulance_station|drinking_water|fire_hydrant"];
+                  node(around:$radiusMeters,$lat,$lon)["tourism"~"camp_site"];
+                );
+                out center tags;
+            """.trimIndent()
+        }
+
+        val r = radiusMeters
         return """
-            [out:json][timeout:25];
+            [out:json][timeout:20];
             (
-              node(around:$r,$lat,$lon)["amenity"~"hospital|clinic|doctors|dentist|pharmacy|veterinary|nursing_home|fire_station|police|shelter|social_facility|place_of_worship|community_centre|drinking_water|fountain|restaurant|fast_food|cafe|pub|mall|marketplace|school|library"];
-              way(around:$r,$lat,$lon)["amenity"~"hospital|clinic|doctors|dentist|pharmacy|veterinary|nursing_home|fire_station|police|shelter|social_facility|place_of_worship|community_centre|restaurant|fast_food|cafe|pub|mall|marketplace|school|library"];
-              node(around:$r,$lat,$lon)["emergency"~"hospital|ambulance_station|drinking_water|fire_hydrant"];
-              way(around:$r,$lat,$lon)["emergency"~"hospital|ambulance_station"];
-              node(around:$r,$lat,$lon)["tourism"~"camp_site|information"];
-              node(around:$r,$lat,$lon)["shop"~"supermarket|convenience"];
+              nwr(around:$r,$lat,$lon)["amenity"~"hospital|clinic|doctors|dentist|pharmacy|veterinary|nursing_home|fire_station|police|shelter|social_facility|place_of_worship|community_centre|drinking_water|fountain|restaurant|fast_food|cafe|pub|mall|marketplace|school|library"];
+              nwr(around:$r,$lat,$lon)["emergency"~"hospital|ambulance_station|drinking_water|fire_hydrant"];
+              nwr(around:$r,$lat,$lon)["tourism"~"camp_site|information"];
+              nwr(around:$r,$lat,$lon)["shop"~"supermarket|convenience"];
             );
             out center tags;
         """.trimIndent()

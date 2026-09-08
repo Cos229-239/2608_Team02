@@ -19,6 +19,7 @@ fun CrisisScreen(
     onFirstAidSurvivalClick: () -> Unit,
     onShareStatusLocationClick: () -> Unit,
     onNearbyResourcesClick: () -> Unit,
+    onOfflineMapBacktrackClick: () -> Unit,
     onBackClick: () -> Unit
 ) {
     Column(
@@ -52,6 +53,12 @@ fun CrisisScreen(
 
         Button(onClick = onNearbyResourcesClick) {
             Text(text = "Nearby Resources")
+        }
+
+        Spacer(modifier = Modifier.height(12.dp))
+
+        Button(onClick = onOfflineMapBacktrackClick) {
+            Text(text = "Offline Maps & Backtrack")
         }
 
         Spacer(modifier = Modifier.height(12.dp))
