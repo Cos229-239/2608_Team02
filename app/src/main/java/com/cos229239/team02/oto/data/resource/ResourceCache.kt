@@ -2,6 +2,8 @@ package com.cos229239.team02.oto.data.resource
 
 import android.content.Context
 import com.cos229239.team02.oto.data.location.OtoLocation
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
@@ -35,15 +37,15 @@ class ResourceCache(
      * The search radius is part of the cache key so a wider search never
      * reuses a narrower (possibly empty) result.
      */
-    fun readCached(
+    suspend fun readCached(
         location: OtoLocation,
         radiusMeters: Int,
         maxAgeMillis: Long
-    ): List<NearbyResource>? {
+    ): List<NearbyResource>? = withContext(Dispatchers.IO) {
         val file = cacheFileFor(location, radiusMeters)
-        if (!file.exists()) return null
+        if (!file.exists()) return@withContext null
 
-        return runCatching {
+        runCatching {
             val blob = json.decodeFromString<CachedResourceBlob>(file.readText())
             if (blob.radiusMeters != radiusMeters) return@runCatching null
             val age = System.currentTimeMillis() - blob.fetchedAtMillis
@@ -60,7 +62,7 @@ class ResourceCache(
      * Callers may save even stale data when offline so it can be shown
      * later.
      */
-    fun write(
+    suspend fun write(
         location: OtoLocation,
         radiusMeters: Int,
         resources: List<NearbyResource>
@@ -70,14 +72,16 @@ class ResourceCache(
         // for the whole TTL.
         if (resources.isEmpty()) return
 
-        runCatching {
-            val blob = CachedResourceBlob(
-                cellKey = cellKeyFor(location, radiusMeters),
-                radiusMeters = radiusMeters,
-                fetchedAtMillis = System.currentTimeMillis(),
-                resources = resources.map { it.toCached() }
-            )
-            cacheFileFor(location, radiusMeters).writeText(json.encodeToString(blob))
+        withContext(Dispatchers.IO) {
+            runCatching {
+                val blob = CachedResourceBlob(
+                    cellKey = cellKeyFor(location, radiusMeters),
+                    radiusMeters = radiusMeters,
+                    fetchedAtMillis = System.currentTimeMillis(),
+                    resources = resources.map { it.toCached() }
+                )
+                cacheFileFor(location, radiusMeters).writeText(json.encodeToString(blob))
+            }
         }
     }
 
@@ -85,13 +89,13 @@ class ResourceCache(
      * Reads whatever is cached for a location + radius regardless of age.
      * Used as a last-resort offline fallback.
      */
-    fun readAny(
+    suspend fun readAny(
         location: OtoLocation,
         radiusMeters: Int
-    ): List<NearbyResource>? {
+    ): List<NearbyResource>? = withContext(Dispatchers.IO) {
         val file = cacheFileFor(location, radiusMeters)
-        if (!file.exists()) return null
-        return runCatching {
+        if (!file.exists()) return@withContext null
+        runCatching {
             json.decodeFromString<CachedResourceBlob>(file.readText()).toResources()
         }.getOrNull()
     }
@@ -108,19 +112,21 @@ class ResourceCache(
     }
 
     private fun CachedResourceBlob.toResources(): List<NearbyResource> =
-        resources.map {
-            NearbyResource(
-                name = it.name,
-                types = it.types.mapNotNull { typeName ->
-                    ResourceType.entries.firstOrNull { type -> type.name == typeName }
-                },
-                distanceKm = it.distanceKm,
-                location = OtoLocation(
-                    latitude = it.latitude,
-                    longitude = it.longitude
+        resources
+            .map {
+                NearbyResource(
+                    name = it.name,
+                    types = it.types.mapNotNull { typeName ->
+                        ResourceType.entries.firstOrNull { type -> type.name == typeName }
+                    },
+                    distanceKm = it.distanceKm,
+                    location = OtoLocation(
+                        latitude = it.latitude,
+                        longitude = it.longitude
+                    )
                 )
-            )
-        }
+            }
+            .take(MAX_NEARBY_RESOURCES)
 
     private fun NearbyResource.toCached(): CachedResource =
         CachedResource(

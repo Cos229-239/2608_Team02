@@ -10,6 +10,13 @@ import kotlin.math.sqrt
  * Maps raw Overpass elements to [NearbyResource] and computes the
  * straight-line (Haversine) distance from the user's location.
  */
+
+/**
+ * Cap for how many nearest resources are kept after sorting by distance.
+ * Bounds memory for the UI, the JSON cache, and every downstream stage.
+ */
+internal const val MAX_NEARBY_RESOURCES = 500
+
 internal object NearbyResourceMapper {
 
     fun map(
@@ -38,6 +45,7 @@ internal object NearbyResourceMapper {
                 )
             }
             .sortedBy { it.distanceKm }
+            .take(MAX_NEARBY_RESOURCES)
 
     /**
      * Maps OSM tags to one or more [ResourceType] buckets.
