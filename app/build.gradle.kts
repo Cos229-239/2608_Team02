@@ -48,6 +48,7 @@ dependencies {
     implementation(libs.androidx.compose.ui)
     implementation(libs.androidx.compose.ui.graphics)
     implementation(libs.androidx.compose.ui.tooling.preview)
+    implementation(libs.androidx.compose.material.icons.extended)
 
     // Navigation
     implementation(libs.androidx.navigation3.runtime)
@@ -69,13 +70,17 @@ dependencies {
     // Networking
     implementation(libs.okhttp)
 
-    // MapLibre Compose
-    implementation("org.maplibre.compose:maplibre-compose:0.15.0")
+    // MapLibre Compose.
+    // Exclude the default Android renderer so OTO can use OpenGL.
+    implementation(libs.maplibre.compose) {
+        exclude(
+            group = "org.maplibre.gl",
+            module = "android-sdk"
+        )
+    }
 
-    // MapLibre OpenGL Android runtime
-    runtimeOnly(
-        "org.maplibre.compose:maplibre-compose-runtime-opengl-android:0.15.0"
-    )
+    // OpenGL renderer for emulator and physical-device support.
+    implementation(libs.maplibre.android.opengl)
 
     // Unit testing
     testImplementation(libs.junit)
