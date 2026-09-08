@@ -16,61 +16,343 @@ import org.maplibre.compose.sources.rememberGeoJsonSource
 import org.maplibre.compose.style.BaseStyle
 import org.maplibre.spatialk.geojson.Point
 import org.maplibre.spatialk.geojson.Position
+import kotlin.math.abs
 
-//Display OTO's shared interactive map.
+/**
+ * Shared interactive map used throughout OTO.
+ *
+ * If a saved trip exists, the map displays:
+ * Blue = Starting Point
+ * Green = Destination
+ *
+ * If there is no saved trip, the map can display
+ * the user's current location instead.
+ */
 @Composable
 fun OtoMap(
-    modifier: Modifier = Modifier.Companion,
+    modifier: Modifier = Modifier,
+
     latitude: Double? = null,
-    longitude: Double? = null
+    longitude: Double? = null,
+
+    startingLatitude: Double? = null,
+    startingLongitude: Double? = null,
+
+    destinationLatitude: Double? = null,
+    destinationLongitude: Double? = null
 ) {
 
-    val cameraState = rememberCameraState()
+    val cameraState =
+        rememberCameraState()
 
-    //Center the map when OTO receives a valid location.
-    LaunchedEffect(latitude, longitude) {
+    val hasSavedTrip =
+        startingLatitude != null &&
+                startingLongitude != null &&
+                destinationLatitude != null &&
+                destinationLongitude != null
 
-        if (latitude != null && longitude != null) {
+    /*
+     * ---------------------------------------------------------
+     * CAMERA POSITION
+     * ---------------------------------------------------------
+     */
 
-            cameraState.position = CameraPosition(
-                target = Position(
-                    longitude = longitude,
-                    latitude = latitude
-                ),
-                zoom = 14.0
-            )
+    LaunchedEffect(
+        latitude,
+        longitude,
+        startingLatitude,
+        startingLongitude,
+        destinationLatitude,
+        destinationLongitude
+    ) {
+
+        if (hasSavedTrip) {
+
+            val startLat =
+                startingLatitude!!
+
+            val startLon =
+                startingLongitude!!
+
+            val destinationLat =
+                destinationLatitude!!
+
+            val destinationLon =
+                destinationLongitude!!
+
+            val centerLatitude =
+                (
+                        startLat +
+                                destinationLat
+                        ) / 2.0
+
+            val centerLongitude =
+                (
+                        startLon +
+                                destinationLon
+                        ) / 2.0
+
+            val latitudeDifference =
+                abs(
+                    startLat -
+                            destinationLat
+                )
+
+            val longitudeDifference =
+                abs(
+                    startLon -
+                            destinationLon
+                )
+
+            val largestDifference =
+                maxOf(
+                    latitudeDifference,
+                    longitudeDifference
+                )
+
+            val tripZoom =
+                when {
+
+                    largestDifference < 0.01 ->
+                        14.0
+
+                    largestDifference < 0.03 ->
+                        12.5
+
+                    largestDifference < 0.08 ->
+                        11.0
+
+                    largestDifference < 0.20 ->
+                        9.5
+
+                    largestDifference < 0.50 ->
+                        8.0
+
+                    largestDifference < 1.0 ->
+                        7.0
+
+                    largestDifference < 3.0 ->
+                        5.5
+
+                    largestDifference < 7.0 ->
+                        4.5
+
+                    else ->
+                        3.5
+                }
+
+            cameraState.position =
+                CameraPosition(
+                    target =
+                        Position(
+                            longitude =
+                                centerLongitude,
+
+                            latitude =
+                                centerLatitude
+                        ),
+
+                    zoom =
+                        tripZoom
+                )
+
+        } else if (
+            latitude != null &&
+            longitude != null
+        ) {
+
+            cameraState.position =
+                CameraPosition(
+                    target =
+                        Position(
+                            longitude =
+                                longitude,
+
+                            latitude =
+                                latitude
+                        ),
+
+                    zoom =
+                        14.0
+                )
         }
     }
 
+    /*
+     * ---------------------------------------------------------
+     * MAP
+     * ---------------------------------------------------------
+     */
+
     MaplibreMap(
-        modifier = modifier.fillMaxSize(),
-        baseStyle = BaseStyle.Uri(
-            "https://tiles.openfreemap.org/styles/liberty"
-        ),
-        cameraState = cameraState
+        modifier =
+            modifier.fillMaxSize(),
+
+        baseStyle =
+            BaseStyle.Uri(
+                "https://tiles.openfreemap.org/styles/liberty"
+            ),
+
+        cameraState =
+            cameraState
     ) {
 
-        if (latitude != null && longitude != null) {
+        /*
+         * -----------------------------------------------------
+         * SAVED TRIP MARKERS
+         * -----------------------------------------------------
+         */
 
-            //Show one temporary OTO marker for Map MVP 1.
-            val testMarkerSource = rememberGeoJsonSource(
-                GeoJsonData.Features(
-                    Point(
-                        Position(
-                            longitude = longitude,
-                            latitude = latitude
+        if (hasSavedTrip) {
+
+            val startingPointSource =
+                rememberGeoJsonSource(
+                    GeoJsonData.Features(
+                        Point(
+                            Position(
+                                longitude =
+                                    startingLongitude!!,
+
+                                latitude =
+                                    startingLatitude!!
+                            )
                         )
                     )
                 )
+
+            /*
+             * BLUE = Starting Point
+             */
+            CircleLayer(
+                id =
+                    "oto-trip-start",
+
+                source =
+                    startingPointSource,
+
+                radius =
+                    const(
+                        9.dp
+                    ),
+
+                color =
+                    const(
+                        Color(
+                            0xFF1976D2
+                        )
+                    ),
+
+                strokeColor =
+                    const(
+                        Color.White
+                    ),
+
+                strokeWidth =
+                    const(
+                        3.dp
+                    )
             )
 
+            val destinationSource =
+                rememberGeoJsonSource(
+                    GeoJsonData.Features(
+                        Point(
+                            Position(
+                                longitude =
+                                    destinationLongitude!!,
+
+                                latitude =
+                                    destinationLatitude!!
+                            )
+                        )
+                    )
+                )
+
+            /*
+             * GREEN = Destination / Finish
+             */
             CircleLayer(
-                id = "oto-test-marker",
-                source = testMarkerSource,
-                radius = const(9.dp),
-                color = const(Color(0xFF0B5D1E)),
-                strokeColor = const(Color.White),
-                strokeWidth = const(3.dp)
+                id =
+                    "oto-trip-destination",
+
+                source =
+                    destinationSource,
+
+                radius =
+                    const(
+                        9.dp
+                    ),
+
+                color =
+                    const(
+                        Color(
+                            0xFF149447
+                        )
+                    ),
+
+                strokeColor =
+                    const(
+                        Color.White
+                    ),
+
+                strokeWidth =
+                    const(
+                        3.dp
+                    )
+            )
+
+        } else if (
+            latitude != null &&
+            longitude != null
+        ) {
+
+            /*
+             * Current location is only shown when
+             * no saved trip exists.
+             */
+            val currentLocationSource =
+                rememberGeoJsonSource(
+                    GeoJsonData.Features(
+                        Point(
+                            Position(
+                                longitude =
+                                    longitude,
+
+                                latitude =
+                                    latitude
+                            )
+                        )
+                    )
+                )
+
+            CircleLayer(
+                id =
+                    "oto-current-location",
+
+                source =
+                    currentLocationSource,
+
+                radius =
+                    const(
+                        9.dp
+                    ),
+
+                color =
+                    const(
+                        Color(
+                            0xFF1976D2
+                        )
+                    ),
+
+                strokeColor =
+                    const(
+                        Color.White
+                    ),
+
+                strokeWidth =
+                    const(
+                        3.dp
+                    )
             )
         }
     }

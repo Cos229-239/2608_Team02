@@ -36,6 +36,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.cos229239.team02.oto.data.location.PlaceSearchClient
@@ -59,6 +60,7 @@ fun PlanTripScreen(
     }
 
     val darkGreen = Color(0xFF0B5D1E)
+    val dangerRed = Color(0xFFB3261E)
 
     val placeSearchClient = remember {
         PlaceSearchClient()
@@ -81,6 +83,11 @@ fun PlanTripScreen(
     }
 
     var showCalendar by remember {
+        mutableStateOf(false)
+    }
+
+    // Controls the confirmation box before deleting a saved trip.
+    var showClearTripDialog by remember {
         mutableStateOf(false)
     }
 
@@ -506,6 +513,11 @@ fun PlanTripScreen(
                             120.dp
                         ),
 
+                    textStyle =
+                        TextStyle(
+                            color = Color.Black
+                        ),
+
                     placeholder = {
                         Text(
                             "Add notes about your trip"
@@ -540,7 +552,7 @@ fun PlanTripScreen(
                 )
 
                 /*
-                 * Save
+                 * Save / Update Trip
                  */
                 Button(
                     onClick = {
@@ -604,6 +616,41 @@ fun PlanTripScreen(
                             "UPDATE TRIP"
                         }
                     )
+                }
+
+                /*
+                 * Clear Trip only appears when
+                 * a saved trip currently exists.
+                 */
+                if (
+                    tripViewModel.savedTrip != null
+                ) {
+
+                    Spacer(
+                        modifier =
+                            Modifier.height(
+                                8.dp
+                            )
+                    )
+
+                    TextButton(
+                        onClick = {
+                            showClearTripDialog =
+                                true
+                        },
+
+                        modifier =
+                            Modifier.fillMaxWidth()
+                    ) {
+
+                        Text(
+                            text =
+                                "CLEAR TRIP",
+
+                            color =
+                                dangerRed
+                        )
+                    }
                 }
 
                 Spacer(
@@ -788,6 +835,73 @@ fun PlanTripScreen(
             }
         }
     }
+
+    /*
+     * Confirm Clear Trip.
+     */
+    if (
+        showClearTripDialog
+    ) {
+
+        AlertDialog(
+            onDismissRequest = {
+                showClearTripDialog =
+                    false
+            },
+
+            title = {
+                Text(
+                    "Clear Saved Trip?"
+                )
+            },
+
+            text = {
+                Text(
+                    "This will permanently delete the saved trip and clear all Plan Trip information."
+                )
+            },
+
+            confirmButton = {
+
+                TextButton(
+                    onClick = {
+
+                        tripViewModel
+                            .clearTrip()
+
+                        showClearTripDialog =
+                            false
+
+                        onBackClick()
+                    }
+                ) {
+
+                    Text(
+                        text =
+                            "Clear Trip",
+
+                        color =
+                            dangerRed
+                    )
+                }
+            },
+
+            dismissButton = {
+
+                TextButton(
+                    onClick = {
+                        showClearTripDialog =
+                            false
+                    }
+                ) {
+
+                    Text(
+                        "Keep Trip"
+                    )
+                }
+            }
+        )
+    }
 }
 
 @Composable
@@ -811,6 +925,11 @@ private fun LocationAutocompleteField(
 
             modifier =
                 Modifier.fillMaxWidth(),
+
+            textStyle =
+                TextStyle(
+                    color = Color.Black
+                ),
 
             placeholder = {
                 Text(
