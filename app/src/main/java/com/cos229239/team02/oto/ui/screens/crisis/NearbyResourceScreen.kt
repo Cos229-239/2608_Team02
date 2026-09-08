@@ -285,11 +285,25 @@ fun NearbyResourceScreen(
                         text = "No resources match the selected filters.",
                         style = MaterialTheme.typography.bodyMedium
                     )
+
                 } else {
-                    filtered.forEach { resource ->
+
+                    //Limit the number of resource cards shown at once so large searches do not exhaust memory.
+                    val displayedResources = filtered.take(100)
+
+                    displayedResources.forEach { resource ->
                         ResourceCard(resource = resource)
                     }
+
+                    if (filtered.size > displayedResources.size) {
+
+                        Text(
+                            text = "Showing the first ${displayedResources.size} of ${filtered.size} resources.",
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                    }
                 }
+
             }
         }
     }
