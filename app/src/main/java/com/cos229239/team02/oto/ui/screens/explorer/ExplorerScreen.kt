@@ -1,8 +1,5 @@
 package com.cos229239.team02.oto.ui.screens.explorer
 
-//Use OTO's shared MapLibre map component.
-
-
 import android.Manifest
 import android.content.pm.PackageManager
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -52,6 +49,7 @@ import com.cos229239.team02.oto.data.location.AndroidLocationRepository
 import com.cos229239.team02.oto.data.location.OtoLocation
 import com.cos229239.team02.oto.ui.components.map.OtoMap
 import com.cos229239.team02.oto.ui.features.AreaSafetyView
+import com.cos229239.team02.oto.ui.features.PlanTripViewModel
 import com.cos229239.team02.oto.ui.features.SafetyLevel
 import kotlinx.coroutines.launch
 import java.util.Locale
@@ -61,6 +59,7 @@ fun ExplorerScreen(
     onAreaSafetyClick: () -> Unit,
     onPlanTripClick: () -> Unit,
     onBackClick: () -> Unit,
+    tripViewModel: PlanTripViewModel,
     safetyView: AreaSafetyView = viewModel()
 ) {
 
@@ -71,22 +70,39 @@ fun ExplorerScreen(
     val mediumGreen = Color(0xFF0B5D1E)
     val lightBackground = Color(0xFFF7F8F6)
 
-    // Uses the same Area Safety ViewModel as the full Area Safety screen.
-    val safetyState by safetyView.uiState.collectAsStateWithLifecycle()
+    /*
+     * ---------------------------------------------------------
+     * SHARED DATA
+     * ---------------------------------------------------------
+     */
 
-    // Uses the location system already created for Crisis Mode.
-    val locationRepository = remember(context) {
-        AndroidLocationRepository(
-            context.applicationContext
-        )
-    }
+    val safetyState by
+    safetyView.uiState.collectAsStateWithLifecycle()
+
+    val savedTrip =
+        tripViewModel.savedTrip
+
+    /*
+     * ---------------------------------------------------------
+     * LOCATION
+     * ---------------------------------------------------------
+     */
+
+    val locationRepository =
+        remember(context) {
+            AndroidLocationRepository(
+                context.applicationContext
+            )
+        }
 
     var currentLocation by remember {
         mutableStateOf<OtoLocation?>(null)
     }
 
     var locationStatus by remember {
-        mutableStateOf("Location not loaded")
+        mutableStateOf(
+            "Location not loaded"
+        )
     }
 
     var loadingLocation by remember {
@@ -94,21 +110,27 @@ fun ExplorerScreen(
     }
 
     /**
-     * Loads the device's current GPS location.
+     * Loads the device's current location.
      */
     fun loadCurrentLocation() {
+
         scope.launch {
 
             loadingLocation = true
-            locationStatus = "Finding your location..."
+            locationStatus =
+                "Finding your location..."
 
             val location =
-                locationRepository.getCurrentLocation()
+                locationRepository
+                    .getCurrentLocation()
 
             if (location != null) {
 
-                currentLocation = location
-                locationStatus = "Current location found"
+                currentLocation =
+                    location
+
+                locationStatus =
+                    "Current location found"
 
             } else {
 
@@ -116,25 +138,29 @@ fun ExplorerScreen(
                     "Unable to determine current location"
             }
 
-            loadingLocation = false
+            loadingLocation =
+                false
         }
     }
 
     /**
-     * Handles Android's location permission request.
+     * Handles Android's permission response.
      */
     val locationPermissionLauncher =
         rememberLauncherForActivityResult(
             contract =
-                ActivityResultContracts.RequestMultiplePermissions()
+                ActivityResultContracts
+                    .RequestMultiplePermissions()
         ) { permissions ->
 
             val granted =
                 permissions[
-                    Manifest.permission.ACCESS_FINE_LOCATION
+                    Manifest.permission
+                        .ACCESS_FINE_LOCATION
                 ] == true ||
                         permissions[
-                            Manifest.permission.ACCESS_COARSE_LOCATION
+                            Manifest.permission
+                                .ACCESS_COARSE_LOCATION
                         ] == true
 
             if (granted) {
@@ -149,76 +175,112 @@ fun ExplorerScreen(
         }
 
     /**
-     * Checks permission before trying to locate the user.
+     * Requests location permission if needed.
      */
     fun requestLocation() {
 
         val fineGranted =
-            ContextCompat.checkSelfPermission(
-                context,
-                Manifest.permission.ACCESS_FINE_LOCATION
-            ) == PackageManager.PERMISSION_GRANTED
+            ContextCompat
+                .checkSelfPermission(
+                    context,
+                    Manifest.permission
+                        .ACCESS_FINE_LOCATION
+                ) ==
+                    PackageManager.PERMISSION_GRANTED
 
         val coarseGranted =
-            ContextCompat.checkSelfPermission(
-                context,
-                Manifest.permission.ACCESS_COARSE_LOCATION
-            ) == PackageManager.PERMISSION_GRANTED
+            ContextCompat
+                .checkSelfPermission(
+                    context,
+                    Manifest.permission
+                        .ACCESS_COARSE_LOCATION
+                ) ==
+                    PackageManager.PERMISSION_GRANTED
 
-        if (fineGranted || coarseGranted) {
+        if (
+            fineGranted ||
+            coarseGranted
+        ) {
 
             loadCurrentLocation()
 
         } else {
 
-            locationPermissionLauncher.launch(
-                arrayOf(
-                    Manifest.permission.ACCESS_FINE_LOCATION,
-                    Manifest.permission.ACCESS_COARSE_LOCATION
+            locationPermissionLauncher
+                .launch(
+                    arrayOf(
+                        Manifest.permission
+                            .ACCESS_FINE_LOCATION,
+
+                        Manifest.permission
+                            .ACCESS_COARSE_LOCATION
+                    )
                 )
-            )
         }
     }
 
-    /**
-     * If the user already granted location permission elsewhere
-     * in the app, automatically populate Explorer when it opens.
+    /*
+     * If there is no saved trip, Explorer can use
+     * the device's current location instead.
      */
-    LaunchedEffect(Unit) {
+    LaunchedEffect(savedTrip) {
 
-        val fineGranted =
-            ContextCompat.checkSelfPermission(
-                context,
-                Manifest.permission.ACCESS_FINE_LOCATION
-            ) == PackageManager.PERMISSION_GRANTED
+        if (savedTrip == null) {
 
-        val coarseGranted =
-            ContextCompat.checkSelfPermission(
-                context,
-                Manifest.permission.ACCESS_COARSE_LOCATION
-            ) == PackageManager.PERMISSION_GRANTED
+            val fineGranted =
+                ContextCompat
+                    .checkSelfPermission(
+                        context,
+                        Manifest.permission
+                            .ACCESS_FINE_LOCATION
+                    ) ==
+                        PackageManager.PERMISSION_GRANTED
 
-        if (fineGranted || coarseGranted) {
-            loadCurrentLocation()
+            val coarseGranted =
+                ContextCompat
+                    .checkSelfPermission(
+                        context,
+                        Manifest.permission
+                            .ACCESS_COARSE_LOCATION
+                    ) ==
+                        PackageManager.PERMISSION_GRANTED
+
+            if (
+                fineGranted ||
+                coarseGranted
+            ) {
+
+                loadCurrentLocation()
+            }
         }
     }
+
+    /*
+     * ---------------------------------------------------------
+     * SCREEN
+     * ---------------------------------------------------------
+     */
 
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(lightBackground)
+            .background(
+                lightBackground
+            )
     ) {
 
         /*
-         * ---------------------------------------------------------
-         * EXPLORER HEADER
-         * ---------------------------------------------------------
+         * -----------------------------------------------------
+         * HEADER
+         * -----------------------------------------------------
          */
 
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .background(darkGreen)
+                .background(
+                    darkGreen
+                )
                 .statusBarsPadding()
                 .padding(
                     horizontal = 18.dp,
@@ -227,35 +289,55 @@ fun ExplorerScreen(
         ) {
 
             Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically
+                modifier =
+                    Modifier.fillMaxWidth(),
+
+                verticalAlignment =
+                    Alignment.CenterVertically
             ) {
 
                 TextButton(
-                    onClick = onBackClick
+                    onClick =
+                        onBackClick
                 ) {
+
                     Text(
                         text = "←",
-                        color = Color.White,
-                        fontSize = 26.sp
+                        color =
+                            Color.White,
+                        fontSize =
+                            26.sp
                     )
                 }
 
                 Column(
-                    modifier = Modifier.weight(1f)
+                    modifier =
+                        Modifier.weight(1f)
                 ) {
 
                     Text(
-                        text = "EXPLORER MODE",
-                        color = Color.White,
-                        fontSize = 24.sp,
-                        fontWeight = FontWeight.Bold
+                        text =
+                            "EXPLORER MODE",
+
+                        color =
+                            Color.White,
+
+                        fontSize =
+                            24.sp,
+
+                        fontWeight =
+                            FontWeight.Bold
                     )
 
                     Text(
-                        text = "Plan • Navigate • Report • Stay Safe",
-                        color = Color.White,
-                        fontSize = 14.sp
+                        text =
+                            "Plan • Navigate • Report • Stay Safe",
+
+                        color =
+                            Color.White,
+
+                        fontSize =
+                            14.sp
                     )
                 }
 
@@ -267,9 +349,9 @@ fun ExplorerScreen(
         }
 
         /*
-         * ---------------------------------------------------------
+         * -----------------------------------------------------
          * SCROLLABLE DASHBOARD
-         * ---------------------------------------------------------
+         * -----------------------------------------------------
          */
 
         Column(
@@ -281,124 +363,277 @@ fun ExplorerScreen(
         ) {
 
             /*
-             * -----------------------------------------------------
-             * MAP AREA
-             * -----------------------------------------------------
+             * -------------------------------------------------
+             * MAP
+             * -------------------------------------------------
              */
 
-        //Show OTO's shared interactive MapLibre map.
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(280.dp)
+                    .height(
+                        300.dp
+                    )
             ) {
 
                 OtoMap(
-                    modifier = Modifier.fillMaxSize(), latitude = currentLocation?.latitude,
-                    longitude = currentLocation?.longitude )
+                    modifier =
+                        Modifier.fillMaxSize(),
 
-                //Keep Explorer's existing location information and Locate Me control over the map.
-                Card(
-                    modifier = Modifier
-                        .align(Alignment.BottomCenter)
-                        .padding(12.dp),
-                    colors = CardDefaults.cardColors(
-                        containerColor = Color.White.copy(alpha = 0.92f)
-                    ),
-                    shape = RoundedCornerShape(14.dp)
-                ) {
+                    latitude =
+                        currentLocation?.latitude,
 
-                    Column(
-                        modifier = Modifier.padding(12.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally
+                    longitude =
+                        currentLocation?.longitude,
+
+                    startingLatitude =
+                        savedTrip
+                            ?.startingLatitude,
+
+                    startingLongitude =
+                        savedTrip
+                            ?.startingLongitude,
+
+                    destinationLatitude =
+                        savedTrip
+                            ?.destinationLatitude,
+
+                    destinationLongitude =
+                        savedTrip
+                            ?.destinationLongitude
+                )
+
+                /*
+                 * Show location status only when
+                 * there is no saved trip.
+                 */
+                if (savedTrip == null) {
+
+                    Card(
+                        modifier =
+                            Modifier
+                                .align(
+                                    Alignment.TopStart
+                                )
+                                .padding(
+                                    12.dp
+                                ),
+
+                        colors =
+                            CardDefaults.cardColors(
+                                containerColor =
+                                    Color.White.copy(
+                                        alpha = 0.92f
+                                    )
+                            ),
+
+                        shape =
+                            RoundedCornerShape(
+                                12.dp
+                            )
                     ) {
 
-
-                    if (loadingLocation) {
-
-                            CircularProgressIndicator()
-
-                        } else {
-
-                            currentLocation?.let { location ->
-
-                            Text(
-                                text =
-                                    formatExplorerLocation(
-                                        location
-                                    ),
-                                textAlign =
-                                    TextAlign.Center,
-                                color = darkGreen
-                            )
-
-                            } ?: Text(
-                                text = locationStatus,
-                                textAlign = TextAlign.Center,
-                                color = darkGreen
-                            )
-                        }
-
-
-
-                        if (loadingLocation) {
-
-                            CircularProgressIndicator()
-
-                        } else {
-
-                            currentLocation?.let { location ->
-
-                                Text(
-                                    text = formatExplorerLocation(location),
-                                    textAlign = TextAlign.Center,
-                                    color = darkGreen
+                        Column(
+                            modifier =
+                                Modifier.padding(
+                                    10.dp
                                 )
-
-                            } ?: Text(
-                                text = locationStatus,
-                                textAlign = TextAlign.Center,
-                                color = darkGreen
-                            )
-                        }
-
-
-                        Spacer(
-                            modifier = Modifier.height(8.dp)
-                        )
-
-                        Button(
-                            onClick = {
-                                requestLocation()
-                            },
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = mediumGreen
-                            )
                         ) {
 
                             Text(
-                                text = "📍 Locate Me"
+                                text =
+                                    "CURRENT LOCATION",
+
+                                color =
+                                    darkGreen,
+
+                                fontSize =
+                                    11.sp,
+
+                                fontWeight =
+                                    FontWeight.Bold
                             )
+
+                            Spacer(
+                                modifier =
+                                    Modifier.height(
+                                        3.dp
+                                    )
+                            )
+
+                            if (loadingLocation) {
+
+                                CircularProgressIndicator()
+
+                            } else {
+
+                                currentLocation
+                                    ?.let { location ->
+
+                                        Text(
+                                            text =
+                                                formatExplorerLocation(
+                                                    location
+                                                ),
+
+                                            color =
+                                                darkGreen,
+
+                                            style =
+                                                MaterialTheme
+                                                    .typography
+                                                    .bodySmall
+                                        )
+
+                                    } ?: Text(
+                                    text =
+                                        locationStatus,
+
+                                    style =
+                                        MaterialTheme
+                                            .typography
+                                            .bodySmall
+                                )
+                            }
+
+                            if (
+                                currentLocation == null &&
+                                !loadingLocation
+                            ) {
+
+                                Spacer(
+                                    modifier =
+                                        Modifier.height(
+                                            8.dp
+                                        )
+                                )
+
+                                Button(
+                                    onClick = {
+                                        requestLocation()
+                                    },
+
+                                    colors =
+                                        ButtonDefaults
+                                            .buttonColors(
+                                                containerColor =
+                                                    mediumGreen
+                                            )
+                                ) {
+
+                                    Text(
+                                        text =
+                                            "Locate Me"
+                                    )
+                                }
+                            }
                         }
                     }
                 }
+
+                /*
+                 * Saved trip summary.
+                 */
+                savedTrip
+                    ?.let { trip ->
+
+                        Card(
+                            modifier =
+                                Modifier
+                                    .align(
+                                        Alignment.BottomStart
+                                    )
+                                    .padding(
+                                        12.dp
+                                    ),
+
+                            colors =
+                                CardDefaults.cardColors(
+                                    containerColor =
+                                        Color.White.copy(
+                                            alpha = 0.94f
+                                        )
+                                ),
+
+                            shape =
+                                RoundedCornerShape(
+                                    12.dp
+                                )
+                        ) {
+
+                            Column(
+                                modifier =
+                                    Modifier.padding(
+                                        10.dp
+                                    )
+                            ) {
+
+                                Text(
+                                    text =
+                                        "ACTIVE TRIP",
+
+                                    color =
+                                        darkGreen,
+
+                                    fontWeight =
+                                        FontWeight.Bold,
+
+                                    fontSize =
+                                        12.sp
+                                )
+
+                                Spacer(
+                                    modifier =
+                                        Modifier.height(
+                                            4.dp
+                                        )
+                                )
+
+                                Text(
+                                    text =
+                                        "Start: ${trip.startingPointName}",
+
+                                    style =
+                                        MaterialTheme
+                                            .typography
+                                            .bodySmall
+                                )
+
+                                Text(
+                                    text =
+                                        "Destination: ${trip.destinationName}",
+
+                                    style =
+                                        MaterialTheme
+                                            .typography
+                                            .bodySmall
+                                )
+                            }
+                        }
+                    }
             }
 
+            /*
+             * -------------------------------------------------
+             * DASHBOARD CONTENT
+             * -------------------------------------------------
+             */
 
-        //Keep the rest of the Explorer dashboard padded below the map.
-        Column(
-            modifier = Modifier
-                .padding(16.dp)
-        ) {
+            Column(
+                modifier =
+                    Modifier.padding(
+                        16.dp
+                    )
+            ) {
+
                 /*
-                 * -------------------------------------------------
-                 * QUICK ACTION CARDS
-                 * -------------------------------------------------
+                 * QUICK ACTIONS
                  */
 
                 Row(
                     modifier =
                         Modifier.fillMaxWidth(),
+
                     horizontalArrangement =
                         Arrangement.spacedBy(
                             10.dp
@@ -406,12 +641,26 @@ fun ExplorerScreen(
                 ) {
 
                     ExplorerActionCard(
-                        title = "PLAN TRIP",
+                        title =
+                            "PLAN TRIP",
+
                         description =
-                            "Plan or edit a trip",
-                        icon = "📍",
+                            if (
+                                savedTrip == null
+                            ) {
+                                "Plan a new trip"
+                            } else {
+                                "View or edit trip"
+                            },
+
+                        icon =
+                            "📍",
+
                         modifier =
-                            Modifier.weight(1f),
+                            Modifier.weight(
+                                1f
+                            ),
+
                         onClick =
                             onPlanTripClick
                     )
@@ -419,11 +668,18 @@ fun ExplorerScreen(
                     ExplorerActionCard(
                         title =
                             "CREATE ROUTE",
+
                         description =
                             "Build a custom route",
-                        icon = "➕",
+
+                        icon =
+                            "➕",
+
                         modifier =
-                            Modifier.weight(1f),
+                            Modifier.weight(
+                                1f
+                            ),
+
                         onClick = {
                             // Future feature.
                         }
@@ -432,11 +688,18 @@ fun ExplorerScreen(
                     ExplorerActionCard(
                         title =
                             "OFFLINE MAPS",
+
                         description =
                             "Save maps offline",
-                        icon = "⬇️",
+
+                        icon =
+                            "⬇️",
+
                         modifier =
-                            Modifier.weight(1f),
+                            Modifier.weight(
+                                1f
+                            ),
+
                         onClick = {
                             // Future feature.
                         }
@@ -445,56 +708,67 @@ fun ExplorerScreen(
 
                 Spacer(
                     modifier =
-                        Modifier.height(16.dp)
+                        Modifier.height(
+                            16.dp
+                        )
                 )
 
                 /*
-                 * -------------------------------------------------
                  * LIVE SAFETY OVERVIEW
-                 * -------------------------------------------------
                  */
 
                 SafetyOverviewCard(
                     areaName =
                         safetyState.areaName,
+
                     alertCount =
-                        safetyState.notifications.size,
+                        safetyState
+                            .notifications
+                            .size,
+
                     severeCount =
-                        safetyState.notifications.count {
-                            it.level ==
-                                    SafetyLevel.SEVERE
-                        },
+                        safetyState
+                            .notifications
+                            .count {
+                                it.level ==
+                                        SafetyLevel.SEVERE
+                            },
+
                     moderateCount =
-                        safetyState.notifications.count {
-                            it.level ==
-                                    SafetyLevel.MODERATE
-                        },
+                        safetyState
+                            .notifications
+                            .count {
+                                it.level ==
+                                        SafetyLevel.MODERATE
+                            },
+
                     isLoading =
                         safetyState.isLoading,
+
                     isOffline =
                         safetyState.isOffline,
+
                     isSample =
                         safetyState.isSampleData,
+
                     onClick =
                         onAreaSafetyClick
                 )
 
                 Spacer(
                     modifier =
-                        Modifier.height(16.dp)
+                        Modifier.height(
+                            16.dp
+                        )
                 )
-
-                /*
-                 * -------------------------------------------------
-                 * REPORT HAZARD
-                 * -------------------------------------------------
-                 */
 
                 DashboardWideCard(
                     title =
                         "⚠️  REPORT HAZARD / ROUTE CHANGE",
+
                     subtitle =
                         "Help keep trails safe for everyone",
+
                     onClick = {
                         // Future feature.
                     }
@@ -502,23 +776,21 @@ fun ExplorerScreen(
 
                 Spacer(
                     modifier =
-                        Modifier.height(12.dp)
+                        Modifier.height(
+                            12.dp
+                        )
                 )
-
-                /*
-                 * -------------------------------------------------
-                 * CHECK-IN
-                 * -------------------------------------------------
-                 */
 
                 Card(
                     modifier =
                         Modifier.fillMaxWidth(),
+
                     colors =
                         CardDefaults.cardColors(
                             containerColor =
                                 Color.White
                         ),
+
                     shape =
                         RoundedCornerShape(
                             14.dp
@@ -533,11 +805,17 @@ fun ExplorerScreen(
                     ) {
 
                         Text(
-                            text = "👥  CHECK-IN",
-                            fontSize = 18.sp,
+                            text =
+                                "👥  CHECK-IN",
+
+                            fontSize =
+                                18.sp,
+
                             fontWeight =
                                 FontWeight.Bold,
-                            color = darkGreen
+
+                            color =
+                                darkGreen
                         )
 
                         Spacer(
@@ -550,16 +828,20 @@ fun ExplorerScreen(
                         Text(
                             text =
                                 "Trusted Contact",
-                            fontSize = 14.sp
+
+                            fontSize =
+                                14.sp
                         )
 
                         Text(
                             text =
                                 "Not checked in",
+
                             color =
                                 Color(
                                     0xFFE67E22
                                 ),
+
                             fontWeight =
                                 FontWeight.Bold
                         )
@@ -573,19 +855,23 @@ fun ExplorerScreen(
 
                         Button(
                             onClick = {
-                                // Future Check-In feature.
+                                // Future feature.
                             },
+
                             modifier =
                                 Modifier.fillMaxWidth(),
+
                             colors =
-                                ButtonDefaults.buttonColors(
-                                    containerColor =
-                                        mediumGreen
-                                )
+                                ButtonDefaults
+                                    .buttonColors(
+                                        containerColor =
+                                            mediumGreen
+                                    )
                         ) {
 
                             Text(
-                                "CHECK IN"
+                                text =
+                                    "CHECK IN"
                             )
                         }
                     }
@@ -593,20 +879,18 @@ fun ExplorerScreen(
 
                 Spacer(
                     modifier =
-                        Modifier.height(12.dp)
+                        Modifier.height(
+                            12.dp
+                        )
                 )
-
-                /*
-                 * -------------------------------------------------
-                 * FIELD REPORTS
-                 * -------------------------------------------------
-                 */
 
                 DashboardWideCard(
                     title =
                         "📋  FIELD REPORTS",
+
                     subtitle =
                         "View recent reports from this area",
+
                     onClick = {
                         // Future feature.
                     }
@@ -614,7 +898,9 @@ fun ExplorerScreen(
 
                 Spacer(
                     modifier =
-                        Modifier.height(30.dp)
+                        Modifier.height(
+                            30.dp
+                        )
                 )
             }
         }
@@ -623,8 +909,7 @@ fun ExplorerScreen(
 
 
 /**
- * Small action card used for Plan Trip,
- * Create Route and Offline Maps.
+ * Small Explorer action card.
  */
 @Composable
 private fun ExplorerActionCard(
@@ -636,19 +921,27 @@ private fun ExplorerActionCard(
 ) {
 
     val darkGreen =
-        Color(0xFF063D24)
+        Color(
+            0xFF063D24
+        )
 
     Card(
-        modifier = modifier
-            .height(150.dp)
-            .clickable {
-                onClick()
-            },
+        modifier =
+            modifier
+                .height(
+                    150.dp
+                )
+                .clickable {
+                    onClick()
+                },
+
         colors =
-            CardDefaults.cardColors(
-                containerColor =
-                    Color.White
-            ),
+            CardDefaults
+                .cardColors(
+                    containerColor =
+                        Color.White
+                ),
+
         shape =
             RoundedCornerShape(
                 14.dp
@@ -656,46 +949,68 @@ private fun ExplorerActionCard(
     ) {
 
         Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(12.dp),
+            modifier =
+                Modifier
+                    .fillMaxSize()
+                    .padding(
+                        12.dp
+                    ),
+
             horizontalAlignment =
                 Alignment.CenterHorizontally,
+
             verticalArrangement =
                 Arrangement.Center
         ) {
 
             Text(
-                text = icon,
-                fontSize = 30.sp
+                text =
+                    icon,
+
+                fontSize =
+                    30.sp
             )
 
             Spacer(
                 modifier =
-                    Modifier.height(6.dp)
+                    Modifier.height(
+                        6.dp
+                    )
             )
 
             Text(
-                text = title,
-                color = darkGreen,
+                text =
+                    title,
+
+                color =
+                    darkGreen,
+
                 fontWeight =
                     FontWeight.Bold,
-                fontSize = 14.sp,
+
+                fontSize =
+                    14.sp,
+
                 textAlign =
                     TextAlign.Center
             )
 
             Spacer(
                 modifier =
-                    Modifier.height(4.dp)
+                    Modifier.height(
+                        4.dp
+                    )
             )
 
             Text(
-                text = description,
+                text =
+                    description,
+
                 style =
                     MaterialTheme
                         .typography
                         .bodySmall,
+
                 textAlign =
                     TextAlign.Center
             )
@@ -705,7 +1020,7 @@ private fun ExplorerActionCard(
 
 
 /**
- * Displays live information from AreaSafetyView.
+ * Live Area Safety summary.
  */
 @Composable
 private fun SafetyOverviewCard(
@@ -720,19 +1035,25 @@ private fun SafetyOverviewCard(
 ) {
 
     val darkGreen =
-        Color(0xFF063D24)
+        Color(
+            0xFF063D24
+        )
 
     Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable {
-                onClick()
-            },
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .clickable {
+                    onClick()
+                },
+
         colors =
-            CardDefaults.cardColors(
-                containerColor =
-                    Color.White
-            ),
+            CardDefaults
+                .cardColors(
+                    containerColor =
+                        Color.White
+                ),
+
         shape =
             RoundedCornerShape(
                 14.dp
@@ -741,14 +1062,18 @@ private fun SafetyOverviewCard(
 
         Column(
             modifier =
-                Modifier.padding(18.dp)
+                Modifier.padding(
+                    18.dp
+                )
         ) {
 
             Row(
                 modifier =
                     Modifier.fillMaxWidth(),
+
                 horizontalArrangement =
                     Arrangement.SpaceBetween,
+
                 verticalAlignment =
                     Alignment.CenterVertically
             ) {
@@ -756,8 +1081,13 @@ private fun SafetyOverviewCard(
                 Text(
                     text =
                         "🛡️  SAFETY OVERVIEW",
-                    color = darkGreen,
-                    fontSize = 18.sp,
+
+                    color =
+                        darkGreen,
+
+                    fontSize =
+                        18.sp,
+
                     fontWeight =
                         FontWeight.Bold
                 )
@@ -765,7 +1095,10 @@ private fun SafetyOverviewCard(
                 Text(
                     text =
                         "View Area Safety ›",
-                    color = darkGreen,
+
+                    color =
+                        darkGreen,
+
                     fontWeight =
                         FontWeight.Bold
                 )
@@ -773,21 +1106,29 @@ private fun SafetyOverviewCard(
 
             Spacer(
                 modifier =
-                    Modifier.height(12.dp)
+                    Modifier.height(
+                        12.dp
+                    )
             )
 
             Text(
-                text = areaName,
+                text =
+                    areaName,
+
                 fontWeight =
                     FontWeight.Bold
             )
 
             Spacer(
                 modifier =
-                    Modifier.height(12.dp)
+                    Modifier.height(
+                        12.dp
+                    )
             )
 
-            if (isLoading) {
+            if (
+                isLoading
+            ) {
 
                 CircularProgressIndicator()
 
@@ -796,6 +1137,7 @@ private fun SafetyOverviewCard(
                 Row(
                     modifier =
                         Modifier.fillMaxWidth(),
+
                     horizontalArrangement =
                         Arrangement.SpaceEvenly
                 ) {
@@ -803,6 +1145,7 @@ private fun SafetyOverviewCard(
                     SafetyStat(
                         value =
                             alertCount.toString(),
+
                         label =
                             "Active Alerts"
                     )
@@ -810,6 +1153,7 @@ private fun SafetyOverviewCard(
                     SafetyStat(
                         value =
                             severeCount.toString(),
+
                         label =
                             "Severe"
                     )
@@ -817,13 +1161,16 @@ private fun SafetyOverviewCard(
                     SafetyStat(
                         value =
                             moderateCount.toString(),
+
                         label =
                             "Moderate"
                     )
                 }
             }
 
-            if (isOffline) {
+            if (
+                isOffline
+            ) {
 
                 Spacer(
                     modifier =
@@ -835,16 +1182,20 @@ private fun SafetyOverviewCard(
                 Text(
                     text =
                         "⚠ Offline — showing saved safety information",
+
                     color =
                         MaterialTheme
                             .colorScheme
                             .error,
+
                     fontWeight =
                         FontWeight.Bold
                 )
             }
 
-            if (isSample) {
+            if (
+                isSample
+            ) {
 
                 Spacer(
                     modifier =
@@ -856,6 +1207,7 @@ private fun SafetyOverviewCard(
                 Text(
                     text =
                         "Sample safety data",
+
                     style =
                         MaterialTheme
                             .typography
@@ -868,7 +1220,7 @@ private fun SafetyOverviewCard(
 
 
 /**
- * One statistic inside Safety Overview.
+ * One safety statistic.
  */
 @Composable
 private fun SafetyStat(
@@ -882,18 +1234,25 @@ private fun SafetyStat(
     ) {
 
         Text(
-            text = value,
-            fontSize = 26.sp,
+            text =
+                value,
+
+            fontSize =
+                26.sp,
+
             fontWeight =
                 FontWeight.Bold
         )
 
         Text(
-            text = label,
+            text =
+                label,
+
             style =
                 MaterialTheme
                     .typography
                     .bodySmall,
+
             textAlign =
                 TextAlign.Center
         )
@@ -902,7 +1261,7 @@ private fun SafetyStat(
 
 
 /**
- * Large full-width dashboard action.
+ * Full-width dashboard card.
  */
 @Composable
 private fun DashboardWideCard(
@@ -912,19 +1271,25 @@ private fun DashboardWideCard(
 ) {
 
     val darkGreen =
-        Color(0xFF063D24)
+        Color(
+            0xFF063D24
+        )
 
     Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable {
-                onClick()
-            },
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .clickable {
+                    onClick()
+                },
+
         colors =
-            CardDefaults.cardColors(
-                containerColor =
-                    Color.White
-            ),
+            CardDefaults
+                .cardColors(
+                    containerColor =
+                        Color.White
+                ),
+
         shape =
             RoundedCornerShape(
                 14.dp
@@ -932,40 +1297,60 @@ private fun DashboardWideCard(
     ) {
 
         Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(18.dp),
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .padding(
+                        18.dp
+                    ),
+
             verticalAlignment =
                 Alignment.CenterVertically
         ) {
 
             Column(
                 modifier =
-                    Modifier.weight(1f)
+                    Modifier.weight(
+                        1f
+                    )
             ) {
 
                 Text(
-                    text = title,
-                    color = darkGreen,
+                    text =
+                        title,
+
+                    color =
+                        darkGreen,
+
                     fontWeight =
                         FontWeight.Bold,
-                    fontSize = 17.sp
+
+                    fontSize =
+                        17.sp
                 )
 
                 Spacer(
                     modifier =
-                        Modifier.height(4.dp)
+                        Modifier.height(
+                            4.dp
+                        )
                 )
 
                 Text(
-                    text = subtitle
+                    text =
+                        subtitle
                 )
             }
 
             Text(
-                text = "›",
-                fontSize = 28.sp,
-                color = darkGreen
+                text =
+                    "›",
+
+                fontSize =
+                    28.sp,
+
+                color =
+                    darkGreen
             )
         }
     }
@@ -973,8 +1358,7 @@ private fun DashboardWideCard(
 
 
 /**
- * Formats the GPS coordinates shown in
- * the Explorer map placeholder.
+ * Formats GPS coordinates for Explorer.
  */
 private fun formatExplorerLocation(
     location: OtoLocation

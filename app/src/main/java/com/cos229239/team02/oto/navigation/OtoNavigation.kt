@@ -25,11 +25,10 @@ fun OtoNavigation() {
             OtoRoute.Home
         )
 
-    // Shared Plan Trip ViewModel.
-    // This keeps trip data available while navigating
-    // and reloads the saved trip from local storage.
+    // One shared Plan Trip ViewModel.
+    // Plan Trip writes to it and Explorer reads from it.
     val planTripViewModel:
-        PlanTripViewModel =
+            PlanTripViewModel =
         viewModel()
 
     NavDisplay(
@@ -84,7 +83,10 @@ fun OtoNavigation() {
 
                         onBackClick = {
                             backStack.removeLastOrNull()
-                        }
+                        },
+
+                        tripViewModel =
+                            planTripViewModel
                     )
                 }
 
