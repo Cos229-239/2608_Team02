@@ -45,6 +45,7 @@ import com.cos229239.team02.oto.data.resource.NearbyResource
 import com.cos229239.team02.oto.data.resource.OverpassResourceRepository
 import com.cos229239.team02.oto.data.resource.ResourceResult
 import com.cos229239.team02.oto.data.resource.ResourceType
+import com.cos229239.team02.oto.ui.components.OtoTopAppBar //Use OTO's shared Material 3 top app bar.
 import kotlinx.coroutines.launch
 import java.util.Locale
 import kotlin.math.roundToInt
@@ -170,22 +171,12 @@ fun NearbyResourceScreen(
 
     Scaffold(
         topBar = {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .statusBarsPadding()
-                    .padding(horizontal = 4.dp, vertical = 12.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                TextButton(onClick = onBackClick) {
-                    Text("Back")
-                }
-                Text(
-                    text = "Nearby Resources",
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Bold
-                )
-            }
+
+            //Use OTO's shared Material 3 top app bar.
+            OtoTopAppBar(
+                title = "NEARBY RESOURCES",
+                onBackClick = onBackClick
+            )
         }
     ) { paddingValues ->
         val resources = result?.resources ?: emptyList()
