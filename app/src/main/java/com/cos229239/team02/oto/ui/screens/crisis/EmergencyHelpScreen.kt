@@ -6,19 +6,15 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.heightIn
-
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.Card
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
@@ -37,6 +33,8 @@ import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import com.cos229239.team02.oto.data.location.AndroidLocationRepository
 import com.cos229239.team02.oto.data.location.OtoLocation
+import com.cos229239.team02.oto.ui.components.OtoTopAppBar   //Use OTO's shared Material 3 top app bar.
+
 import kotlinx.coroutines.launch
 import java.util.Locale
 import android.content.Intent
@@ -155,35 +153,17 @@ fun EmergencyHelpScreen(
     }
 
 
-
-
-
     Scaffold(
         topBar = {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    //Move the header below Android's status bar and camera cutout.
-                    .statusBarsPadding()
-                    .padding(horizontal = 8.dp, vertical = 8.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                //Use a text button so Back has a larger and clearer touch target.
-                TextButton(
-                    onClick = onBackClick,
-                    modifier = Modifier.heightIn(min = 48.dp)
-                ) {
-                    Text(text = "← Back")
-                }
 
-                Text(
-                    text = "Emergency Help",
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Bold
-                )
-            }
+            //Use OTO's shared Material 3 top app bar.
+            OtoTopAppBar(
+                title = "EMERGENCY HELP",
+                onBackClick = onBackClick
+            )
         }
-    ) { paddingValues ->
+    )
+    { paddingValues ->
 
         Column(
             modifier = Modifier
