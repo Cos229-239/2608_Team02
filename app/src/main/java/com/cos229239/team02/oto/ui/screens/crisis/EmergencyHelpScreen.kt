@@ -256,15 +256,6 @@ fun EmergencyHelpScreen(
             ) {
                 Text(text = "Share Status & Location")
             }
-            //Keep Back available as a clearly labeled action in addition to the arrow.
-            Button(
-                onClick = onBackClick,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .heightIn(min = 48.dp)
-            ) {
-                Text(text = "Back")
-            }
         }
     }
 }
