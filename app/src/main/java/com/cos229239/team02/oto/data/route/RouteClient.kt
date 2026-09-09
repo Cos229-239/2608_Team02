@@ -36,8 +36,8 @@ class RouteClient {
         }
 
     /**
-     * Requests the primary route plus any alternative routes
-     * available between the starting point and destination.
+     * Requests the primary route plus any available
+     * alternative routes.
      */
     suspend fun getRoutes(
         startingLatitude: Double,
@@ -47,7 +47,7 @@ class RouteClient {
     ): List<RouteResult> {
 
         /*
-         * OSRM expects coordinates in:
+         * OSRM expects:
          *
          * longitude,latitude
          *
@@ -144,7 +144,7 @@ class RouteClient {
         ) {
 
             /*
-             * If routing fails, return an empty list.
+             * Network/API failure.
              */
             emptyList()
         }
@@ -153,38 +153,31 @@ class RouteClient {
 
 
 /**
- * Route data used by Explorer.
+ * Route data used by Explorer and OtoMap.
  */
 data class RouteResult(
 
     /*
-     * Position of the route returned by OSRM.
-     *
      * 0 = primary route
      * 1+ = alternative routes
      */
-    val routeIndex:
-    Int,
+    val routeIndex: Int,
 
     /*
      * Each coordinate is:
      *
      * [longitude, latitude]
      */
-    val coordinates:
-    List<List<Double>>,
+    val coordinates: List<List<Double>>,
 
-    val distanceMeters:
-    Double,
+    val distanceMeters: Double,
 
-    val durationSeconds:
-    Double,
+    val durationSeconds: Double,
 
     /*
-     * True for the first route returned by OSRM.
+     * True only for the first route returned.
      */
-    val isPrimary:
-    Boolean
+    val isPrimary: Boolean
 )
 
 
