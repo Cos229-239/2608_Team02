@@ -10,8 +10,13 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.material3.Button
 import androidx.compose.material3.Text
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -25,6 +30,12 @@ import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import com.cos229239.team02.oto.data.location.AndroidLocationRepository
 import kotlinx.coroutines.launch
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
+import com.cos229239.team02.oto.ui.theme.OtoSpacing
+
+
+
 
 @Composable
 fun HomeScreen(
@@ -77,12 +88,37 @@ fun HomeScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(24.dp),
-        verticalArrangement = Arrangement.Center,
+            .statusBarsPadding()
+            .padding(
+                horizontal = OtoSpacing.ScreenHorizontal,
+                vertical = OtoSpacing.ScreenVertical
+            ),
+
+        verticalArrangement = Arrangement.Top,
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Text(text = "Out in the Open")
-        Text(text = "Explore farther. Return safer.")
+
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Text(
+                text = "OUT IN THE OPEN",
+                style = MaterialTheme.typography.headlineLarge,
+                color = MaterialTheme.colorScheme.primary
+            )
+
+            Spacer(
+                modifier = Modifier.height(
+                    OtoSpacing.Small
+                )
+            )
+
+            Text(
+                text = "Explore farther. Return safer.",
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onBackground
+            )
+        }
 
         Spacer(modifier = Modifier.height(24.dp))
 
@@ -119,16 +155,113 @@ fun HomeScreen(
 
         Text(text = locationText)
 
-        Spacer(modifier = Modifier.height(24.dp))
+        Spacer(modifier = Modifier.height(OtoSpacing.SectionGap))
 
-        Button(onClick = onExplorerClick) {
-            Text(text = "Explorer Mode")
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            shape = MaterialTheme.shapes.large,
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.primaryContainer
+            )
+        ) {
+            Column(
+                modifier = Modifier.padding(OtoSpacing.CardPadding)
+            ) {
+                Text(
+                    text = "EXPLORER MODE",
+                    style = MaterialTheme.typography.headlineMedium,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer
+                )
+
+                Spacer(
+                    modifier = Modifier.height(
+                        OtoSpacing.Small
+                    )
+                )
+
+                Text(
+                    text = "Plan trips, navigate, review safety conditions, and explore with confidence.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer
+                )
+
+                Spacer(
+                    modifier = Modifier.height(
+                        OtoSpacing.Standard
+                    )
+                )
+
+                TextButton(
+                    onClick = onExplorerClick,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(
+                            min = OtoSpacing.TouchTarget
+                        )
+                ) {
+                    Text(
+                        text = "OPEN EXPLORER",
+                        style = MaterialTheme.typography.labelLarge
+                    )
+                }
+            }
         }
 
-        Spacer(modifier = Modifier.height(12.dp))
+        Spacer(
+            modifier = Modifier.height(
+                OtoSpacing.CardGap
+            )
+        )
 
-        Button(onClick = onCrisisClick) {
-            Text(text = "Crisis Mode")
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            shape = MaterialTheme.shapes.large,
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.errorContainer
+            )
+        ) {
+            Column(
+                modifier = Modifier.padding(OtoSpacing.CardPadding)
+            ) {
+                Text(
+                    text = "CRISIS MODE",
+                    style = MaterialTheme.typography.headlineMedium,
+                    color = MaterialTheme.colorScheme.onErrorContainer
+                )
+
+                Spacer(
+                    modifier = Modifier.height(
+                        OtoSpacing.Small
+                    )
+                )
+
+                Text(
+                    text = "Get emergency help, find critical resources, and access survival tools.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onErrorContainer
+                )
+
+                Spacer(
+                    modifier = Modifier.height(
+                        OtoSpacing.Standard
+                    )
+                )
+
+                TextButton(
+                    onClick = onCrisisClick,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(
+                            min = OtoSpacing.CrisisTouchTarget
+                        )
+                ) {
+                    Text(
+                        text = "OPEN CRISIS MODE",
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.error
+                    )
+                }
+            }
         }
     }
 }
