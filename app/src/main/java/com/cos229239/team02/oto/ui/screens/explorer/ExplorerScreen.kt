@@ -15,7 +15,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -26,7 +25,6 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -53,6 +51,7 @@ import com.cos229239.team02.oto.data.route.RouteResult
 import com.cos229239.team02.oto.ui.components.map.OtoMap
 import com.cos229239.team02.oto.ui.features.AreaSafetyView
 import com.cos229239.team02.oto.ui.features.PlanTripViewModel
+import com.cos229239.team02.oto.ui.components.OtoTopAppBar
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
 import java.util.Locale
@@ -495,95 +494,16 @@ fun ExplorerScreen(
     ) {
 
         /*
-         * -----------------------------------------------------
-         * HEADER
-         * -----------------------------------------------------
-         */
+        * -----------------------------------------------------
+        * HEADER
+        * -----------------------------------------------------
+        */
 
-        Column(
-            modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .background(
-                        darkGreen
-                    )
-                    .statusBarsPadding()
-                    .padding(
-                        horizontal =
-                            18.dp,
-
-                        vertical =
-                            14.dp
-                    )
-        ) {
-
-            Row(
-                modifier =
-                    Modifier.fillMaxWidth(),
-
-                verticalAlignment =
-                    Alignment.CenterVertically
-            ) {
-
-                TextButton(
-                    onClick =
-                        onBackClick
-                ) {
-
-                    Text(
-                        text =
-                            "←",
-
-                        color =
-                            Color.White,
-
-                        fontSize =
-                            26.sp
-                    )
-                }
-
-                Column(
-                    modifier =
-                        Modifier.weight(
-                            1f
-                        )
-                ) {
-
-                    Text(
-                        text =
-                            "EXPLORER MODE",
-
-                        color =
-                            Color.White,
-
-                        fontSize =
-                            24.sp,
-
-                        fontWeight =
-                            FontWeight.Bold
-                    )
-
-                    Text(
-                        text =
-                            "Plan • Navigate • Report • Stay Safe",
-
-                        color =
-                            Color.White,
-
-                        fontSize =
-                            14.sp
-                    )
-                }
-
-                Text(
-                    text =
-                        "🔔",
-
-                    fontSize =
-                        24.sp
-                )
-            }
-        }
+        //Use OTO's shared Material 3 top app bar.
+        OtoTopAppBar(
+            title = "EXPLORER MODE",
+            onBackClick = onBackClick
+        )
 
         /*
          * -----------------------------------------------------

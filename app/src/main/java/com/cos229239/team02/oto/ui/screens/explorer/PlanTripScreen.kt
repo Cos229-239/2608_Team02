@@ -42,6 +42,7 @@ import androidx.compose.ui.unit.sp
 import com.cos229239.team02.oto.data.location.PlaceSearchClient
 import com.cos229239.team02.oto.data.location.PlaceSuggestion
 import com.cos229239.team02.oto.ui.features.PlanTripViewModel
+import com.cos229239.team02.oto.ui.components.OtoTopAppBar //Use OTO's shared Material 3 top app bar.
 import kotlinx.coroutines.delay
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -128,6 +129,7 @@ fun PlanTripScreen(
             placeSearchClient.search(
                 tripViewModel.startingPoint
             )
+
     }
 
     /*
@@ -168,41 +170,15 @@ fun PlanTripScreen(
         ) {
 
             /*
-             * Header
-             */
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(darkGreen)
-                    .padding(
-                        horizontal = 16.dp,
-                        vertical = 16.dp
-                    ),
-                verticalAlignment =
-                    Alignment.CenterVertically
-            ) {
+            * Header
+            */
 
-                TextButton(
-                    onClick = onBackClick
-                ) {
+            //Use OTO's shared Material 3 top app bar.
+            OtoTopAppBar(
+                title = "PLAN YOUR TRIP",
+                onBackClick = onBackClick
+            )
 
-                    Text(
-                        text = "← Back",
-                        color = Color.White,
-                        fontSize = 18.sp
-                    )
-                }
-
-                Text(
-                    text = "PLAN YOUR TRIP",
-                    color = Color.White,
-                    fontSize = 20.sp,
-                    modifier =
-                        Modifier.padding(
-                            start = 16.dp
-                        )
-                )
-            }
 
             Column(
                 modifier = Modifier

@@ -25,7 +25,6 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
@@ -40,6 +39,8 @@ import com.cos229239.team02.oto.ui.features.AreaSafetyView
 import com.cos229239.team02.oto.ui.features.SafetyFilter
 import com.cos229239.team02.oto.ui.features.SafetyLevel
 import com.cos229239.team02.oto.ui.features.SafetyNotification
+import com.cos229239.team02.oto.ui.components.OtoTopAppBar //Use OTO's shared Material 3 top app bar.
+
 
 @Composable
 fun AreaSafetyRoute( onBackClick: () -> Unit,
@@ -74,22 +75,19 @@ fun AreaSafetyScreen(
 {
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = {
-                    Text("Area Alerts")
-                        },
-                navigationIcon = { TextButton(
-                    onClick = onBackClick
-                ) {
-                    Text("Back")
-                }
-                                 },
+            //Use OTO's shared Material 3 top app bar.
+            OtoTopAppBar(
+                title = "AREA ALERTS",
+                onBackClick = onBackClick,
                 actions = {
                     TextButton(
                         onClick = onRefresh,
                         enabled = !uiState.isLoading
                     ) {
-                        Text("Refresh")
+                        Text(
+                            text = "Refresh",
+                            color = Color.White
+                        )
                     }
                 }
             )
