@@ -6,14 +6,17 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
+import com.cos229239.team02.oto.data.route.RouteResult
 import org.maplibre.compose.camera.CameraPosition
 import org.maplibre.compose.camera.rememberCameraState
 import org.maplibre.compose.expressions.dsl.const
 import org.maplibre.compose.layers.CircleLayer
+import org.maplibre.compose.layers.LineLayer
 import org.maplibre.compose.map.MaplibreMap
 import org.maplibre.compose.sources.GeoJsonData
 import org.maplibre.compose.sources.rememberGeoJsonSource
 import org.maplibre.compose.style.BaseStyle
+import org.maplibre.spatialk.geojson.LineString
 import org.maplibre.spatialk.geojson.Point
 import org.maplibre.spatialk.geojson.Position
 import kotlin.math.abs
@@ -21,12 +24,13 @@ import kotlin.math.abs
 /**
  * Shared interactive map used throughout OTO.
  *
- * If a saved trip exists, the map displays:
+ * Saved trip:
  * Blue = Starting Point
  * Green = Destination
  *
- * If there is no saved trip, the map can display
- * the user's current location instead.
+ * Route Navigation:
+ * Primary / selected route = highlighted
+ * Alternative routes = lighter background routes
  */
 @Composable
 fun OtoMap(
@@ -39,12 +43,20 @@ fun OtoMap(
     startingLongitude: Double? = null,
 
     destinationLatitude: Double? = null,
-    destinationLongitude: Double? = null
+    destinationLongitude: Double? = null,
+
+    routes: List<RouteResult> = emptyList(),
+
+    selectedRouteIndex: Int = 0
 ) {
 
     val cameraState =
         rememberCameraState()
 
+    /*
+     * Determine whether Explorer has a complete
+     * saved trip available.
+     */
     val hasSavedTrip =
         startingLatitude != null &&
                 startingLongitude != null &&
@@ -66,6 +78,9 @@ fun OtoMap(
         destinationLongitude
     ) {
 
+        /*
+         * Saved trip takes priority.
+         */
         if (hasSavedTrip) {
 
             val startLat =
@@ -80,6 +95,10 @@ fun OtoMap(
             val destinationLon =
                 destinationLongitude!!
 
+            /*
+             * Center the camera between the
+             * starting point and destination.
+             */
             val centerLatitude =
                 (
                         startLat +
@@ -92,6 +111,10 @@ fun OtoMap(
                                 destinationLon
                         ) / 2.0
 
+            /*
+             * Choose a zoom level based on
+             * the distance between the two points.
+             */
             val latitudeDifference =
                 abs(
                     startLat -
@@ -161,6 +184,11 @@ fun OtoMap(
             longitude != null
         ) {
 
+            /*
+             * No saved trip.
+             *
+             * Fall back to current GPS location.
+             */
             cameraState.position =
                 CameraPosition(
                     target =
@@ -199,12 +227,180 @@ fun OtoMap(
 
         /*
          * -----------------------------------------------------
+         * ALTERNATIVE ROUTES
+         * -----------------------------------------------------
+         *
+         * Draw alternatives first so the selected route
+         * appears on top of them.
+         */
+
+        routes.forEachIndexed { index, route ->
+
+            if (
+                index != selectedRouteIndex &&
+                route.coordinates.size >= 2
+            ) {
+
+                val alternativePositions =
+                    route.coordinates.mapNotNull { coordinate ->
+
+                        if (
+                            coordinate.size >= 2
+                        ) {
+
+                            Position(
+                                longitude =
+                                    coordinate[0],
+
+                                latitude =
+                                    coordinate[1]
+                            )
+
+                        } else {
+
+                            null
+                        }
+                    }
+
+                if (
+                    alternativePositions.size >= 2
+                ) {
+
+                    val alternativeSource =
+                        rememberGeoJsonSource(
+                            GeoJsonData.Features(
+                                LineString(
+                                    alternativePositions
+                                )
+                            )
+                        )
+
+                    /*
+                     * Alternative routes are visible,
+                     * but intentionally less prominent.
+                     */
+                    LineLayer(
+                        id =
+                            "oto-route-alternative-$index",
+
+                        source =
+                            alternativeSource,
+
+                        color =
+                            const(
+                                Color(
+                                    0xFF9E9E9E
+                                )
+                            ),
+
+                        width =
+                            const(
+                                4.dp
+                            ),
+
+                        opacity =
+                            const(
+                                0.75f
+                            )
+                    )
+                }
+            }
+        }
+
+        /*
+         * -----------------------------------------------------
+         * SELECTED / PRIMARY ROUTE
+         * -----------------------------------------------------
+         */
+
+        val selectedRoute =
+            routes.getOrNull(
+                selectedRouteIndex
+            )
+
+        if (
+            selectedRoute != null &&
+            selectedRoute.coordinates.size >= 2
+        ) {
+
+            val selectedPositions =
+                selectedRoute.coordinates.mapNotNull { coordinate ->
+
+                    if (
+                        coordinate.size >= 2
+                    ) {
+
+                        Position(
+                            longitude =
+                                coordinate[0],
+
+                            latitude =
+                                coordinate[1]
+                        )
+
+                    } else {
+
+                        null
+                    }
+                }
+
+            if (
+                selectedPositions.size >= 2
+            ) {
+
+                val selectedRouteSource =
+                    rememberGeoJsonSource(
+                        GeoJsonData.Features(
+                            LineString(
+                                selectedPositions
+                            )
+                        )
+                    )
+
+                /*
+                 * Main route.
+                 *
+                 * Blue is used here because it visually
+                 * connects with the starting point.
+                 */
+                LineLayer(
+                    id =
+                        "oto-route-selected",
+
+                    source =
+                        selectedRouteSource,
+
+                    color =
+                        const(
+                            Color(
+                                0xFF1976D2
+                            )
+                        ),
+
+                    width =
+                        const(
+                            6.dp
+                        ),
+
+                    opacity =
+                        const(
+                            1.0f
+                        )
+                )
+            }
+        }
+
+        /*
+         * -----------------------------------------------------
          * SAVED TRIP MARKERS
          * -----------------------------------------------------
          */
 
         if (hasSavedTrip) {
 
+            /*
+             * Starting Point
+             */
             val startingPointSource =
                 rememberGeoJsonSource(
                     GeoJsonData.Features(
@@ -253,6 +449,9 @@ fun OtoMap(
                     )
             )
 
+            /*
+             * Destination
+             */
             val destinationSource =
                 rememberGeoJsonSource(
                     GeoJsonData.Features(
@@ -307,9 +506,13 @@ fun OtoMap(
         ) {
 
             /*
-             * Current location is only shown when
-             * no saved trip exists.
+             * -------------------------------------------------
+             * CURRENT LOCATION
+             * -------------------------------------------------
+             *
+             * Only shown when there is no saved trip.
              */
+
             val currentLocationSource =
                 rememberGeoJsonSource(
                     GeoJsonData.Features(

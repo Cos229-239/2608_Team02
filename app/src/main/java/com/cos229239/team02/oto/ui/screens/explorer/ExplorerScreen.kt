@@ -30,6 +30,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -47,6 +48,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.cos229239.team02.oto.data.location.AndroidLocationRepository
 import com.cos229239.team02.oto.data.location.OtoLocation
+import com.cos229239.team02.oto.data.route.RouteClient
+import com.cos229239.team02.oto.data.route.RouteResult
 import com.cos229239.team02.oto.ui.components.map.OtoMap
 import com.cos229239.team02.oto.ui.features.AreaSafetyView
 import com.cos229239.team02.oto.ui.features.PlanTripViewModel
@@ -84,6 +87,126 @@ fun ExplorerScreen(
 
     /*
      * ---------------------------------------------------------
+     * ROUTE NAVIGATION
+     * ---------------------------------------------------------
+     */
+
+    val routeClient =
+        remember {
+            RouteClient()
+        }
+
+    var routes by remember {
+        mutableStateOf<List<RouteResult>>(
+            emptyList()
+        )
+    }
+
+    /*
+     * Route 0 is selected automatically.
+     */
+    var selectedRouteIndex by remember {
+        mutableIntStateOf(0)
+    }
+
+    var routeLoading by remember {
+        mutableStateOf(false)
+    }
+
+    var routeError by remember {
+        mutableStateOf<String?>(null)
+    }
+
+    /*
+     * Controls whether the Active Trip card
+     * is expanded or minimized.
+     */
+    var isTripCardExpanded by remember {
+        mutableStateOf(true)
+    }
+
+    /*
+     * Request routes whenever the saved trip changes.
+     */
+    LaunchedEffect(
+        savedTrip?.startingLatitude,
+        savedTrip?.startingLongitude,
+        savedTrip?.destinationLatitude,
+        savedTrip?.destinationLongitude
+    ) {
+
+        val trip =
+            savedTrip
+
+        if (trip == null) {
+
+            routes =
+                emptyList()
+
+            selectedRouteIndex =
+                0
+
+            routeLoading =
+                false
+
+            routeError =
+                null
+
+            isTripCardExpanded =
+                true
+
+            return@LaunchedEffect
+        }
+
+        routeLoading =
+            true
+
+        routeError =
+            null
+
+        routes =
+            emptyList()
+
+        selectedRouteIndex =
+            0
+
+        val results =
+            routeClient.getRoutes(
+                startingLatitude =
+                    trip.startingLatitude,
+
+                startingLongitude =
+                    trip.startingLongitude,
+
+                destinationLatitude =
+                    trip.destinationLatitude,
+
+                destinationLongitude =
+                    trip.destinationLongitude
+            )
+
+        if (
+            results.isNotEmpty()
+        ) {
+
+            routes =
+                results
+
+            selectedRouteIndex =
+                0
+
+        } else {
+
+            routeError =
+                "Route unavailable"
+        }
+
+        routeLoading =
+            false
+    }
+
+    /*
+     * ---------------------------------------------------------
      * LOCATION
      * ---------------------------------------------------------
      */
@@ -116,7 +239,9 @@ fun ExplorerScreen(
 
         scope.launch {
 
-            loadingLocation = true
+            loadingLocation =
+                true
+
             locationStatus =
                 "Finding your location..."
 
@@ -144,7 +269,7 @@ fun ExplorerScreen(
     }
 
     /**
-     * Handles Android's permission response.
+     * Handles Android's location permission response.
      */
     val locationPermissionLauncher =
         rememberLauncherForActivityResult(
@@ -220,8 +345,8 @@ fun ExplorerScreen(
     }
 
     /*
-     * If there is no saved trip, Explorer can use
-     * the device's current location instead.
+     * If there is no saved trip,
+     * use the current device location.
      */
     LaunchedEffect(savedTrip) {
 
@@ -302,9 +427,12 @@ fun ExplorerScreen(
                 ) {
 
                     Text(
-                        text = "←",
+                        text =
+                            "←",
+
                         color =
                             Color.White,
+
                         fontSize =
                             26.sp
                     )
@@ -312,7 +440,9 @@ fun ExplorerScreen(
 
                 Column(
                     modifier =
-                        Modifier.weight(1f)
+                        Modifier.weight(
+                            1f
+                        )
                 ) {
 
                     Text(
@@ -342,8 +472,11 @@ fun ExplorerScreen(
                 }
 
                 Text(
-                    text = "🔔",
-                    fontSize = 24.sp
+                    text =
+                        "🔔",
+
+                    fontSize =
+                        24.sp
                 )
             }
         }
@@ -372,7 +505,7 @@ fun ExplorerScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(
-                        300.dp
+                        350.dp
                     )
             ) {
 
@@ -400,13 +533,21 @@ fun ExplorerScreen(
 
                     destinationLongitude =
                         savedTrip
-                            ?.destinationLongitude
+                            ?.destinationLongitude,
+
+                    routes =
+                        routes,
+
+                    selectedRouteIndex =
+                        selectedRouteIndex
                 )
 
                 /*
-                 * Show location status only when
-                 * there is no saved trip.
+                 * -------------------------------------------------
+                 * CURRENT LOCATION
+                 * -------------------------------------------------
                  */
+
                 if (savedTrip == null) {
 
                     Card(
@@ -420,12 +561,14 @@ fun ExplorerScreen(
                                 ),
 
                         colors =
-                            CardDefaults.cardColors(
-                                containerColor =
-                                    Color.White.copy(
-                                        alpha = 0.92f
-                                    )
-                            ),
+                            CardDefaults
+                                .cardColors(
+                                    containerColor =
+                                        Color.White.copy(
+                                            alpha =
+                                                0.92f
+                                        )
+                                ),
 
                         shape =
                             RoundedCornerShape(
@@ -461,7 +604,9 @@ fun ExplorerScreen(
                                     )
                             )
 
-                            if (loadingLocation) {
+                            if (
+                                loadingLocation
+                            ) {
 
                                 CircularProgressIndicator()
 
@@ -532,40 +677,62 @@ fun ExplorerScreen(
                 }
 
                 /*
-                 * Saved trip summary.
+                 * -------------------------------------------------
+                 * EXPANDED ACTIVE TRIP CARD
+                 * -------------------------------------------------
                  */
-                savedTrip
-                    ?.let { trip ->
 
-                        Card(
-                            modifier =
-                                Modifier
-                                    .align(
-                                        Alignment.BottomStart
-                                    )
-                                    .padding(
-                                        12.dp
-                                    ),
+                if (
+                    savedTrip != null &&
+                    isTripCardExpanded
+                ) {
 
-                            colors =
-                                CardDefaults.cardColors(
+                    Card(
+                        modifier =
+                            Modifier
+                                .align(
+                                    Alignment.BottomStart
+                                )
+                                .fillMaxWidth()
+                                .padding(
+                                    12.dp
+                                ),
+
+                        colors =
+                            CardDefaults
+                                .cardColors(
                                     containerColor =
                                         Color.White.copy(
-                                            alpha = 0.94f
+                                            alpha =
+                                                0.95f
                                         )
                                 ),
 
-                            shape =
-                                RoundedCornerShape(
+                        shape =
+                            RoundedCornerShape(
+                                12.dp
+                            )
+                    ) {
+
+                        Column(
+                            modifier =
+                                Modifier.padding(
                                     12.dp
                                 )
                         ) {
 
-                            Column(
+                            /*
+                             * Header with minimize button.
+                             */
+                            Row(
                                 modifier =
-                                    Modifier.padding(
-                                        10.dp
-                                    )
+                                    Modifier.fillMaxWidth(),
+
+                                horizontalArrangement =
+                                    Arrangement.SpaceBetween,
+
+                                verticalAlignment =
+                                    Alignment.CenterVertically
                             ) {
 
                                 Text(
@@ -575,42 +742,345 @@ fun ExplorerScreen(
                                     color =
                                         darkGreen,
 
-                                    fontWeight =
-                                        FontWeight.Bold,
-
                                     fontSize =
-                                        12.sp
+                                        12.sp,
+
+                                    fontWeight =
+                                        FontWeight.Bold
                                 )
 
-                                Spacer(
-                                    modifier =
-                                        Modifier.height(
-                                            4.dp
-                                        )
-                                )
+                                TextButton(
+                                    onClick = {
+
+                                        isTripCardExpanded =
+                                            false
+                                    }
+                                ) {
+
+                                    Text(
+                                        text =
+                                            "−",
+
+                                        color =
+                                            darkGreen,
+
+                                        fontSize =
+                                            24.sp,
+
+                                        fontWeight =
+                                            FontWeight.Bold
+                                    )
+                                }
+                            }
+
+                            /*
+                             * Start / Destination.
+                             */
+                            Text(
+                                text =
+                                    "Start: ${savedTrip.startingPointName}",
+
+                                style =
+                                    MaterialTheme
+                                        .typography
+                                        .bodySmall
+                            )
+
+                            Text(
+                                text =
+                                    "Destination: ${savedTrip.destinationName}",
+
+                                style =
+                                    MaterialTheme
+                                        .typography
+                                        .bodySmall
+                            )
+
+                            Spacer(
+                                modifier =
+                                    Modifier.height(
+                                        6.dp
+                                    )
+                            )
+
+                            /*
+                             * Route information.
+                             */
+                            when {
+
+                                routeLoading -> {
+
+                                    Text(
+                                        text =
+                                            "Calculating routes...",
+
+                                        color =
+                                            darkGreen,
+
+                                        style =
+                                            MaterialTheme
+                                                .typography
+                                                .bodySmall
+                                    )
+                                }
+
+                                routes.isNotEmpty() -> {
+
+                                    val selectedRoute =
+                                        routes[
+                                            selectedRouteIndex
+                                        ]
+
+                                    Text(
+                                        text =
+                                            "${
+                                                formatRouteDistance(
+                                                    selectedRoute.distanceMeters
+                                                )
+                                            } • ${
+                                                formatRouteDuration(
+                                                    selectedRoute.durationSeconds
+                                                )
+                                            }",
+
+                                        color =
+                                            darkGreen,
+
+                                        fontSize =
+                                            16.sp,
+
+                                        fontWeight =
+                                            FontWeight.Bold
+                                    )
+
+                                    Text(
+                                        text =
+                                            if (
+                                                routes.size > 1
+                                            ) {
+
+                                                "Fastest Route • ${routes.size} options"
+
+                                            } else {
+
+                                                "Fastest Route"
+                                            },
+
+                                        color =
+                                            mediumGreen,
+
+                                        style =
+                                            MaterialTheme
+                                                .typography
+                                                .bodySmall
+                                    )
+                                }
+
+                                routeError != null -> {
+
+                                    Text(
+                                        text =
+                                            routeError
+                                                ?: "Route unavailable",
+
+                                        color =
+                                            MaterialTheme
+                                                .colorScheme
+                                                .error,
+
+                                        style =
+                                            MaterialTheme
+                                                .typography
+                                                .bodySmall
+                                    )
+                                }
+                            }
+
+                            Spacer(
+                                modifier =
+                                    Modifier.height(
+                                        4.dp
+                                    )
+                            )
+
+                            TextButton(
+                                onClick =
+                                    onPlanTripClick
+                            ) {
 
                                 Text(
                                     text =
-                                        "Start: ${trip.startingPointName}",
+                                        "View Trip ›",
 
-                                    style =
-                                        MaterialTheme
-                                            .typography
-                                            .bodySmall
-                                )
+                                    color =
+                                        mediumGreen,
 
-                                Text(
-                                    text =
-                                        "Destination: ${trip.destinationName}",
-
-                                    style =
-                                        MaterialTheme
-                                            .typography
-                                            .bodySmall
+                                    fontWeight =
+                                        FontWeight.Bold
                                 )
                             }
                         }
                     }
+                }
+
+                /*
+                 * -------------------------------------------------
+                 * MINIMIZED ACTIVE TRIP CARD
+                 * -------------------------------------------------
+                 */
+
+                if (
+                    savedTrip != null &&
+                    !isTripCardExpanded
+                ) {
+
+                    Card(
+                        modifier =
+                            Modifier
+                                .align(
+                                    Alignment.BottomCenter
+                                )
+                                .padding(
+                                    12.dp
+                                ),
+
+                        colors =
+                            CardDefaults
+                                .cardColors(
+                                    containerColor =
+                                        Color.White.copy(
+                                            alpha =
+                                                0.95f
+                                        )
+                                ),
+
+                        shape =
+                            RoundedCornerShape(
+                                22.dp
+                            )
+                    ) {
+
+                        Row(
+                            modifier =
+                                Modifier.padding(
+                                    horizontal = 16.dp,
+                                    vertical = 7.dp
+                                ),
+
+                            verticalAlignment =
+                                Alignment.CenterVertically,
+
+                            horizontalArrangement =
+                                Arrangement.spacedBy(
+                                    12.dp
+                                )
+                        ) {
+
+                            Column {
+
+                                Text(
+                                    text =
+                                        "ACTIVE TRIP",
+
+                                    color =
+                                        darkGreen,
+
+                                    fontSize =
+                                        10.sp,
+
+                                    fontWeight =
+                                        FontWeight.Bold
+                                )
+
+                                if (
+                                    routes.isNotEmpty()
+                                ) {
+
+                                    val selectedRoute =
+                                        routes[
+                                            selectedRouteIndex
+                                        ]
+
+                                    Text(
+                                        text =
+                                            "${
+                                                formatRouteDistance(
+                                                    selectedRoute.distanceMeters
+                                                )
+                                            } • ${
+                                                formatRouteDuration(
+                                                    selectedRoute.durationSeconds
+                                                )
+                                            }",
+
+                                        color =
+                                            darkGreen,
+
+                                        fontWeight =
+                                            FontWeight.Bold,
+
+                                        style =
+                                            MaterialTheme
+                                                .typography
+                                                .bodySmall
+                                    )
+
+                                } else if (
+                                    routeLoading
+                                ) {
+
+                                    Text(
+                                        text =
+                                            "Calculating...",
+
+                                        style =
+                                            MaterialTheme
+                                                .typography
+                                                .bodySmall
+                                    )
+
+                                } else {
+
+                                    Text(
+                                        text =
+                                            "Route unavailable",
+
+                                        style =
+                                            MaterialTheme
+                                                .typography
+                                                .bodySmall
+                                    )
+                                }
+                            }
+
+                            /*
+                             * Expand button.
+                             */
+                            TextButton(
+                                onClick = {
+
+                                    isTripCardExpanded =
+                                        true
+                                }
+                            ) {
+
+                                Text(
+                                    text =
+                                        "▲",
+
+                                    color =
+                                        darkGreen,
+
+                                    fontSize =
+                                        18.sp,
+
+                                    fontWeight =
+                                        FontWeight.Bold
+                                )
+                            }
+                        }
+                    }
+                }
             }
 
             /*
@@ -627,7 +1097,9 @@ fun ExplorerScreen(
             ) {
 
                 /*
+                 * -------------------------------------------------
                  * QUICK ACTIONS
+                 * -------------------------------------------------
                  */
 
                 Row(
@@ -648,8 +1120,11 @@ fun ExplorerScreen(
                             if (
                                 savedTrip == null
                             ) {
+
                                 "Plan a new trip"
+
                             } else {
+
                                 "View or edit trip"
                             },
 
@@ -714,7 +1189,9 @@ fun ExplorerScreen(
                 )
 
                 /*
-                 * LIVE SAFETY OVERVIEW
+                 * -------------------------------------------------
+                 * SAFETY OVERVIEW
+                 * -------------------------------------------------
                  */
 
                 SafetyOverviewCard(
@@ -730,6 +1207,7 @@ fun ExplorerScreen(
                         safetyState
                             .notifications
                             .count {
+
                                 it.level ==
                                         SafetyLevel.SEVERE
                             },
@@ -738,6 +1216,7 @@ fun ExplorerScreen(
                         safetyState
                             .notifications
                             .count {
+
                                 it.level ==
                                         SafetyLevel.MODERATE
                             },
@@ -781,15 +1260,22 @@ fun ExplorerScreen(
                         )
                 )
 
+                /*
+                 * -------------------------------------------------
+                 * CHECK-IN
+                 * -------------------------------------------------
+                 */
+
                 Card(
                     modifier =
                         Modifier.fillMaxWidth(),
 
                     colors =
-                        CardDefaults.cardColors(
-                            containerColor =
-                                Color.White
-                        ),
+                        CardDefaults
+                            .cardColors(
+                                containerColor =
+                                    Color.White
+                            ),
 
                     shape =
                         RoundedCornerShape(
@@ -883,6 +1369,12 @@ fun ExplorerScreen(
                             12.dp
                         )
                 )
+
+                /*
+                 * -------------------------------------------------
+                 * FIELD REPORTS
+                 * -------------------------------------------------
+                 */
 
                 DashboardWideCard(
                     title =
@@ -1377,4 +1869,67 @@ private fun formatExplorerLocation(
             location.longitude
         )
     }"
+}
+
+
+/**
+ * Converts route distance from meters to miles.
+ */
+private fun formatRouteDistance(
+    distanceMeters: Double
+): String {
+
+    val miles =
+        distanceMeters /
+                1609.344
+
+    return String.format(
+        Locale.US,
+        "%.1f mi",
+        miles
+    )
+}
+
+
+/**
+ * Converts route duration from seconds
+ * into minutes or hours.
+ */
+private fun formatRouteDuration(
+    durationSeconds: Double
+): String {
+
+    val totalMinutes =
+        (
+                durationSeconds /
+                        60.0
+                ).toInt()
+
+    return if (
+        totalMinutes < 60
+    ) {
+
+        "$totalMinutes min"
+
+    } else {
+
+        val hours =
+            totalMinutes /
+                    60
+
+        val minutes =
+            totalMinutes %
+                    60
+
+        if (
+            minutes == 0
+        ) {
+
+            "$hours hr"
+
+        } else {
+
+            "$hours hr $minutes min"
+        }
+    }
 }
