@@ -1,5 +1,5 @@
 package com.cos229239.team02.oto.ui.components
-
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Text
@@ -13,9 +13,10 @@ import androidx.compose.ui.graphics.Color
 @Composable
 fun OtoTopAppBar(
     title: String,
-    onBackClick: (() -> Unit)? = null
-) {
-
+    onBackClick: (() -> Unit)? = null,
+    actions: @Composable RowScope.() -> Unit = {}
+)
+{
     val darkGreen = Color(0xFF063D24)
 
     CenterAlignedTopAppBar(
@@ -38,6 +39,7 @@ fun OtoTopAppBar(
                 }
             }
         },
+        actions = actions,
         colors = TopAppBarDefaults.topAppBarColors(
             containerColor = darkGreen
         )
