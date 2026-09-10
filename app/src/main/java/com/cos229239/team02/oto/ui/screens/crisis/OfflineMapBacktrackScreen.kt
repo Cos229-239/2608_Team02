@@ -233,8 +233,10 @@ fun OfflineMapBacktrackScreen(
                                 )
                             }
 
-                            TextButton(onClick = { requestLocation() }) {
-                                Text("📍 Locate Me")
+                            if (currentLocation == null) {
+                                TextButton(onClick = { requestLocation() }) {
+                                    Text("📍 Locate Me")
+                                }
                             }
                         }
                     }
