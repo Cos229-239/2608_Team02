@@ -1,7 +1,13 @@
 package com.cos229239.team02.oto.ui.screens.explorer
 
+//Use OTO's shared MapLibre map component.
+
+import com.cos229239.team02.oto.ui.features.AreaSafetyUIState
+import kotlinx.coroutines.CancellationException
 import android.Manifest
+
 import android.content.pm.PackageManager
+import android.net.TetheringManager
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
@@ -24,6 +30,8 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
+
+
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -48,11 +56,26 @@ import com.cos229239.team02.oto.data.location.OtoLocation
 import com.cos229239.team02.oto.ui.components.map.OtoMap
 import com.cos229239.team02.oto.ui.features.AreaSafetyView
 import com.cos229239.team02.oto.ui.features.PlanTripViewModel
-import com.cos229239.team02.oto.ui.features.SafetyLevel
+import com.cos229239.team02.oto.ui.components.map.OtoMap
+import com.cos229239.team02.oto.ui.features.AreaSafetyView
+import com.cos229239.team02.oto.ui.features.PlanTripViewModel
+import com.cos229239.team02.oto.data.safety.SafetyLevel
 import com.cos229239.team02.oto.ui.components.OtoTopAppBar  //Use OTO's shared Material 3 top app bar.
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.runtime.saveable.rememberSaveable
+import com.cos229239.team02.oto.BuildConfig
+import com.cos229239.team02.oto.data.resource.NpsAlertClient
+import com.cos229239.team02.oto.data.resource.NpsParkPicker
+import com.cos229239.team02.oto.data.safety.createSafetyHttpClient
 
 import kotlinx.coroutines.launch
 import java.util.Locale
+
+
+
+
+
+
 
 @Composable
 fun ExplorerScreen(
@@ -60,7 +83,7 @@ fun ExplorerScreen(
     onPlanTripClick: () -> Unit,
     onBackClick: () -> Unit,
     tripViewModel: PlanTripViewModel,
-    safetyView: AreaSafetyView = viewModel()
+    safetyView: AreaSafetyView
 ) {
 
     val context = LocalContext.current
@@ -87,7 +110,15 @@ fun ExplorerScreen(
      * LOCATION
      * ---------------------------------------------------------
      */
-
+val parkDirectoryHttp = remember {
+    createSafetyHttpClient()
+}
+    val parkDirectoryClient = remember(parkDirectoryHttp){
+        NpsAlertClient(
+            http = parkDirectoryHttp,
+            apiKey = BuildConfig.NPS_API_KEY
+        )
+    }
     val locationRepository =
         remember(context) {
             AndroidLocationRepository(
@@ -97,6 +128,52 @@ fun ExplorerScreen(
 
     var currentLocation by remember {
         mutableStateOf<OtoLocation?>(null)
+    }
+    val destinationLatitude = savedTrip?.destinationLatitude
+    val destinationLongitude = savedTrip?.destinationLongitude
+    val destinationName = savedTrip?.destinationName
+    var parkCodeInput by rememberSaveable{
+        mutableStateOf("")
+    }
+    var selectedParkCode by rememberSaveable {
+        mutableStateOf<String?>(null)
+    }
+    var parkCodeError by rememberSaveable {
+        mutableStateOf<String?>(null)
+    }
+    LaunchedEffect(
+        destinationLatitude,
+        destinationLongitude,
+        destinationName,
+        currentLocation?.latitude,
+        currentLocation?.longitude,
+        selectedParkCode
+    ) {
+
+        val selectedLocation =
+            if (
+                destinationLatitude != null &&
+                destinationLongitude != null
+            ) {
+                OtoLocation(
+                    latitude = destinationLatitude,
+                    longitude = destinationLongitude
+                )
+            } else {
+                currentLocation
+            }
+        safetyView.setArea(
+            location = selectedLocation,
+            areaName = if (savedTrip != null) {
+                destinationName
+                    ?.takeIf { it.isNotBlank() }
+                    ?: "Trip destination"
+            } else {
+                "Current area"
+            },
+
+            parkCode = selectedParkCode
+        )
     }
 
     var locationStatus by remember {
@@ -269,11 +346,17 @@ fun ExplorerScreen(
             )
     ) {
 
+
         /*
-        * -----------------------------------------------------
-        * HEADER
-        * -----------------------------------------------------
-        */
+        /*
+         * -----------------------------------------------------
+         * HEADER
+         * -----------------------------------------------------
+         */
+        Spacer(
+            modifier =
+                Modifier.height(24.dp)
+        )
 
         //Use OTO's shared Material 3 top app bar.
         OtoTopAppBar(
@@ -649,51 +732,44 @@ fun ExplorerScreen(
                 /*
                  * LIVE SAFETY OVERVIEW
                  */
+// Tested code dialog for NPS Park Code Entry still work in progress will probably be moved inside screen
+// trying to get park codes to auto-generate once typing but still doing research
+                NpsParkPicker(
+                    client = parkDirectoryClient,
+                    selectedParkCode = selectedParkCode,
 
-                SafetyOverviewCard(
-                    areaName =
-                        safetyState.areaName,
-
-                    alertCount =
-                        safetyState
-                            .notifications
-                            .size,
-
-                    severeCount =
-                        safetyState
-                            .notifications
-                            .count {
-                                it.level ==
-                                        SafetyLevel.SEVERE
-                            },
-
-                    moderateCount =
-                        safetyState
-                            .notifications
-                            .count {
-                                it.level ==
-                                        SafetyLevel.MODERATE
-                            },
-
-                    isLoading =
-                        safetyState.isLoading,
-
-                    isOffline =
-                        safetyState.isOffline,
-
-                    isSample =
-                        safetyState.isSampleData,
-
-                    onClick =
-                        onAreaSafetyClick
+                    onParkSelected = { code ->
+                        if (selectedParkCode == code) {
+                            safetyView.refreshNotifications()
+                        } else {
+                            selectedParkCode = code
+                        }
+                    }
                 )
+                if (!safetyState.hasLocation) {
+                    Text(
+                        text = "Use locate Me or select a trip destination " +
+                        "to load safety notices. ",
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                }
 
                 Spacer(
-                    modifier =
-                        Modifier.height(
-                            16.dp
-                        )
+                    modifier = Modifier.height(16.dp)
                 )
+                SafetyOverviewCard(
+                    uiState = safetyState,
+                    onClick = onAreaSafetyClick
+                )
+                Spacer(
+                    modifier = Modifier.height(16.dp)
+                )
+
+                /*
+                 * -------------------------------------------------
+                 * REPORT HAZARD
+                 * -------------------------------------------------
+                 */
 
                 DashboardWideCard(
                     title =
@@ -803,8 +879,7 @@ fun ExplorerScreen(
                         ) {
 
                             Text(
-                                text =
-                                    "CHECK IN"
+                                "CHECK IN"
                             )
                         }
                     }
@@ -831,14 +906,100 @@ fun ExplorerScreen(
 
                 Spacer(
                     modifier =
-                        Modifier.height(
-                            30.dp
-                        )
+                        Modifier.height(30.dp)
                 )
             }
         }
     }
-}
+
+                DashboardWideCard(
+                    title  =
+                        "⚠️ REPORT HAZARD / ROUTE CHANGE",
+                    subtitle =
+                        "Help keep trails safe for everyone",
+                    onClick = {}
+                )
+                Spacer(modifier = Modifier.height(12.dp))
+
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors =
+                        CardDefaults.cardColors(
+                            containerColor =
+                                Color.White
+                        ),
+                    shape =
+                        RoundedCornerShape(
+                            14.dp
+                        )) {
+                            Column(
+                                modifier = Modifier.padding(
+                                    18.dp)
+                            ) {
+                                Text(
+                                    text = "👥 CHECK-IN",
+                                    fontSize = 18.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = darkGreen
+                                )
+
+                                Spacer(
+                                    modifier =
+                                        Modifier.height(6.dp)
+                                )
+
+                                Text(
+                                    text = "Trusted Contact",
+                                    fontSize = 14.sp
+                                )
+
+                                Text(
+                                    text = "Not checked in",
+                                    color = Color(
+                                        0xFFE67E22
+                                    ),
+                                    fontWeight =
+                                        FontWeight.Bold
+                                )
+                                Spacer(
+                                    modifier = Modifier.height(10.dp)
+
+                                )
+
+                                Button(
+                                    onClick = {
+
+                                    },
+                                    modifier = Modifier.fillMaxWidth(),
+                                    colors = ButtonDefaults.buttonColors(
+                                        containerColor = mediumGreen
+                                    )
+                                ) {
+                                    Text(
+                                        "CHECK IN"
+                                    )
+                                }
+
+                            }
+
+                        }
+                                Spacer( modifier = Modifier.height(12.dp)
+                    )
+
+                    DashboardWideCard(
+                        title =
+                            "📋 FIELD REPORTS",
+                        subtitle =
+                            "View recent reports from this area",
+                        onClick = {
+
+                        }
+                    )
+                    Spacer(modifier =
+                        Modifier.height(30.dp)
+                    )
+            }
+
 
 
 /**
@@ -957,13 +1118,7 @@ private fun ExplorerActionCard(
  */
 @Composable
 private fun SafetyOverviewCard(
-    areaName: String,
-    alertCount: Int,
-    severeCount: Int,
-    moderateCount: Int,
-    isLoading: Boolean,
-    isOffline: Boolean,
-    isSample: Boolean,
+    uiState: AreaSafetyUIState,
     onClick: () -> Unit
 ) {
 
@@ -997,19 +1152,9 @@ private fun SafetyOverviewCard(
             modifier =
                 Modifier.padding(
                     18.dp
-                )
+                ),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-
-            Row(
-                modifier =
-                    Modifier.fillMaxWidth(),
-
-                horizontalArrangement =
-                    Arrangement.SpaceBetween,
-
-                verticalAlignment =
-                    Alignment.CenterVertically
-            ) {
 
                 Text(
                     text =
@@ -1026,127 +1171,103 @@ private fun SafetyOverviewCard(
                 )
 
                 Text(
-                    text =
-                        "View Area Safety ›",
-
-                    color =
-                        darkGreen,
-
-                    fontWeight =
-                        FontWeight.Bold
+                    text = uiState.areaName,
+                    fontWeight = FontWeight.Bold
                 )
+
+            when {
+                !uiState.hasLocation -> {
+                    Text(
+                        text = "Select a trip destination or use Locate Me."
+                    )
             }
-
-            Spacer(
-                modifier =
-                    Modifier.height(
-                        12.dp
+                uiState.isLoading -> {
+                    CircularProgressIndicator(
+                        color = darkGreen
                     )
-            )
-
-            Text(
-                text =
-                    areaName,
-
-                fontWeight =
-                    FontWeight.Bold
-            )
-
-            Spacer(
-                modifier =
-                    Modifier.height(
-                        12.dp
+                    Text(
+                        text = "Checking safety sources..."
                     )
-            )
+                }
 
-            if (
-                isLoading
-            ) {
+                uiState.errorMessage != null -> {
+                    Text(
+                        text = uiState.errorMessage
+                            ?: "Unable to update safety information.",
+                        color = MaterialTheme.colorScheme.error
+                    )
+                }
 
-                CircularProgressIndicator()
-
-            } else {
-
-                Row(
-                    modifier =
-                        Modifier.fillMaxWidth(),
-
-                    horizontalArrangement =
-                        Arrangement.SpaceEvenly
-                ) {
-
-                    SafetyStat(
-                        value =
-                            alertCount.toString(),
-
-                        label =
-                            "Active Alerts"
+                uiState.checkedAtMillis == null -> {
+                    Text(
+                        text = "Safety information has not been checked yet."
+                    )
+                }
+                else -> {
+                    Text(
+                        text = "Filter: ${uiState.filterSelected.displayName}",
+                        style = MaterialTheme.typography.bodySmall
                     )
 
-                    SafetyStat(
-                        value =
-                            severeCount.toString(),
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceEvenly
+                    ) {
+                        SafetyStat(
+                            value = uiState.notifications.size.toString(),
+                            label = "Shown notices"
+                        )
 
-                        label =
-                            "Severe"
-                    )
+                        SafetyStat(
+                            value = uiState.notifications.count {
+                                it.level == SafetyLevel.SEVERE
+                            }.toString(),
+                            label = "Severe"
+                        )
 
-                    SafetyStat(
-                        value =
-                            moderateCount.toString(),
+                        SafetyStat(
+                            value = uiState.notifications.count {
+                                it.level == SafetyLevel.MODERATE
+                            }.toString(),
+                            label = "Moderate"
+                        )
+                    }
 
-                        label =
-                            "Moderate"
+                    uiState.sources.forEach { source ->
+                        Text(
+                            text = "${source.source}: ${source.message}",
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                    }
+
+                    if (uiState.hasUnavailableSources) {
+                        Text(
+                            text = "Some safety sources could not be updated.",
+                            color = MaterialTheme.colorScheme.error,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    }
+
+                    if (uiState.resourcesFromCache) {
+                        Text(
+                            text = "Nearby resources include saved data.",
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                    }
+
+                    Text(
+                        text = "No returned notices does not establish " +
+                        "that the area is safe.",
+                        style =MaterialTheme.typography.bodySmall
                     )
                 }
             }
 
-            if (
-                isOffline
-            ) {
-
-                Spacer(
-                    modifier =
-                        Modifier.height(
-                            12.dp
-                        )
-                )
-
-                Text(
-                    text =
-                        "⚠ Offline — showing saved safety information",
-
-                    color =
-                        MaterialTheme
-                            .colorScheme
-                            .error,
-
-                    fontWeight =
-                        FontWeight.Bold
-                )
-            }
-
-            if (
-                isSample
-            ) {
-
-                Spacer(
-                    modifier =
-                        Modifier.height(
-                            8.dp
-                        )
-                )
-
-                Text(
-                    text =
-                        "Sample safety data",
-
-                    style =
-                        MaterialTheme
-                            .typography
-                            .bodySmall
-                )
-            }
+            Text(
+                text = "View Area Safety >",
+                color = darkGreen,
+                fontWeight = FontWeight.Bold
+            )
         }
     }
 }

@@ -36,12 +36,11 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.cos229239.team02.oto.ui.features.AreaSafetyUIState
 import com.cos229239.team02.oto.ui.features.AreaSafetyView
-import com.cos229239.team02.oto.ui.features.SafetyFilter
-import com.cos229239.team02.oto.ui.features.SafetyLevel
-import com.cos229239.team02.oto.ui.features.SafetyNotification
+import com.cos229239.team02.oto.data.safety.SafetyFilter
+import com.cos229239.team02.oto.data.safety.SafetyLevel
+import com.cos229239.team02.oto.data.safety.SafetyNotification
 import com.cos229239.team02.oto.ui.components.OtoTopAppBar //Use OTO's shared Material 3 top app bar.
-
-
+//Connects ViewModel's state and actions to the Area Safety screen.
 @Composable
 fun AreaSafetyRoute( onBackClick: () -> Unit,
                      safetyView: AreaSafetyView = viewModel()
@@ -123,26 +122,8 @@ fun AreaSafetyScreen(
                 )
             }
 
-            if (uiState.isSampleData){
-                Spacer(modifier = Modifier.height(16.dp))
 
-                Surface(
-                    modifier = Modifier.fillMaxWidth(),
-                    color = MaterialTheme.colorScheme.tertiaryContainer,
-                    shape = MaterialTheme.shapes.medium
-                ) {
-                    Text(
-                        text = """
-                            Sample notifications do not represent current conditions. 
-                        """.trimIndent(),
-                        modifier = Modifier.padding(12.dp),
-                        style = MaterialTheme.typography.bodySmall,
-                        fontWeight = FontWeight.Bold
-
-                    )
-                }
-            }
-            if (uiState.isOffline) {
+            if (uiState.hasUnavailableSources) {
                 Spacer(modifier = Modifier.height(8.dp))
                 Surface(
                     modifier = Modifier.fillMaxWidth(),
@@ -378,18 +359,11 @@ private fun SafetyNotificationCard(
                 )
             }
 
-            if (notification.sampleData) {
-                Text(
-                    text = "SAMPLE DATA",
-                    color = MaterialTheme.colorScheme.error,
-                    fontWeight = FontWeight.Bold,
-                    style = MaterialTheme.typography.bodySmall
-                )
-            }
+
 
             TextButton(
                 onClick = {
-                    onSourceClick(notification.sourceURL)
+                    onSourceClick(notification.sourceUrl)
                 }
             ) {
                 Text("View Source")

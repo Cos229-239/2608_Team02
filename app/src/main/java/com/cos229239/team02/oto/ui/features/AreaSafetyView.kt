@@ -2,102 +2,170 @@ package com.cos229239.team02.oto.ui.features
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.cos229239.team02.oto.data.location.OtoLocation
+import com.cos229239.team02.oto.data.safety.AreaSafetyRepo
+import com.cos229239.team02.oto.data.safety.SafetyNotification
+import com.cos229239.team02.oto.data.safety.SafetyCategory
+import com.cos229239.team02.oto.data.safety.SafetyFilter
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
-class AreaSafetyView : ViewModel() {
-    private val repo: AreaSafetyRepo = DummyAreaSafetyRepo()
 
-    private val _uiState = MutableStateFlow(
-        AreaSafetyUIState()
+class AreaSafetyView (
+    private val repo: AreaSafetyRepo
+) : ViewModel() {
 
-    )
+    private val _uiState = MutableStateFlow(AreaSafetyUIState())
+    val uiState = _uiState.asStateFlow()
+    private var selectedLocation: OtoLocation? = null
+    private var selectedParkCode: String? = null
 
-    val uiState: StateFlow<AreaSafetyUIState> = _uiState.asStateFlow()
+    private var allNotifications = emptyList<SafetyNotification>()
+    private var requestJob: Job? = null
+    private var requestVersion: Long = 0
 
-    private var allNotifications: List<SafetyNotification> = emptyList()
+    fun setArea(
+        location: OtoLocation?,
+        areaName: String,
+        parkCode: String? = null
+    ) {
+        val normalizedParkCode = parkCode
+            ?.trim()
+            ?.lowercase()
+            ?.takeIf { it.isNotEmpty() }
+        val previousLocation = selectedLocation
 
-    init {
-        refreshNotifications()
+        val sameCoordinates =
+            previousLocation?.latitude == location?.latitude &&
+                    previousLocation?.longitude == location?.longitude
+
+        if (
+            sameCoordinates &&
+            _uiState.value.areaName == areaName &&
+            selectedParkCode == normalizedParkCode
+        ) {
+            return
+        }
+
+        requestVersion++
+        requestJob?.cancel()
+
+        selectedLocation = if (location != null) {
+            OtoLocation(
+                latitude = location.latitude,
+                longitude = location.longitude
+            )
+        } else {
+            null
+        }
+
+        selectedParkCode = normalizedParkCode
+        allNotifications = emptyList()
+
+        _uiState.value = AreaSafetyUIState(
+            areaName = areaName,
+            hasLocation = selectedLocation != null,
+            filterSelected = _uiState.value.filterSelected
+        )
+
+        if (selectedLocation != null) {
+            loadArea(forceRefresh = false)
+        }
 
     }
-
+//Loads safety updates according to OTO Location/Area
     fun refreshNotifications() {
-        viewModelScope.launch {
-            _uiState.update { currentState ->
-                currentState.copy(
-                    isLoading = true,
-                    errorMessage = null
-                )
-            }
+        loadArea(forceRefresh = false)
+    }
 
+    private fun loadArea(
+        forceRefresh: Boolean = false
+    ) {
+        val location = selectedLocation ?: return
+
+        requestJob?.cancel()
+
+        val version = ++requestVersion
+        val areaName = _uiState.value.areaName
+        val parkCode = selectedParkCode
+
+        allNotifications = emptyList()
+
+        _uiState.update {
+            it.copy(
+                isLoading = true,
+                notifications = emptyList(),
+                resourceResult = null,
+                sources = emptyList(),
+                checkedAtMillis = null,
+                errorMessage = null
+            )
+        }
+
+        requestJob = viewModelScope.launch {
             try {
-                val notifications = repo.getNotified(areaName = _uiState.value.areaName)
+                val result = repo.getAreaSafety(
+                    location = location,
+                    areaName = areaName,
+                    parkCode = parkCode,
+                    forceRefresh = forceRefresh
+                )
+                if (version != requestVersion) {
+                    return@launch
+                }
 
-                allNotifications = notifications
+                allNotifications = result.notifications
 
-                _uiState.update { currentState ->
-                    currentState.copy(
-                        notifications = filterNotifications(
-                            notifications = notifications,
-                            filter = currentState.filterSelected
-                        ),
+                _uiState.update { state ->
+                    state.copy(
                         isLoading = false,
-                        errorMessage = null,
-                        isSampleData = notifications.any {
-                            it.sampleData
-                        }
+                        notifications = filterNotifications(state.filterSelected),
+                        resourceResult = result.resourceResult,
+                        sources = result.sources,
+                        checkedAtMillis = result.checkedAtMillis
                     )
                 }
             } catch (error: CancellationException) {
                 throw error
             } catch (error: Exception) {
-                _uiState.update { currentState ->
-                    currentState.copy(
-                        isLoading = false,
-                        errorMessage = error.message
-                            ?: "Unable to load safety notifications."
-                    )
+                if (version == requestVersion) {
+                    _uiState.update {
+                        it.copy(
+                            isLoading = false,
+                            errorMessage = "Unable to update Area Safety. Please retry."
+                        )
+                    }
                 }
             }
         }
     }
-
-    private fun filterNotifications(notifications: List<SafetyNotification>,
-                                    filter: SafetyFilter
-    ): List<SafetyNotification> {
-        return when (filter) {
-        SafetyFilter.ALL -> notifications
-            SafetyFilter.WEATHER -> { notifications.filter { notification ->
-                notification.category == SafetyCategory.WEATHER
-              }
-            }
-            SafetyFilter.AREA -> { notifications.filter{notification ->
-                notification.category == SafetyCategory.AREA
-            }
-            }
-            SafetyFilter.COMMUNITY -> { notifications.filter { notification ->
-                notification.category == SafetyCategory.COMMUNITY
-                }
-
-            }
-        }
-    }
-
-    fun selectFilter(filter: SafetyFilter) {
-        _uiState.update { currentState ->
-            currentState.copy(
+//Updates visible notifications using results already loaded
+    fun selectFilter(
+        filter: SafetyFilter
+    ) {
+        _uiState.update {
+            it.copy(
                 filterSelected = filter,
-                notifications = filterNotifications(
-                   notifications = allNotifications,
-                    filter = filter
-               )
-           )
+                notifications = filterNotifications(filter)
+            )
+        }
+    }
 
+    private fun filterNotifications(
+        filter: SafetyFilter
+    ): List<SafetyNotification> = allNotifications.filter {
+        when (filter) {
+            SafetyFilter.ALL -> true
+            SafetyFilter.WEATHER ->
+                it.category == SafetyCategory.WEATHER
+            SafetyFilter.AREA ->
+                it.category == SafetyCategory.AREA
+            SafetyFilter.COMMUNITY ->
+                it.category == SafetyCategory.COMMUNITY
         }
     }
 }
