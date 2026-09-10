@@ -22,6 +22,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.cos229239.team02.oto.data.location.OtoLocation
 import com.cos229239.team02.oto.data.route.RouteResult
 import org.maplibre.compose.camera.CameraPosition
 import org.maplibre.compose.camera.rememberCameraState
@@ -37,6 +38,10 @@ import org.maplibre.spatialk.geojson.Point
 import org.maplibre.spatialk.geojson.Position
 import kotlin.math.abs
 
+//The style OTO's offline regions must match so maps work offline.
+const val OTO_MAP_STYLE_URL =
+    "https://tiles.openfreemap.org/styles/liberty"
+
 /**
  * Shared interactive map used throughout OTO.
  *
@@ -46,6 +51,8 @@ import kotlin.math.abs
  *
  * Blue line = Selected Route
  * Gray lines = Alternative Routes
+ *
+ * Blue polyline = Tracked / Backtrack Route
  */
 @Composable
 fun OtoMap(
@@ -78,7 +85,27 @@ fun OtoMap(
      *
      * That tells the map to center on the new location.
      */
-    locationFocusRequest: Int = 0
+    locationFocusRequest: Int = 0,
+
+    /*
+     * Recorded route points drawn as a blue polyline
+     * (used by Offline Maps & Backtrack).
+     */
+    routePoints: List<OtoLocation> = emptyList(),
+
+    /*
+     * When true, the camera keeps centering on the
+     * current location while preserving the user's zoom.
+     */
+    followCamera: Boolean = true,
+
+    /*
+     * Shows the "My Location" button overlay.
+     *
+     * Explorer opts in; Backtrack hides it because it
+     * has its own Locate Me control.
+     */
+    showMyLocationButton: Boolean = true
 ) {
 
     val cameraState =
@@ -117,6 +144,15 @@ fun OtoMap(
         mutableStateOf(false)
     }
 
+    /*
+     * Used by follow-camera mode (Backtrack) so the
+     * initial default zoom is applied only once, and
+     * the user's zoom is preserved on later updates.
+     */
+    var hasFollowCenteredOnce by remember {
+        mutableStateOf(false)
+    }
+
     val routeKey =
         if (
             selectedRoute != null &&
@@ -132,6 +168,94 @@ fun OtoMap(
 
             null
         }
+
+    /*
+     * Frames a saved trip by the midpoint between its
+     * start and destination when no route geometry exists
+     * (e.g. OSRM unavailable).
+     */
+    fun frameSavedTrip() {
+
+        val startLat =
+            startingLatitude!!
+
+        val startLon =
+            startingLongitude!!
+
+        val endLat =
+            destinationLatitude!!
+
+        val endLon =
+            destinationLongitude!!
+
+        val centerLatitude =
+            (
+                    startLat +
+                            endLat
+                    ) / 2.0
+
+        val centerLongitude =
+            (
+                    startLon +
+                            endLon
+                    ) / 2.0
+
+        val largestDifference =
+            maxOf(
+                abs(
+                    startLat -
+                            endLat
+                ),
+
+                abs(
+                    startLon -
+                            endLon
+                )
+            )
+
+        val tripZoom =
+            when {
+
+                largestDifference < 0.01 ->
+                    14.0
+
+                largestDifference < 0.03 ->
+                    12.5
+
+                largestDifference < 0.08 ->
+                    11.0
+
+                largestDifference < 0.20 ->
+                    9.5
+
+                largestDifference < 0.50 ->
+                    8.0
+
+                largestDifference < 1.0 ->
+                    7.0
+
+                largestDifference < 3.0 ->
+                    5.5
+
+                else ->
+                    4.0
+            }
+
+        cameraState.position =
+            CameraPosition(
+                target =
+                    Position(
+                        longitude =
+                            centerLongitude,
+
+                        latitude =
+                            centerLatitude
+                    ),
+
+                zoom =
+                    tripZoom
+            )
+    }
 
     /*
      * ---------------------------------------------------------
@@ -284,85 +408,7 @@ fun OtoMap(
             /*
              * Fallback before actual route geometry loads.
              */
-            val startLat =
-                startingLatitude!!
-
-            val startLon =
-                startingLongitude!!
-
-            val endLat =
-                destinationLatitude!!
-
-            val endLon =
-                destinationLongitude!!
-
-            val centerLatitude =
-                (
-                        startLat +
-                                endLat
-                        ) / 2.0
-
-            val centerLongitude =
-                (
-                        startLon +
-                                endLon
-                        ) / 2.0
-
-            val largestDifference =
-                maxOf(
-                    abs(
-                        startLat -
-                                endLat
-                    ),
-
-                    abs(
-                        startLon -
-                                endLon
-                    )
-                )
-
-            val tripZoom =
-                when {
-
-                    largestDifference < 0.01 ->
-                        14.0
-
-                    largestDifference < 0.03 ->
-                        12.5
-
-                    largestDifference < 0.08 ->
-                        11.0
-
-                    largestDifference < 0.20 ->
-                        9.5
-
-                    largestDifference < 0.50 ->
-                        8.0
-
-                    largestDifference < 1.0 ->
-                        7.0
-
-                    largestDifference < 3.0 ->
-                        5.5
-
-                    else ->
-                        4.0
-                }
-
-            cameraState.position =
-                CameraPosition(
-                    target =
-                        Position(
-                            longitude =
-                                centerLongitude,
-
-                            latitude =
-                                centerLatitude
-                        ),
-
-                    zoom =
-                        tripZoom
-                )
+            frameSavedTrip()
         }
     }
 
@@ -390,6 +436,35 @@ fun OtoMap(
 
     /*
      * ---------------------------------------------------------
+     * FALLBACK TRIP FRAME
+     * ---------------------------------------------------------
+     *
+     * Frames the saved trip even when no route geometry
+     * is available yet (OSRM unreachable / still loading).
+     *
+     * Once a route loads, routeKey becomes non-null and the
+     * AUTO-FRAME ROUTE ONCE effect above takes over.
+     */
+    LaunchedEffect(
+        hasSavedTrip,
+        startingLatitude,
+        startingLongitude,
+        destinationLatitude,
+        destinationLongitude,
+        routeKey
+    ) {
+
+        if (
+            hasSavedTrip &&
+            routeKey == null
+        ) {
+
+            frameSavedTrip()
+        }
+    }
+
+    /*
+     * ---------------------------------------------------------
      * INITIAL CURRENT LOCATION
      * ---------------------------------------------------------
      *
@@ -406,6 +481,7 @@ fun OtoMap(
 
         if (
             !hasSavedTrip &&
+            routePoints.isEmpty() &&
             !hasCenteredOnInitialLocation &&
             latitude != null &&
             longitude != null
@@ -428,6 +504,73 @@ fun OtoMap(
 
             hasCenteredOnInitialLocation =
                 true
+        }
+    }
+
+    /*
+     * ---------------------------------------------------------
+     * FOLLOW CAMERA (BACKTRACK)
+     * ---------------------------------------------------------
+     *
+     * While tracking/backtracking, keeps the map centered
+     * on the current location.
+     *
+     * The first time, uses the walking-level default zoom.
+     * Afterward, the user's zoom is preserved.
+     */
+    LaunchedEffect(
+        latitude,
+        longitude,
+        routePoints,
+        followCamera
+    ) {
+
+        if (
+            routePoints.isNotEmpty() &&
+            followCamera &&
+            latitude != null &&
+            longitude != null
+        ) {
+
+            if (
+                !hasFollowCenteredOnce
+            ) {
+
+                hasFollowCenteredOnce =
+                    true
+
+                cameraState.position =
+                    CameraPosition(
+                        target =
+                            Position(
+                                longitude =
+                                    longitude,
+
+                                latitude =
+                                    latitude
+                            ),
+
+                        zoom =
+                            17.0
+                    )
+
+            } else {
+
+                cameraState.position =
+                    CameraPosition(
+                        target =
+                            Position(
+                                longitude =
+                                    longitude,
+
+                                latitude =
+                                    latitude
+                            ),
+
+                        zoom =
+                            cameraState.position.zoom
+                    )
+            }
         }
     }
 
@@ -483,7 +626,7 @@ fun OtoMap(
 
             baseStyle =
                 BaseStyle.Uri(
-                    "https://tiles.openfreemap.org/styles/liberty"
+                    OTO_MAP_STYLE_URL
                 ),
 
             cameraState =
@@ -636,6 +779,62 @@ fun OtoMap(
                             )
                     )
                 }
+            }
+
+            /*
+             * -------------------------------------------------
+             * TRACKED / BACKTRACK ROUTE
+             * -------------------------------------------------
+             */
+
+            if (
+                routePoints.size >= 2
+            ) {
+
+                val routePositions =
+                    routePoints.map { point ->
+                        Position(
+                            longitude =
+                                point.longitude,
+
+                            latitude =
+                                point.latitude
+                        )
+                    }
+
+                val routeSource =
+                    rememberGeoJsonSource(
+                        GeoJsonData.Features(
+                            LineString(
+                                routePositions
+                            )
+                        )
+                    )
+
+                LineLayer(
+                    id =
+                        "oto-route-polyline",
+
+                    source =
+                        routeSource,
+
+                    color =
+                        const(
+                            Color(
+                                0xFF1976D2
+                            )
+                        ),
+
+                    width =
+                        const(
+                            4.dp
+                        ),
+
+                    opacity =
+                        const(
+                            0.90f
+                        )
+                )
             }
 
             /*
@@ -959,51 +1158,57 @@ fun OtoMap(
              *
              * ExplorerScreen requests a fresh
              * high-accuracy GPS location.
+             *
+             * Hidden by screens that provide their own
+             * location control (e.g. Backtrack).
              */
-            Button(
-                onClick =
-                    onMyLocationClick,
+            if (showMyLocationButton) {
 
-                modifier =
-                    Modifier.size(
-                        42.dp
-                    ),
+                Button(
+                    onClick =
+                        onMyLocationClick,
 
-                shape =
-                    CircleShape,
+                    modifier =
+                        Modifier.size(
+                            42.dp
+                        ),
 
-                colors =
-                    ButtonDefaults.buttonColors(
-                        containerColor =
-                            Color.White,
+                    shape =
+                        CircleShape,
 
-                        contentColor =
-                            Color(
-                                0xFF063D24
-                            )
-                    ),
+                    colors =
+                        ButtonDefaults.buttonColors(
+                            containerColor =
+                                Color.White,
 
-                contentPadding =
-                    PaddingValues(
-                        0.dp
+                            contentColor =
+                                Color(
+                                    0xFF063D24
+                                )
+                        ),
+
+                    contentPadding =
+                        PaddingValues(
+                            0.dp
+                        )
+                ) {
+
+                    Text(
+                        text =
+                            "◎",
+
+                        fontSize =
+                            22.sp
                     )
-            ) {
+                }
 
-                Text(
-                    text =
-                        "◎",
-
-                    fontSize =
-                        22.sp
+                Spacer(
+                    modifier =
+                        Modifier.size(
+                            6.dp
+                        )
                 )
             }
-
-            Spacer(
-                modifier =
-                    Modifier.size(
-                        6.dp
-                    )
-            )
 
             /*
              * FULL ROUTE
