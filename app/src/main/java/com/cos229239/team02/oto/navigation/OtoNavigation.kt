@@ -19,6 +19,7 @@ import com.cos229239.team02.oto.ui.screens.crisis.ShareStatusLocationScreen
 import com.cos229239.team02.oto.ui.screens.explorer.AreaSafetyRoute
 import com.cos229239.team02.oto.ui.screens.explorer.ExplorerScreen
 import com.cos229239.team02.oto.ui.screens.explorer.PlanTripScreen
+import com.cos229239.team02.oto.ui.screens.explorer.WeatherReportScreen
 import com.cos229239.team02.oto.ui.screens.home.HomeScreen
 
 @Composable
@@ -29,8 +30,12 @@ fun OtoNavigation() {
             OtoRoute.Home
         )
 
-    // One shared Plan Trip ViewModel.
-    // Plan Trip writes to it and Explorer reads from it.
+    /*
+     * One shared Plan Trip ViewModel.
+     *
+     * Plan Trip writes to it.
+     * Explorer reads from it.
+     */
     val planTripViewModel:
             PlanTripViewModel =
         viewModel()
@@ -46,10 +51,15 @@ fun OtoNavigation() {
         factory = safetyFactory
     )
     NavDisplay(
-        backStack = backStack,
+        backStack =
+            backStack,
 
         onBack = {
-            if (backStack.size > 1) {
+
+            if (
+                backStack.size > 1
+            ) {
+
                 backStack.removeLastOrNull()
             }
         },
@@ -58,18 +68,23 @@ fun OtoNavigation() {
             entryProvider {
 
                 /*
+                 * -------------------------------------------------
                  * HOME
+                 * -------------------------------------------------
                  */
+
                 entry<OtoRoute.Home> {
 
                     HomeScreen(
                         onExplorerClick = {
+
                             backStack.add(
                                 OtoRoute.Explorer
                             )
                         },
 
                         onCrisisClick = {
+
                             backStack.add(
                                 OtoRoute.Crisis
                             )
@@ -78,20 +93,35 @@ fun OtoNavigation() {
                 }
 
                 /*
+                 * -------------------------------------------------
                  * EXPLORER
+                 * -------------------------------------------------
                  */
+
                 entry<OtoRoute.Explorer> {
 
                     ExplorerScreen(
                         onAreaSafetyClick = {
+
                             backStack.add(
                                 OtoRoute.AreaSafety
                             )
                         },
 
                         onPlanTripClick = {
+
                             backStack.add(
                                 OtoRoute.PlanTrip
+                            )
+                        },
+
+                        /*
+                         * Opens the new Weather Report screen.
+                         */
+                        onWeatherClick = {
+
+                            backStack.add(
+                                OtoRoute.WeatherReport
                             )
                         },
 
@@ -107,16 +137,21 @@ fun OtoNavigation() {
                 }
 
                 /*
+                 * -------------------------------------------------
                  * PLAN TRIP
+                 * -------------------------------------------------
                  */
+
                 entry<OtoRoute.PlanTrip> {
 
                     PlanTripScreen(
                         onBackClick = {
+
                             backStack.removeLastOrNull()
                         },
 
                         onSaveClick = {
+
                             backStack.removeLastOrNull()
                         },
 
@@ -126,11 +161,14 @@ fun OtoNavigation() {
                 }
 
                 /*
-                 * AREA SAFETY
+                 * -------------------------------------------------
+                 * WEATHER REPORT
+                 * -------------------------------------------------
                  */
-                entry<OtoRoute.AreaSafety> {
 
-                    AreaSafetyRoute(
+                entry<OtoRoute.WeatherReport> {
+
+                    WeatherReportScreen(
                         onBackClick = {
                             if (backStack.size > 1) {
                                 backStack.removeLastOrNull()
@@ -141,108 +179,154 @@ fun OtoNavigation() {
                 }
 
                 /*
-                 * CRISIS MODE
+                 * -------------------------------------------------
+                 * AREA SAFETY
+                 * -------------------------------------------------
                  */
+
+                entry<OtoRoute.AreaSafety> {
+
+                    AreaSafetyRoute(
+                        onBackClick = {
+
+                            backStack.removeLastOrNull()
+                        }
+                    )
+                }
+
+                /*
+                 * -------------------------------------------------
+                 * CRISIS MODE
+                 * -------------------------------------------------
+                 */
+
                 entry<OtoRoute.Crisis> {
 
                     CrisisScreen(
                         onEmergencyHelpClick = {
+
                             backStack.add(
                                 OtoRoute.EmergencyHelp
                             )
                         },
 
                         onFirstAidSurvivalClick = {
+
                             backStack.add(
                                 OtoRoute.FirstAidSurvival
                             )
                         },
 
                         onShareStatusLocationClick = {
+
                             backStack.add(
                                 OtoRoute.ShareStatusLocation
                             )
                         },
 
                         onNearbyResourcesClick = {
+
                             backStack.add(
                                 OtoRoute.NearbyResources
                             )
                         },
 
                         onOfflineMapBacktrackClick = {
+
                             backStack.add(
                                 OtoRoute.OfflineMapBacktrack
                             )
                         },
 
                         onBackClick = {
+
                             backStack.removeLastOrNull()
                         }
                     )
                 }
 
                 /*
+                 * -------------------------------------------------
                  * CRISIS - EMERGENCY HELP
+                 * -------------------------------------------------
                  */
+
                 entry<OtoRoute.EmergencyHelp> {
 
                     EmergencyHelpScreen(
                         onShareStatusLocationClick = {
+
                             backStack.add(
                                 OtoRoute.ShareStatusLocation
                             )
                         },
 
                         onBackClick = {
+
                             backStack.removeLastOrNull()
                         }
                     )
                 }
 
                 /*
+                 * -------------------------------------------------
                  * CRISIS - SHARE STATUS / LOCATION
+                 * -------------------------------------------------
                  */
+
                 entry<OtoRoute.ShareStatusLocation> {
 
                     ShareStatusLocationScreen(
                         onBackClick = {
+
                             backStack.removeLastOrNull()
                         }
                     )
                 }
 
                 /*
+                 * -------------------------------------------------
                  * CRISIS - FIRST AID / SURVIVAL
+                 * -------------------------------------------------
                  */
+
                 entry<OtoRoute.FirstAidSurvival> {
 
                     FirstAidSurvivalScreen(
                         onBackClick = {
+
                             backStack.removeLastOrNull()
                         }
                     )
                 }
 
                 /*
+                 * -------------------------------------------------
                  * CRISIS - NEARBY RESOURCES
+                 * -------------------------------------------------
                  */
+
                 entry<OtoRoute.NearbyResources> {
 
                     NearbyResourceScreen(
                         onBackClick = {
+
                             backStack.removeLastOrNull()
                         }
                     )
                 }
 
                 /*
+                 * -------------------------------------------------
                  * CRISIS - OFFLINE MAPS & BACKTRACK
+                 * -------------------------------------------------
                  */
+
                 entry<OtoRoute.OfflineMapBacktrack> {
 
                     OfflineMapBacktrackScreen(
                         onBackClick = {
+
                             backStack.removeLastOrNull()
                         }
                     )
