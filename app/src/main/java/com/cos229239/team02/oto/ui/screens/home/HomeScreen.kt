@@ -17,6 +17,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.OutlinedCard
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -40,7 +41,8 @@ import com.cos229239.team02.oto.ui.theme.OtoSpacing
 @Composable
 fun HomeScreen(
     onExplorerClick: () -> Unit,
-    onCrisisClick: () -> Unit
+    onCrisisClick: () -> Unit,
+    onOfflineToolsClick: () -> Unit
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -120,42 +122,156 @@ fun HomeScreen(
             )
         }
 
-        Spacer(modifier = Modifier.height(24.dp))
+        Spacer(
+            modifier = Modifier.height(
+                OtoSpacing.SectionGap
+            )
+        )
 
-        Button(
-            onClick = {
-                val fineGranted =
-                    ContextCompat.checkSelfPermission(
-                        context,
-                        Manifest.permission.ACCESS_FINE_LOCATION
-                    ) == PackageManager.PERMISSION_GRANTED
+        OutlinedCard(
+            modifier = Modifier.fillMaxWidth(),
+            shape = MaterialTheme.shapes.medium
+        ) {
+            Column(
+                modifier = Modifier.padding(
+                    OtoSpacing.CardPadding
+                )
+            ) {
+                Text(
+                    text = "LOCATION STATUS",
+                    style = MaterialTheme.typography.titleLarge,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
 
-                val coarseGranted =
-                    ContextCompat.checkSelfPermission(
-                        context,
-                        Manifest.permission.ACCESS_COARSE_LOCATION
-                    ) == PackageManager.PERMISSION_GRANTED
+                Spacer(
+                    modifier = Modifier.height(
+                        OtoSpacing.Small
+                    )
+                )
 
-                if (fineGranted || coarseGranted) {
-                    loadLocation()
-                } else {
-                    locationPermissionLauncher.launch(
-                        arrayOf(
-                            Manifest.permission.ACCESS_FINE_LOCATION,
-                            Manifest.permission.ACCESS_COARSE_LOCATION
+                Text(
+                    text = locationText,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+
+                Spacer(
+                    modifier = Modifier.height(
+                        OtoSpacing.Standard
+                    )
+                )
+
+                Button(
+                    onClick = {
+                        val fineGranted =
+                            ContextCompat.checkSelfPermission(
+                                context,
+                                Manifest.permission.ACCESS_FINE_LOCATION
+                            ) == PackageManager.PERMISSION_GRANTED
+
+                        val coarseGranted =
+                            ContextCompat.checkSelfPermission(
+                                context,
+                                Manifest.permission.ACCESS_COARSE_LOCATION
+                            ) == PackageManager.PERMISSION_GRANTED
+
+                        if (fineGranted || coarseGranted) {
+                            loadLocation()
+                        } else {
+                            locationPermissionLauncher.launch(
+                                arrayOf(
+                                    Manifest.permission.ACCESS_FINE_LOCATION,
+                                    Manifest.permission.ACCESS_COARSE_LOCATION
+                                )
+                            )
+                        }
+                    },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(
+                            min = OtoSpacing.TouchTarget
                         )
+                ) {
+                    Text(
+                        text = "UPDATE LOCATION",
+                        style = MaterialTheme.typography.labelLarge
                     )
                 }
             }
-        ) {
-            Text(text = "Test Location")
         }
 
-        Spacer(modifier = Modifier.height(12.dp))
+        Spacer(
+            modifier = Modifier.height(
+                OtoSpacing.SectionGap
+            )
+        )
 
-        Text(text = locationText)
+         //Show a preparedness reminder before the user chooses a mode.
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            shape = MaterialTheme.shapes.medium,
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.tertiaryContainer
+            )
+        ) {
+            Column(
+                modifier = Modifier.padding(
+                    OtoSpacing.CardPadding
+                )
+            ) {
 
-        Spacer(modifier = Modifier.height(OtoSpacing.SectionGap))
+                //Label the readiness section.
+                Text(
+                    text = "PREPAREDNESS",
+                    style = MaterialTheme.typography.titleLarge,
+                    color = MaterialTheme.colorScheme.onTertiaryContainer
+                )
+
+                Spacer(
+                    modifier = Modifier.height(
+                        OtoSpacing.Small
+                    )
+                )
+
+                //Remind the user to prepare important resources before a trip.
+                Text(
+                    text = "Download offline maps and review emergency resources before heading out.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onTertiaryContainer
+                )
+                Spacer(
+                    modifier = Modifier.height(
+                        OtoSpacing.Standard
+                    )
+                )
+
+                //Open the existing Offline Maps & Backtrack tools.
+                TextButton(
+                    onClick = onOfflineToolsClick,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(
+                            min = OtoSpacing.TouchTarget
+                        )
+                ) {
+                    Text(
+                        text = "REVIEW OFFLINE TOOLS",
+                        style = MaterialTheme.typography.labelLarge
+                    )
+                }
+
+            }
+        }
+
+        //Keep space between the preparedness reminder and Explorer Mode.
+        Spacer(
+            modifier = Modifier.height(
+                OtoSpacing.SectionGap
+            )
+        )
+
+
+
 
         Card(
             modifier = Modifier.fillMaxWidth(),
