@@ -7,11 +7,13 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Button
+import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.cos229239.team02.oto.ui.components.OtoTopAppBar
 
 @Composable
 fun CrisisScreen(
@@ -22,49 +24,82 @@ fun CrisisScreen(
     onOfflineMapBacktrackClick: () -> Unit,
     onBackClick: () -> Unit
 ) {
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(24.dp),
-        verticalArrangement = Arrangement.Center,
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        Text(text = "Crisis Mode")
 
-        Spacer(modifier = Modifier.height(24.dp))
+    Scaffold(
+        topBar = {
 
-        Button(onClick = onEmergencyHelpClick) {
-            Text(text = "Emergency Help")
+            //Use OTO's shared Material 3 top app bar.
+            OtoTopAppBar(
+                title = "CRISIS MODE",
+                onBackClick = onBackClick
+            )
         }
+    ) { paddingValues ->
 
-        Spacer(modifier = Modifier.height(12.dp))
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(paddingValues)
+                .padding(24.dp),
+            verticalArrangement = Arrangement.Center,
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
 
-        Button(onClick = onFirstAidSurvivalClick) {
-            Text(text = "First Aid & Survival")
-        }
+            Button(
+                onClick = onEmergencyHelpClick
+            ) {
+                Text(
+                    text = "Emergency Help"
+                )
+            }
 
-        Spacer(modifier = Modifier.height(12.dp))
+            Spacer(
+                modifier = Modifier.height(12.dp)
+            )
 
-        Button(onClick = onShareStatusLocationClick) {
-            Text(text = "Share Status and Location")
-        }
+            Button(
+                onClick = onFirstAidSurvivalClick
+            ) {
+                Text(
+                    text = "First Aid & Survival"
+                )
+            }
 
-        Spacer(modifier = Modifier.height(12.dp))
+            Spacer(
+                modifier = Modifier.height(12.dp)
+            )
 
-        Button(onClick = onNearbyResourcesClick) {
-            Text(text = "Nearby Resources")
-        }
+            Button(
+                onClick = onShareStatusLocationClick
+            ) {
+                Text(
+                    text = "Share Status and Location"
+                )
+            }
 
-        Spacer(modifier = Modifier.height(12.dp))
+            Spacer(
+                modifier = Modifier.height(12.dp)
+            )
 
-        Button(onClick = onOfflineMapBacktrackClick) {
-            Text(text = "Offline Maps & Backtrack")
-        }
+            Button(
+                onClick = onNearbyResourcesClick
+            ) {
+                Text(
+                    text = "Nearby Resources"
+                )
+            }
 
-        Spacer(modifier = Modifier.height(12.dp))
+            Spacer(
+                modifier = Modifier.height(12.dp)
+            )
 
-        Button(onClick = onBackClick) {
-            Text(text = "Back")
+            Button(
+                onClick = onOfflineMapBacktrackClick
+            ) {
+                Text(
+                    text = "Offline Maps & Backtrack"
+                )
+            }
         }
     }
 }

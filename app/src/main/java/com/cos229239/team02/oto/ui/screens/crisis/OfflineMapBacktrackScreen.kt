@@ -13,7 +13,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -39,6 +38,7 @@ import androidx.core.content.ContextCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.cos229239.team02.oto.data.route.RoutePoint
 import com.cos229239.team02.oto.data.route.toOtoLocation
+import com.cos229239.team02.oto.ui.components.OtoTopAppBar
 import com.cos229239.team02.oto.ui.components.map.OtoMap
 import com.cos229239.team02.oto.ui.features.OfflineMapBacktrackViewModel
 import com.cos229239.team02.oto.ui.features.OfflineRegionOption
@@ -156,22 +156,11 @@ fun OfflineMapBacktrackScreen(
 
     Scaffold(
         topBar = {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .statusBarsPadding()
-                    .padding(horizontal = 4.dp, vertical = 12.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                TextButton(onClick = onBackClick) {
-                    Text("Back")
-                }
-                Text(
-                    text = "Offline Maps & Backtrack",
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Bold
-                )
-            }
+            //Use OTO's shared Material 3 top app bar.
+            OtoTopAppBar(
+                title = "OFFLINE MAPS & BACKTRACK",
+                onBackClick = onBackClick
+            )
         }
     ) { paddingValues ->
         Column(
