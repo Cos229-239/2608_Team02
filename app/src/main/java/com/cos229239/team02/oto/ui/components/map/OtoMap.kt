@@ -180,7 +180,6 @@ fun OtoMap(
         ) {
 
             if (
-                followCamera ||
                 !hasCenteredOnce
             ) {
 
@@ -198,7 +197,24 @@ fun OtoMap(
                             ),
 
                         zoom =
-                            14.0
+                            17.0
+                    )
+
+            } else if (followCamera) {
+
+                cameraState.position =
+                    CameraPosition(
+                        target =
+                            Position(
+                                longitude =
+                                    longitude,
+
+                                latitude =
+                                    latitude
+                            ),
+
+                        zoom =
+                            cameraState.position.zoom
                     )
             }
         }
