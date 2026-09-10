@@ -1,22 +1,31 @@
 package com.cos229239.team02.oto.ui.features
 
-enum class SafetyFilter (
-    val displayName: String
-)
-{
-    ALL ("All"),
-    WEATHER("Weather"),
-    AREA("Location"),
-    COMMUNITY("OTO Outsiders")//Location could be relative to local landmarks or general region name
-}
+import com.cos229239.team02.oto.data.resource.ResourceResult
+import com.cos229239.team02.oto.data.safety.SafetySourceState
+import com.cos229239.team02.oto.data.safety.SafetySourceStatus
+import com.cos229239.team02.oto.data.safety.SafetyNotification
+
+import com.cos229239.team02.oto.data.safety.SafetyFilter
+
+
 
 data class AreaSafetyUIState(
-    val areaName: String = "Current Area",
+    val areaName: String = "Select an area",
     val notifications: List <SafetyNotification> = emptyList(),
+    val resourceResult: ResourceResult? = null,
+    val sources: List<SafetySourceStatus> = emptyList(),
     val filterSelected: SafetyFilter = SafetyFilter.ALL,
+    val hasLocation: Boolean = false,
     val isLoading: Boolean = false,
-    val isOffline: Boolean = false,
-    val isSampleData: Boolean = true,
+    val checkedAtMillis: Long? = null,
     val errorMessage: String? = null
 
-)
+){
+    val hasUnavailableSources: Boolean
+        get() = sources.any {
+            it.state == SafetySourceState.FAILED
+        }
+
+    val resourcesFromCache: Boolean
+        get() = resourceResult?.fromCache == true
+}
