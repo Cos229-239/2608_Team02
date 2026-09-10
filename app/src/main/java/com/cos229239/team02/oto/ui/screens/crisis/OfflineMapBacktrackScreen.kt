@@ -189,7 +189,8 @@ fun OfflineMapBacktrackScreen(
                         latitude = currentLocation?.latitude,
                         longitude = currentLocation?.longitude,
                         routePoints = mapRoutePoints,
-                        followCamera = true
+                        followCamera = true,
+                        showMyLocationButton = false
                     )
 
                     Card(
