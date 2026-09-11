@@ -2,6 +2,7 @@ package com.cos229239.team02.oto.ui.screens.crisis
 
 import android.Manifest
 import android.content.pm.PackageManager
+import android.os.SystemClock
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
@@ -25,8 +26,13 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableLongStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -35,6 +41,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.cos229239.team02.oto.data.route.RoutePoint
 import com.cos229239.team02.oto.data.route.toOtoLocation
@@ -134,6 +143,26 @@ fun OfflineMapBacktrackScreen(
         }
     }
 
+    // Persist a checkpoint whenever the app is backgrounded, so closing
+    // the app never loses the current tracking session.
+    val lifecycleOwner = LocalLifecycleOwner.current
+
+    DisposableEffect(lifecycleOwner) {
+
+        val observer =
+            LifecycleEventObserver { _, event ->
+                if (event == Lifecycle.Event.ON_STOP) {
+                    viewModel.saveNowIfTracking()
+                }
+            }
+
+        lifecycleOwner.lifecycle.addObserver(observer)
+
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+        }
+    }
+
     val isTracking = viewModel.isTracking
     val isBacktracking = viewModel.isBacktracking
     val currentLocation = viewModel.currentLocation
@@ -153,6 +182,34 @@ fun OfflineMapBacktrackScreen(
                 RoutePoint::toOtoLocation
             )
         }
+
+    // The map is fed a throttled copy of the location so rapid GPS
+    // fixes do not force a camera move on every single update.
+    var mapLatitude by remember {
+        mutableStateOf(currentLocation?.latitude)
+    }
+    var mapLongitude by remember {
+        mutableStateOf(currentLocation?.longitude)
+    }
+    var lastMapUpdateMillis by remember {
+        mutableLongStateOf(0L)
+    }
+
+    LaunchedEffect(currentLocation) {
+
+        val location = currentLocation
+
+        if (location != null) {
+
+            val now = SystemClock.uptimeMillis()
+
+            if (now - lastMapUpdateMillis >= MAP_UPDATE_INTERVAL_MILLIS) {
+                mapLatitude = location.latitude
+                mapLongitude = location.longitude
+                lastMapUpdateMillis = now
+            }
+        }
+    }
 
     Scaffold(
         topBar = {
@@ -184,8 +241,8 @@ fun OfflineMapBacktrackScreen(
 
                     OtoMap(
                         modifier = Modifier.fillMaxSize(),
-                        latitude = currentLocation?.latitude,
-                        longitude = currentLocation?.longitude,
+                        latitude = mapLatitude,
+                        longitude = mapLongitude,
                         routePoints = mapRoutePoints,
                         followCamera = true,
                         showMyLocationButton = false
@@ -277,6 +334,15 @@ fun OfflineMapBacktrackScreen(
                             style = MaterialTheme.typography.bodySmall,
                             color = OtoWarningAmber
                         )
+                        if (!isTracking && !isBacktracking) {
+                            TextButton(
+                                onClick = {
+                                    viewModel.clearPreviousRoute()
+                                }
+                            ) {
+                                Text("🗑 Clear Previous Route")
+                            }
+                        }
                     }
                     if (viewModel.saveRouteError != null) {
                         Spacer(modifier = Modifier.height(4.dp))
@@ -285,6 +351,29 @@ fun OfflineMapBacktrackScreen(
                             style = MaterialTheme.typography.bodySmall,
                             color = OtoCrisisRed
                         )
+                    }
+                    if (viewModel.routeSummary != null) {
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = viewModel.routeSummary.orEmpty(),
+                            style = MaterialTheme.typography.bodySmall,
+                            fontWeight = FontWeight.Bold,
+                            color = OtoSuccess
+                        )
+                    }
+                    if (
+                        !isTracking &&
+                        !isBacktracking &&
+                        !viewModel.previousSessionRouteLoaded
+                    ) {
+                        Spacer(modifier = Modifier.height(4.dp))
+                        TextButton(
+                            onClick = {
+                                viewModel.loadLastSavedRoute()
+                            }
+                        ) {
+                            Text("📂 Load Last Route")
+                        }
                     }
                     Spacer(modifier = Modifier.height(12.dp))
                     Button(
@@ -416,6 +505,13 @@ fun OfflineMapBacktrackScreen(
                             option = option,
                             pack = pack,
                             hasLocation = currentLocation != null,
+                            estimatedTiles =
+                                currentLocation?.let { location ->
+                                    OfflineMapBacktrackViewModel.estimatedTilesFor(
+                                        option = option,
+                                        latitude = location.latitude
+                                    )
+                                },
                             onDownload = {
                                 viewModel.downloadRegion(option)
                             },
@@ -438,6 +534,7 @@ private fun OfflineRegionRow(
     option: OfflineRegionOption,
     pack: OfflinePack?,
     hasLocation: Boolean,
+    estimatedTiles: Long? = null,
     onDownload: () -> Unit,
     onDelete: () -> Unit
 ) {
@@ -460,6 +557,26 @@ private fun OfflineRegionRow(
                 text = option.description,
                 style = MaterialTheme.typography.bodySmall
             )
+
+            if (estimatedTiles != null && pack == null) {
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = "~${String.format(Locale.US, "%,d", estimatedTiles)} tiles",
+                    style = MaterialTheme.typography.bodySmall
+                )
+                if (
+                    estimatedTiles >
+                    OfflineMapBacktrackViewModel.TILE_WARNING_LIMIT
+                ) {
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = "Large download - may exceed the offline tile limit",
+                        style = MaterialTheme.typography.bodySmall,
+                        fontWeight = FontWeight.Bold,
+                        color = OtoWarningAmber
+                    )
+                }
+            }
 
             if (pack != null) {
                 Text(
@@ -555,3 +672,5 @@ private fun formatSize(bytes: Long): String {
         String.format(Locale.US, "%.1f %s", value, units[unitIndex])
     }
 }
+
+private const val MAP_UPDATE_INTERVAL_MILLIS = 500L

@@ -24,12 +24,17 @@ import org.maplibre.spatialk.geojson.BoundingBox
 import java.util.Locale
 import java.util.UUID
 import kotlin.math.PI
+import kotlin.math.abs
 import kotlin.math.asin
 import kotlin.math.atan2
+import kotlin.math.ceil
 import kotlin.math.cos
+import kotlin.math.ln
+import kotlin.math.max
 import kotlin.math.round
 import kotlin.math.sin
 import kotlin.math.sqrt
+import kotlin.math.tan
 
 /**
  * Holds route tracking, backtrack guidance and offline map state for
@@ -82,11 +87,22 @@ class OfflineMapBacktrackViewModel(
     var previousSessionRouteLoaded by mutableStateOf(false)
         private set
 
+    var routeSummary by mutableStateOf<String?>(null)
+        private set
+
     // -----------------------------------------------------------------
     // Backtrack guidance state
     // -----------------------------------------------------------------
 
     private var trackStartedAtMillis = 0L
+
+    private var currentRouteId: String? = null
+
+    private var lastAutoSaveAtMillis = 0L
+
+    private var lastAutoSavePointCount = 0
+
+    private var lastGuideIndex = 0
 
     var guideTarget by mutableStateOf<OtoLocation?>(null)
         private set
@@ -116,8 +132,29 @@ class OfflineMapBacktrackViewModel(
                 locationStatus = "Current location found"
 
                 if (isTracking) {
-                    routePoints =
-                        routePoints + location.toRoutePoint()
+
+                    val lastPoint =
+                        routePoints.lastOrNull()
+
+                    val farEnoughFromLastPoint =
+                        lastPoint == null ||
+                            distanceMeters(
+                                lastPoint.latitude,
+                                lastPoint.longitude,
+                                location.latitude,
+                                location.longitude
+                            ) >= MIN_POINT_SPACING_METERS
+
+                    val accurateEnough =
+                        (location.accuracyMeters ?: 0f) <=
+                            MAX_ACCURACY_METERS
+
+                    if (farEnoughFromLastPoint && accurateEnough) {
+                        routePoints =
+                            routePoints + location.toRoutePoint()
+                    }
+
+                    autoSaveIfDue()
                 }
 
                 if (isBacktracking) {
@@ -217,9 +254,19 @@ class OfflineMapBacktrackViewModel(
         isBacktracking = false
         routePoints = emptyList()
         previousSessionRouteLoaded = false
+        routeSummary = null
+        lastGuideIndex = 0
+
+        currentRouteId =
+            UUID.randomUUID().toString()
 
         trackStartedAtMillis =
             System.currentTimeMillis()
+
+        lastAutoSaveAtMillis =
+            System.currentTimeMillis()
+
+        lastAutoSavePointCount = 0
 
         trackingStatus =
             "Tracking route... " +
@@ -251,28 +298,200 @@ class OfflineMapBacktrackViewModel(
 
             val route =
                 TrackedRoute(
-                    id = UUID.randomUUID().toString(),
+                    id = currentRouteId
+                        ?: UUID.randomUUID().toString(),
                     startedAtMillis = trackStartedAtMillis,
                     endedAtMillis = System.currentTimeMillis(),
                     points = routePoints
                 )
 
+            routeSummary =
+                buildRouteSummary(route)
+
+            val saved =
+                routeStorage.saveBlocking(route)
+
             trackingStatus =
-                "Route saved (${routePoints.size} points)"
-
-            viewModelScope.launch {
-
-                if (!routeStorage.save(route)) {
-                    saveRouteError =
-                        "Could not save your route"
+                if (saved) {
+                    "Route saved (${routePoints.size} points)"
+                } else {
+                    "Could not save your route"
                 }
-            }
 
         } else {
 
             trackingStatus =
                 "Not enough points recorded to save a route"
+
+            routeSummary = null
         }
+
+        currentRouteId = null
+    }
+
+    /**
+     * Persists the current route so a killed app still has the session
+     * up to the last checkpoint. Saves whenever the route has grown by
+     * enough recorded points, or after a fixed time has passed.
+     */
+    private fun autoSaveIfDue() {
+
+        val now = System.currentTimeMillis()
+        val routeId = currentRouteId ?: return
+
+        val gainedEnoughPoints =
+            routePoints.size - lastAutoSavePointCount >=
+            AUTO_SAVE_POINT_TRIGGER
+
+        if (
+            isTracking &&
+            (now - lastAutoSaveAtMillis >= AUTO_SAVE_INTERVAL_MILLIS ||
+                gainedEnoughPoints)
+        ) {
+            lastAutoSaveAtMillis = now
+            lastAutoSavePointCount = routePoints.size
+
+if (routePoints.size >= MIN_ROUTE_POINTS) {
+
+                val checkpoint =
+                    TrackedRoute(
+                        id = routeId,
+                        startedAtMillis = trackStartedAtMillis,
+                        endedAtMillis = now,
+                        points = routePoints
+                    )
+
+                val saved =
+                    routeStorage.saveBlocking(checkpoint)
+
+                trackingStatus =
+                    if (saved) {
+                        "Checkpoint saved (${routePoints.size} points)"
+                    } else {
+                        "Checkpoint failed to save"
+                    }
+            }
+        }
+    }
+
+    /**
+     * Persists the current route immediately, for example when the app
+     * moves to the background, so a later app kill still has the whole
+     * session. Saves synchronously so the write reaches disk before
+     * the process can be killed.
+     */
+    fun saveNowIfTracking() {
+
+        val routeId = currentRouteId ?: return
+
+        if (
+            isTracking &&
+            routePoints.size >= MIN_ROUTE_POINTS
+        ) {
+
+            val checkpoint =
+                TrackedRoute(
+                    id = routeId,
+                    startedAtMillis = trackStartedAtMillis,
+                    endedAtMillis = System.currentTimeMillis(),
+                    points = routePoints
+                )
+
+            routeStorage.saveBlocking(checkpoint)
+        }
+    }
+
+    /**
+     * Reloads the most recently saved route, for example after a new
+     * tracking session replaced the one currently shown.
+     */
+    fun loadLastSavedRoute() {
+
+        viewModelScope.launch {
+
+            val saved = routeStorage.loadLatest()
+
+            if (
+                saved != null &&
+                saved.points.size >= MIN_ROUTE_POINTS
+            ) {
+                routePoints = saved.points
+                previousSessionRouteLoaded = true
+                trackingStatus =
+                    "Loaded route from last session " +
+                        "(${saved.points.size} points)"
+            } else {
+                trackingStatus =
+                    if (routeStorage.latestRouteExists()) {
+                        "Saved route could not be read"
+                    } else {
+                        "No saved route to load"
+                    }
+            }
+        }
+    }
+
+    /**
+     * Deletes the previously saved route so a new one can be recorded.
+     */
+    fun clearPreviousRoute() {
+
+        routeStorage.clearSavedRoutes()
+
+        routePoints = emptyList()
+        previousSessionRouteLoaded = false
+        routeSummary = null
+        lastGuideIndex = 0
+
+        guideTarget = null
+        guideDistanceMeters = null
+        guideBearingDegrees = null
+
+        trackingStatus =
+            "No previous route"
+        backtrackStatus =
+            "Backtrack not active"
+
+        updateTrackerState()
+    }
+
+    /**
+     * Summarises a saved route: distance walked, duration and speed.
+     */
+    private fun buildRouteSummary(
+        route: TrackedRoute
+    ): String {
+
+        val points = route.points
+
+        var totalDistanceMeters = 0.0
+
+        for (index in 1 until points.size) {
+            totalDistanceMeters +=
+                distanceMeters(
+                    points[index - 1].latitude,
+                    points[index - 1].longitude,
+                    points[index].latitude,
+                    points[index].longitude
+                )
+        }
+
+        val durationSeconds =
+            (((route.endedAtMillis ?: route.startedAtMillis) -
+                route.startedAtMillis)
+                .toDouble() / 1000.0)
+                .coerceAtLeast(0.0)
+
+        val averageSpeedKmH =
+            if (durationSeconds > 0.0) {
+                totalDistanceMeters / durationSeconds * 3.6
+            } else {
+                0.0
+            }
+
+        return "Walked ${formatDistance(totalDistanceMeters)} · " +
+            "${formatDuration(durationSeconds)} · " +
+            "avg ${"%.1f".format(Locale.US, averageSpeedKmH)} km/h"
     }
 
     // -----------------------------------------------------------------
@@ -296,6 +515,8 @@ class OfflineMapBacktrackViewModel(
         }
 
         isBacktracking = true
+
+        lastGuideIndex = 0
 
         backtrackStatus =
             "Guiding you back along your route"
@@ -337,6 +558,15 @@ class OfflineMapBacktrackViewModel(
             return
         }
 
+        // The reached threshold grows with GPS uncertainty so a poor
+        // fix never declares a waypoint reached too early.
+        val reachThreshold =
+            max(
+                WAYPOINT_REACHED_METERS,
+                ((current.accuracyMeters ?: 0f) *
+                    ACCURACY_THRESHOLD_MULTIPLIER).toDouble()
+            )
+
         // The original start of the route (the end of the reversed path).
         val routeStart = points.first()
 
@@ -348,7 +578,7 @@ class OfflineMapBacktrackViewModel(
                 current.longitude,
                 routeStart.latitude,
                 routeStart.longitude
-            ) <= WAYPOINT_REACHED_METERS
+            ) <= reachThreshold
         ) {
 
             backtrackStatus =
@@ -363,12 +593,19 @@ class OfflineMapBacktrackViewModel(
 
         // Pick the first waypoint (walking backward) that the user
         // has not reached yet. Since the start point is farther than
-        // the reached threshold, a target always exists here.
+        // the reached threshold, a target always exists here. The scan
+        // resumes from the last chosen waypoint so each GPS fix does
+        // not re-walk the whole route.
         val reversed = points.asReversed()
 
         var target: RoutePoint? = null
 
-        for (point in reversed) {
+        val startIndex =
+            lastGuideIndex.coerceIn(0, reversed.lastIndex)
+
+        for (index in startIndex until reversed.size) {
+
+            val point = reversed[index]
 
             val distance =
                 distanceMeters(
@@ -378,9 +615,34 @@ class OfflineMapBacktrackViewModel(
                     point.longitude
                 )
 
-            if (distance > WAYPOINT_REACHED_METERS) {
+            if (distance > reachThreshold) {
                 target = point
+                lastGuideIndex = index
                 break
+            }
+        }
+
+        // If the cursor found nothing ahead, the user may have wandered
+        // sideways; fall back to scanning the waypoints behind it.
+        if (target == null) {
+
+            for (index in 0 until startIndex) {
+
+                val point = reversed[index]
+
+                val distance =
+                    distanceMeters(
+                        current.latitude,
+                        current.longitude,
+                        point.latitude,
+                        point.longitude
+                    )
+
+                if (distance > reachThreshold) {
+                    target = point
+                    lastGuideIndex = index
+                    break
+                }
             }
         }
 
@@ -552,6 +814,29 @@ class OfflineMapBacktrackViewModel(
         private const val WAYPOINT_REACHED_METERS =
             25.0
 
+        /** How far a waypoint must be before the user counts as passed. */
+        private const val ACCURACY_THRESHOLD_MULTIPLIER =
+            2f
+
+        /** Route points closer than this are not recorded. */
+        const val MIN_POINT_SPACING_METERS =
+            5.0
+
+        /** GPS fixes less accurate than this are not recorded. */
+        const val MAX_ACCURACY_METERS =
+            50f
+
+        private const val AUTO_SAVE_INTERVAL_MILLIS =
+            60_000L
+
+        /** How many recorded points trigger another checkpoint save. */
+        private const val AUTO_SAVE_POINT_TRIGGER =
+            6
+
+        /** Above this many estimated tiles a region shows a warning. */
+        const val TILE_WARNING_LIMIT =
+            6_000L
+
         private const val EARTH_RADIUS_METERS =
             6_371_000.0
 
@@ -663,6 +948,89 @@ class OfflineMapBacktrackViewModel(
 
                 "${round(meters).toInt()} m"
             }
+
+        private fun formatDuration(
+            totalSeconds: Double
+        ): String {
+
+            val seconds = round(totalSeconds).toLong()
+            val hours = seconds / 3_600
+            val minutes = (seconds % 3_600) / 60
+            val remainingSeconds = seconds % 60
+
+            return when {
+                hours > 0L -> "${hours}h ${minutes}m"
+                minutes > 0L -> "${minutes}m ${remainingSeconds}s"
+                else -> "${remainingSeconds}s"
+            }
+        }
+
+        /**
+         * Estimates how many tiles a TilePyramid region needs, using the
+         * same degree offsets the [downloadRegion] bounds use. Longitude
+         * span is latitude-independent; latitude uses inverse Mercator.
+         */
+        fun estimatedTilesFor(
+            option: OfflineRegionOption,
+            latitude: Double
+        ): Long {
+
+            var totalTiles = 0L
+
+            for (zoom in option.minZoom..option.maxZoom) {
+
+                val tilesPerWorld =
+                    1L shl zoom
+
+                val lonTiles =
+                    ceil(
+                        tilesPerWorld *
+                            2 *
+                            option.radiusDegrees /
+                            360.0
+                    )
+
+                val yNorth =
+                    mercatorYTile(
+                        latitude + option.radiusDegrees,
+                        tilesPerWorld
+                    )
+
+                val ySouth =
+                    mercatorYTile(
+                        latitude - option.radiusDegrees,
+                        tilesPerWorld
+                    )
+
+                val latTiles =
+                    abs(yNorth - ySouth).coerceAtLeast(1.0)
+
+                totalTiles +=
+                    (lonTiles * latTiles)
+                        .toLong()
+                        .coerceAtLeast(1L)
+            }
+
+            return totalTiles
+        }
+
+        private fun mercatorYTile(
+            latitudeDegrees: Double,
+            tilesPerWorld: Long
+        ): Double {
+
+            val phi =
+                Math.toRadians(latitudeDegrees)
+
+            return (
+                1.0 -
+                    ln(
+                        tan(phi) +
+                            1.0 / cos(phi)
+                    ) /
+                    PI
+            ) / 2.0 * tilesPerWorld
+        }
     }
 }
 
