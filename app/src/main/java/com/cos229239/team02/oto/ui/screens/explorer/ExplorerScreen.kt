@@ -1,13 +1,7 @@
 package com.cos229239.team02.oto.ui.screens.explorer
 
-//Use OTO's shared MapLibre map component.
-
-import com.cos229239.team02.oto.ui.features.AreaSafetyUIState
-import kotlinx.coroutines.CancellationException
 import android.Manifest
-
 import android.content.pm.PackageManager
-import android.net.TetheringManager
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
@@ -30,8 +24,6 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
-
-
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -61,25 +53,13 @@ import com.cos229239.team02.oto.ui.features.AreaSafetyView
 import com.cos229239.team02.oto.ui.features.PlanTripViewModel
 import com.cos229239.team02.oto.ui.components.OtoTopAppBar
 import kotlinx.coroutines.flow.collect
-import com.cos229239.team02.oto.ui.components.map.OtoMap
-import com.cos229239.team02.oto.ui.features.AreaSafetyView
-import com.cos229239.team02.oto.ui.features.PlanTripViewModel
-import com.cos229239.team02.oto.data.safety.SafetyLevel
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.runtime.saveable.rememberSaveable
-import com.cos229239.team02.oto.BuildConfig
-import com.cos229239.team02.oto.data.resource.NpsAlertClient
-import com.cos229239.team02.oto.data.resource.NpsParkPicker
-import com.cos229239.team02.oto.data.safety.createSafetyHttpClient
 import kotlinx.coroutines.launch
 import java.util.Locale
 import androidx.compose.material3.TextButton
-
-
-
-
-
-
+import com.cos229239.team02.oto.data.safety.SafetySourceState
+import com.cos229239.team02.oto.ui.features.AreaSafetyUIState
+import com.cos229239.team02.oto.ui.theme.OtoCrisisRed
+import com.cos229239.team02.oto.ui.theme.OtoExplorerGreenDark
 
 @Composable
 fun ExplorerScreen(
@@ -241,15 +221,7 @@ fun ExplorerScreen(
      * LOCATION
      * ---------------------------------------------------------
      */
-val parkDirectoryHttp = remember {
-    createSafetyHttpClient()
-}
-    val parkDirectoryClient = remember(parkDirectoryHttp){
-        NpsAlertClient(
-            http = parkDirectoryHttp,
-            apiKey = BuildConfig.NPS_API_KEY
-        )
-    }
+
     val locationRepository =
         remember(context) {
 
@@ -261,52 +233,47 @@ val parkDirectoryHttp = remember {
     var currentLocation by remember {
         mutableStateOf<OtoLocation?>(null)
     }
+
     val destinationLatitude = savedTrip?.destinationLatitude
     val destinationLongitude = savedTrip?.destinationLongitude
     val destinationName = savedTrip?.destinationName
-    var parkCodeInput by rememberSaveable{
-        mutableStateOf("")
-    }
-    var selectedParkCode by rememberSaveable {
-        mutableStateOf<String?>(null)
-    }
-    var parkCodeError by rememberSaveable {
-        mutableStateOf<String?>(null)
-    }
+
     LaunchedEffect(
         destinationLatitude,
         destinationLongitude,
         destinationName,
         currentLocation?.latitude,
-        currentLocation?.longitude,
-        selectedParkCode
+        currentLocation?.longitude
     ) {
+        val destination = if (
+            destinationLatitude != null &&
+            destinationLongitude != null
+        ){
+            OtoLocation(
+                latitude = destinationLatitude,
+                longitude = destinationLongitude
+            )
+        } else {
+            null
+        }
+        val selectedArea = destination ?: currentLocation
 
-        val selectedLocation =
-            if (
-                destinationLatitude != null &&
-                destinationLongitude != null
-            ) {
-                OtoLocation(
-                    latitude = destinationLatitude,
-                    longitude = destinationLongitude
-                )
-            } else {
-                currentLocation
-            }
-        safetyView.setArea(
-            location = selectedLocation,
-            areaName = if (savedTrip != null) {
-                destinationName
-                    ?.takeIf { it.isNotBlank() }
-                    ?: "Trip destination"
-            } else {
-                "Current area"
-            },
+        if (selectedArea != null) {
+            safetyView.setArea(
+                location = selectedArea,
+                areaName = if (destination != null) {
+                    destinationName
+                        ?.takeIf { it.isNotBlank() }
+                        ?: "Trip destination"
+                }else {
+                    "Current area"
 
-            parkCode = selectedParkCode
-        )
+                }
+            )
+        }
     }
+
+
 
     var locationStatus by remember {
         mutableStateOf(
@@ -572,17 +539,11 @@ val parkDirectoryHttp = remember {
                 )
     ) {
 
-
         /*
-        /*
-         * -----------------------------------------------------
-         * HEADER
-         * -----------------------------------------------------
-         */
-        Spacer(
-            modifier =
-                Modifier.height(24.dp)
-        )
+        * -----------------------------------------------------
+        * HEADER
+        * -----------------------------------------------------
+        */
 
         //Use OTO's shared Material 3 top app bar.
         OtoTopAppBar(
@@ -1274,17 +1235,8 @@ val parkDirectoryHttp = remember {
              */
 
             SafetyOverviewCard(
-                areaName =
-                    safetyState.areaName,
-
-                isLoading =
-                    safetyState.isLoading,
-
-                isOffline =
-                    safetyState.isOffline,
-
-                isSample =
-                    safetyState.isSampleData,
+               uiState =
+                   safetyState,
 
                 onAreaSafetyClick =
                     onAreaSafetyClick,
@@ -1450,95 +1402,7 @@ val parkDirectoryHttp = remember {
             )
         }
     }
-
-                DashboardWideCard(
-                    title  =
-                        "⚠️ REPORT HAZARD / ROUTE CHANGE",
-                    subtitle =
-                        "Help keep trails safe for everyone",
-                    onClick = {}
-                )
-                Spacer(modifier = Modifier.height(12.dp))
-
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    colors =
-                        CardDefaults.cardColors(
-                            containerColor =
-                                Color.White
-                        ),
-                    shape =
-                        RoundedCornerShape(
-                            14.dp
-                        )) {
-                            Column(
-                                modifier = Modifier.padding(
-                                    18.dp)
-                            ) {
-                                Text(
-                                    text = "👥 CHECK-IN",
-                                    fontSize = 18.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = darkGreen
-                                )
-
-                                Spacer(
-                                    modifier =
-                                        Modifier.height(6.dp)
-                                )
-
-                                Text(
-                                    text = "Trusted Contact",
-                                    fontSize = 14.sp
-                                )
-
-                                Text(
-                                    text = "Not checked in",
-                                    color = Color(
-                                        0xFFE67E22
-                                    ),
-                                    fontWeight =
-                                        FontWeight.Bold
-                                )
-                                Spacer(
-                                    modifier = Modifier.height(10.dp)
-
-                                )
-
-                                Button(
-                                    onClick = {
-
-                                    },
-                                    modifier = Modifier.fillMaxWidth(),
-                                    colors = ButtonDefaults.buttonColors(
-                                        containerColor = mediumGreen
-                                    )
-                                ) {
-                                    Text(
-                                        "CHECK IN"
-                                    )
-                                }
-
-                            }
-
-                        }
-                                Spacer( modifier = Modifier.height(12.dp)
-                    )
-
-                    DashboardWideCard(
-                        title =
-                            "📋 FIELD REPORTS",
-                        subtitle =
-                            "View recent reports from this area",
-                        onClick = {
-
-                        }
-                    )
-                    Spacer(modifier =
-                        Modifier.height(30.dp)
-                    )
-            }
-
+}
 
 
 /**
@@ -1661,28 +1525,36 @@ private fun ExplorerActionCard(
  */
 @Composable
 private fun SafetyOverviewCard(
-    areaName: String,
-    isLoading: Boolean,
-    isOffline: Boolean,
-    isSample: Boolean,
+    uiState: AreaSafetyUIState,
     onAreaSafetyClick: () -> Unit,
     onWeatherClick: () -> Unit
 ) {
 
-    val darkGreen =
-        Color(
-            0xFF063D24
-        )
+    val nwsStatus = uiState.sources.firstOrNull{
+        it.source == "NWS"
+    }
 
-    val mediumGreen =
-        Color(
-            0xFF0B5D1E
-        )
+    val npsStatus = uiState.sources.firstOrNull{
+        it.source == "NPS"
+    }
 
-    val dividerColor =
-        Color(
-            0xFFE1E5E1
-        )
+    val weatherSummary = when {
+        uiState.isLoading -> "Loading..."
+        !uiState.hasLocation -> "Select a location"
+                uiState.errorMessage != null -> "Unavailable"
+        nwsStatus?.state == SafetySourceState.SUCCESS ->
+            "${uiState.weatherNotifications.size} weather alerts"
+        else -> nwsStatus?.message ?: "Not loaded"
+    }
+
+    val parkSummary = when{
+        uiState.selectedParkCode == null -> "Select a park"
+        uiState.isLoading -> "Loading..."
+        !uiState.hasLocation -> "Location required to load notices"
+        uiState.errorMessage != null -> "Unavailable"
+        else -> npsStatus?.message ?: "Not Loaded"
+    }
+
 
     /*
      * The entire card is intentionally NOT clickable.
@@ -1708,137 +1580,73 @@ private fun SafetyOverviewCard(
 
         Column(
             modifier =
-                Modifier.padding(
-                    16.dp
-                )
-        ) {
+                Modifier
+                    .fillMaxWidth()
+                    .padding(
+                        16.dp
+                    ),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        )
 
-            /*
+
+        /*
              * -------------------------------------------------
              * HEADER
              * -------------------------------------------------
              */
+        {
 
-            Row(
-                modifier =
-                    Modifier.fillMaxWidth(),
+            Text(
+                text =
+                    " 🛡️ SAFETY OVERVIEW",
 
-                horizontalArrangement =
-                    Arrangement.SpaceBetween,
+                color =
+                    OtoExplorerGreenDark,
 
-                verticalAlignment =
-                    Alignment.CenterVertically
-            ) {
+                fontSize =
+                    17.sp,
 
-                Row(
-                    verticalAlignment =
-                        Alignment.CenterVertically
-                ) {
+                fontWeight =
+                    FontWeight.Bold
+            )
+            Text(
+                text = uiState.areaName,
+                modifier = Modifier.fillMaxWidth()
+            )
 
-                    Text(
-                        text =
-                            "🛡️",
-
-                        fontSize =
-                            22.sp
-                    )
-
-                    Spacer(
-                        modifier =
-                            Modifier.padding(
-                                horizontal =
-                                    4.dp
-                            )
-                    )
-
-                    Text(
-                        text =
-                            "SAFETY OVERVIEW",
-
-                        color =
-                            darkGreen,
-
-                        fontSize =
-                            17.sp,
-
-                        fontWeight =
-                            FontWeight.Bold
-                    )
-                }
-
-                /*
-                 * This remains connected to Eric's
-                 * Area Safety screen.
-                 */
-                Text(
-                    text =
-                        "View Area Safety ›",
-
-                    modifier =
-                        Modifier.clickable {
-                            onAreaSafetyClick()
-                        },
-
-                    color =
-                        mediumGreen,
-
-                    fontSize =
-                        13.sp,
-
-                    fontWeight =
-                        FontWeight.Bold
-                )
-
-            when {
-                !uiState.hasLocation -> {
-                    Text(
-                        text = "Select a trip destination or use Locate Me."
-                    )
+            if (uiState.isLoading) {
+                CircularProgressIndicator()
             }
-            /*
-             * -------------------------------------------------
-             * AREA
-             * -------------------------------------------------
-             */
+            Text(
+                text = "Weather: $weatherSummary",
+                modifier = Modifier.fillMaxWidth()
+            )
 
-            if (
-                areaName.isNotBlank()
-            ) {
+            TextButton(onClick = onWeatherClick) {
+                Text("View Weather Report >")
+            }
+            Text(
+                text = "Park Notices: $parkSummary",
+                modifier = Modifier.fillMaxWidth()
+            )
 
-                Spacer(
-                    modifier =
-                        Modifier.height(
-                            8.dp
-                        )
-                )
-
-                Text(
-                    text =
-                        areaName,
-
-                    color =
-                        Color(
-                            0xFF4A554F
-                        ),
-
-                    fontSize =
-                        12.sp,
-
-                    fontWeight =
-                        FontWeight.Medium
-                )
+            uiState.selectedParkCode?.let { code ->
+                Text(text = "Selected park code: $code")
             }
 
-            Spacer(
-                modifier =
-                    Modifier.height(
-                        16.dp
-                    )
+            TextButton(onClick = onAreaSafetyClick) {
+                Text("View Area Safety / Select Park >")
+            }
+            if (uiState.hasUnavailableSources) {
+                Text(
+                    text = "Some sources are unavailable. " +
+                            "Results may be incomplete.",
+                    color = OtoCrisisRed
                 )
+            }
+        }
+    }
 
-
-                    )
-                }
 
             /*
              * -------------------------------------------------
@@ -1846,37 +1654,6 @@ private fun SafetyOverviewCard(
              * -------------------------------------------------
              */
 
-            if (
-                isLoading
-            ) {
-
-                Box(
-                    modifier =
-                        Modifier
-                            .fillMaxWidth()
-                            .height(
-                                120.dp
-                            ),
-
-                    contentAlignment =
-                        Alignment.Center
-                ) {
-
-                    CircularProgressIndicator(
-                        color =
-                            mediumGreen
-                    )
-                }
-
-            } else {
-
-                Row(
-                    modifier =
-                        Modifier.fillMaxWidth(),
-
-                    verticalAlignment =
-                        Alignment.Top
-                ) {
 
                     /*
                      * -------------------------------------------------
@@ -1897,21 +1674,16 @@ private fun SafetyOverviewCard(
 
                         description =
                             "View weather",
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable{
+                                onWeatherClick()
+                            }
+                        )
 
-                        modifier =
-                            Modifier
-                                .weight(
-                                    1f
-                                )
-                                .clickable {
-                                    onWeatherClick()
-                                }
-                    )
 
-                    SafetyOverviewDivider(
-                        color =
-                            dividerColor
-                    )
+
+
 
                     /*
                      * HAZARDS
@@ -1929,16 +1701,10 @@ private fun SafetyOverviewCard(
                         description =
                             "Not connected",
 
-                        modifier =
-                            Modifier.weight(
-                                1f
-                            )
+
                     )
 
-                    SafetyOverviewDivider(
-                        color =
-                            dividerColor
-                    )
+
 
                     /*
                      * CLOSURES
@@ -1956,16 +1722,10 @@ private fun SafetyOverviewCard(
                         description =
                             "Not connected",
 
-                        modifier =
-                            Modifier.weight(
-                                1f
-                            )
+
                     )
 
-                    SafetyOverviewDivider(
-                        color =
-                            dividerColor
-                    )
+
 
                     /*
                      * AIR QUALITY
@@ -1983,22 +1743,10 @@ private fun SafetyOverviewCard(
                         description =
                             "Not connected",
 
-                        modifier =
-                            Modifier.weight(
-                                1f
-                            )
-                    )
 
-                    SafetyOverviewDivider(
-                        color =
-                            dividerColor
-                    )
-
-                }
-            }
                     )
                 }
-            }
+
 
             /*
              * -------------------------------------------------
@@ -2006,61 +1754,6 @@ private fun SafetyOverviewCard(
              * -------------------------------------------------
              */
 
-            if (
-                isOffline
-            ) {
-
-                Spacer(
-                    modifier =
-                        Modifier.height(
-                            12.dp
-                        )
-                )
-
-                Text(
-                    text =
-                        "⚠ Offline — live safety information may be unavailable",
-
-                    color =
-                        MaterialTheme
-                            .colorScheme
-                            .error,
-
-                    fontSize =
-                        11.sp,
-
-                    fontWeight =
-                        FontWeight.Bold
-                )
-            }
-
-            if (
-                isSample
-            ) {
-
-                Spacer(
-                    modifier =
-                        Modifier.height(
-                            8.dp
-                        )
-                )
-
-                Text(
-                    text =
-                        "Area Alerts currently contains sample safety data",
-
-                    color =
-                        Color(
-                            0xFF737373
-                        ),
-
-                    fontSize =
-                        10.sp
-                )
-            }
-        }
-    }
-}
 
 
 /**
@@ -2329,4 +2022,67 @@ private fun formatExplorerLocation(
             "%.0f",
             location.accuracyMeters
         )
-    } m"\n}\n\n\n/**\n * Converts meters to miles.\n */\nprivate fun formatRouteDistance(\n    distanceMeters: Double\n): String {\n\n    val miles =\n        distanceMeters /\n                1609.344\n\n    return String.format(\n        Locale.US,\n        "%.1f mi",\n        miles\n    )\n}\n\n\n/**\n * Converts seconds to minutes/hours.\n */\nprivate fun formatRouteDuration(\n    durationSeconds: Double\n): String {\n\n    val totalMinutes =\n        (\n                durationSeconds /\n                        60.0\n                ).toInt()\n\n    return if (\n        totalMinutes < 60\n    ) {\n\n        "$totalMinutes min"\n\n    } else {\n\n        val hours =\n            totalMinutes /\n                    60\n\n        val minutes =\n            totalMinutes %\n                    60\n\n        if (\n            minutes == 0\n        ) {\n\n            "$hours hr"\n\n        } else {\n\n            "$hours hr $minutes min"\n        }\n    }\n}\n
+    } m"
+}
+
+
+/**
+ * Converts meters to miles.
+ */
+private fun formatRouteDistance(
+    distanceMeters: Double
+): String {
+
+    val miles =
+        distanceMeters /
+                1609.344
+
+    return String.format(
+        Locale.US,
+        "%.1f mi",
+        miles
+    )
+}
+
+
+/**
+ * Converts seconds to minutes/hours.
+ */
+private fun formatRouteDuration(
+    durationSeconds: Double
+): String {
+
+    val totalMinutes =
+        (
+                durationSeconds /
+                        60.0
+                ).toInt()
+
+    return if (
+        totalMinutes < 60
+    ) {
+
+        "$totalMinutes min"
+
+    } else {
+
+        val hours =
+            totalMinutes /
+                    60
+
+        val minutes =
+            totalMinutes %
+                    60
+
+        if (
+            minutes == 0
+        ) {
+
+            "$hours hr"
+
+        } else {
+
+            "$hours hr $minutes min"
+        }
+    }
+}

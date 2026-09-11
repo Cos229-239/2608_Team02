@@ -13,6 +13,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import java.util.Locale
 
 
 class AreaSafetyView (
@@ -28,14 +29,16 @@ class AreaSafetyView (
     private var requestJob: Job? = null
     private var requestVersion: Long = 0
 
+
+
     fun setArea(
         location: OtoLocation?,
         areaName: String,
-        parkCode: String? = null
+        parkCode: String? = selectedParkCode
     ) {
         val normalizedParkCode = parkCode
             ?.trim()
-            ?.lowercase()
+            ?.lowercase(Locale.ROOT)
             ?.takeIf { it.isNotEmpty() }
         val previousLocation = selectedLocation
 
@@ -69,6 +72,7 @@ class AreaSafetyView (
         _uiState.value = AreaSafetyUIState(
             areaName = areaName,
             hasLocation = selectedLocation != null,
+            selectedParkCode = selectedParkCode,
             filterSelected = _uiState.value.filterSelected
         )
 
@@ -77,9 +81,16 @@ class AreaSafetyView (
         }
 
     }
+    fun selectParkCode(parkCode: String?){
+        setArea(
+            location = selectedLocation,
+            areaName = _uiState.value.areaName,
+            parkCode = parkCode
+        )
+    }
 //Loads safety updates according to OTO Location/Area
     fun refreshNotifications() {
-        loadArea(forceRefresh = false)
+        loadArea(forceRefresh = true)
     }
 
     private fun loadArea(
@@ -99,6 +110,8 @@ class AreaSafetyView (
             it.copy(
                 isLoading = true,
                 notifications = emptyList(),
+                weatherNotifications = emptyList(),
+                forecast = null,
                 resourceResult = null,
                 sources = emptyList(),
                 checkedAtMillis = null,
@@ -124,6 +137,11 @@ class AreaSafetyView (
                     state.copy(
                         isLoading = false,
                         notifications = filterNotifications(state.filterSelected),
+                        weatherNotifications = allNotifications.filter {
+                            it.category == SafetyCategory.WEATHER
+
+                        },
+                        forecast = result.forecast,
                         resourceResult = result.resourceResult,
                         sources = result.sources,
                         checkedAtMillis = result.checkedAtMillis

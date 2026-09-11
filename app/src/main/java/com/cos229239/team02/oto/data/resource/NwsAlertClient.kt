@@ -7,7 +7,7 @@ import com.cos229239.team02.oto.data.safety.SafetyLevel
 import com.cos229239.team02.oto.data.safety.SafetyNotification
 import com.cos229239.team02.oto.data.safety.getSafetyJson
 import com.cos229239.team02.oto.data.safety.optionalText
-
+import java.util.Locale
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.HttpUrl
@@ -146,6 +146,92 @@ class NwsAlertClient(
 
         }
         alerts.distinctBy { it.id }
+    }
+    suspend fun getForecast(
+        location: OtoLocation
+    ): WeatherForecast = withContext(Dispatchers.IO) {
+        require(userAgent.isNotBlank()) {
+            "NWS User-Agent is missing."
+        }
+
+        require(
+            location.latitude.isFinite() &&
+                    location.latitude in -90.0..90.0 &&
+                    location.longitude.isFinite() &&
+                    location.longitude in -180.0..180.0
+        ) {
+            "Invalid coordinates."
+        }
+
+        val coordinates = String.format(
+            Locale.US,
+            "%.4f,%.4f",
+            location.latitude,
+            location.longitude
+        )
+
+        val pointRequest = Request.Builder()
+            .url("https://api.weather.gov/points/$coordinates")
+            .header("User-Agent", userAgent)
+            .header("Accept", "application/geo+json")
+            .build()
+
+        val pointRoot = http.getSafetyJson(pointRequest)
+
+        val forecastUrl = pointRoot
+            .getJSONObject("properties")
+            .optionalText("forecast")
+            ?.toHttpUrl()
+            ?: throw IOException("No forecast available for this location.")
+
+        require(
+            forecastUrl.scheme == "https" &&
+                    forecastUrl.host == "api.weather.gov"
+        ) {
+            "Unexpected NWS forecast URL."
+        }
+
+        val forecastRequest = Request.Builder()
+            .url(forecastUrl)
+            .header("User-Agent", userAgent)
+            .header("Accept", "application/geo+json")
+            .build()
+
+        val forecastRoot = http.getSafetyJson(forecastRequest)
+
+        val periods = forecastRoot
+            .getJSONObject("properties")
+            .getJSONArray("periods")
+
+        if (periods.length() == 0) {
+            throw IOException("NWS returned no forecast periods.")
+        }
+
+        val period = periods.getJSONObject(0)
+        val precipitation = period.optJSONObject("probabilityOfPrecipitation")
+
+        WeatherForecast(
+            periodName = period.getString("name"),
+            temp = period.getInt("temperature"),
+            tempUnit = period.getString("temperatureUnit"),
+            shortForecast = period.optionalText("shortForecast")
+                ?: "Description unavailable",
+            detailedForecast = period.optionalText("detailedForecast")
+                ?: "Details unavailable",
+            windSpeed = period.optionalText("windSpeed") ?: "Unavailable",
+            windDirection = period.optionalText("windDirection").orEmpty(),
+            precipitationPercent = if (
+                precipitation != null &&
+                precipitation.has("value") &&
+                !precipitation.isNull("value")
+            ) {
+                precipitation.getInt("value")
+            } else {
+                null
+            },
+            startTime = period.getString("startTime"),
+            endTime = period.getString("endTime")
+        )
     }
 }
 

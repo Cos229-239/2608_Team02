@@ -31,7 +31,13 @@ class DefaultAreaSafetyRepo(
             captureSafetyRequest {
                 nwsClient.getAlerts(location)
         }
+
     }
+        val forecastRequest = async {
+            captureSafetyRequest {
+                nwsClient.getForecast(location)
+            }
+        }
 
 val parkRequest = async {
         if (parkCode.isNullOrBlank()) {
@@ -57,6 +63,7 @@ val parkRequest = async {
         val weatherResult = weatherRequest.await()
         val parkResult = parkRequest.await()
         val nearbyResult = resourceRequest.await()
+        val forecastResult = forecastRequest.await()
 
 
         val sources = listOf(

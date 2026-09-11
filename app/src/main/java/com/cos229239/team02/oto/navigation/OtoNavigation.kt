@@ -175,6 +175,7 @@ fun OtoNavigation() {
                             }
                         },
                         safetyView = safetyView
+
                     )
                 }
 
@@ -188,9 +189,12 @@ fun OtoNavigation() {
 
                     AreaSafetyRoute(
                         onBackClick = {
+                            if (backStack.size > 1) {
 
-                            backStack.removeLastOrNull()
-                        }
+                                backStack.removeLastOrNull()
+                            }
+                        },
+                        safetyView = safetyView
                     )
                 }
 

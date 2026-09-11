@@ -14,7 +14,8 @@ import kotlin.coroutines.resumeWithException
 
 
 internal class SafetyHttpException(
-    val statusCode: Int
+    val statusCode: Int,
+    val serviceCode: String? = null
 ) : IOException("HTTP $statusCode")
 
 fun createSafetyHttpClient(): OkHttpClient =
@@ -49,11 +50,22 @@ internal suspend fun OkHttpClient.getSafetyJson(
         ) {
             try {
                 val json = response.use {
+                    val body = it.body?.string().orEmpty()
                     if (!it.isSuccessful) {
-                        throw SafetyHttpException(it.code)
+                        val serviceCode = runCatching {
+                            JSONObject(body)
+                                .optJSONObject("error")
+                                ?.optionalText("code")
+                        }.getOrNull()
+                        throw SafetyHttpException(
+                            statusCode = it.code,
+                            serviceCode = serviceCode
+                            )
                     }
-                    val body = it.body?.string()
-                        ?: throw IOException ("Empty response")
+                    if (body.isBlank()){
+                        throw IOException("Emppty respone")
+                    }
+
 
                     JSONObject(body)
                 }

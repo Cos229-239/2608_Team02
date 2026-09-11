@@ -78,7 +78,7 @@ fun NpsParkPicker(
         } catch (error: Exception) {
             errorMessage = when(error) {
                 is SafetyHttpException ->
-                    "NPS request failed: HTTP ${error.statusCode}."
+                    "NPS request failed: HTTP ${error.message}."
 
                 is IllegalArgumentException ->
                     "NPS configuration is missing or invalid" +
@@ -151,7 +151,7 @@ fun NpsParkPicker(
                     Text("Example: Yellow Stone")
                 },
 
-                enabled = !isLoading && errorMessage == null,
+                enabled = true,
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth()
             )
