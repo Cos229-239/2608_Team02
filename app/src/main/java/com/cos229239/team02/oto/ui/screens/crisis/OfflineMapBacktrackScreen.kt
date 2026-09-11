@@ -166,22 +166,20 @@ fun OfflineMapBacktrackScreen(
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(paddingValues)
-                .padding(16.dp)
-                .verticalScroll(rememberScrollState()),
+                .padding(paddingValues),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            Text(
-                text = "Track your route and find your way back, even without a signal.",
-                style = MaterialTheme.typography.bodyMedium
-            )
 
             // ----- Live Map -----
-            Card(modifier = Modifier.fillMaxWidth()) {
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(start = 16.dp, top = 16.dp, end = 16.dp)
+            ) {
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(320.dp)
+                        .height(440.dp)
                 ) {
 
                     OtoMap(
@@ -243,8 +241,23 @@ fun OfflineMapBacktrackScreen(
                 }
             }
 
-            // ----- Route Tracking -----
-            Card(modifier = Modifier.fillMaxWidth()) {
+            // ----- Scrollable Dashboard -----
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxWidth()
+                    .verticalScroll(rememberScrollState())
+                    .padding(start = 16.dp, end = 16.dp, bottom = 16.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+
+                Text(
+                    text = "Track your route and find your way back, even without a signal.",
+                    style = MaterialTheme.typography.bodyMedium
+                )
+
+                // ----- Route Tracking -----
+                Card(modifier = Modifier.fillMaxWidth()) {
                 Column(modifier = Modifier.padding(16.dp)) {
                     Text(
                         text = "Route Tracking",
@@ -414,6 +427,7 @@ fun OfflineMapBacktrackScreen(
                         Spacer(modifier = Modifier.height(8.dp))
                     }
                 }
+            }
             }
         }
     }
