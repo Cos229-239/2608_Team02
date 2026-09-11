@@ -3,9 +3,9 @@ package com.cos229239.team02.oto.data.safety
 import com.cos229239.team02.oto.data.location.OtoLocation
 import com.cos229239.team02.oto.data.resource.NpsAlertClient
 import com.cos229239.team02.oto.data.resource.NwsAlertClient
+import com.cos229239.team02.oto.data.resource.OpenMeteoClient
 import com.cos229239.team02.oto.data.resource.ResourceRepository
 import com.cos229239.team02.oto.data.resource.ResourceResult
-import com.cos229239.team02.oto.data.safety.SafetyNotification
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
@@ -17,6 +17,7 @@ class DefaultAreaSafetyRepo(
     private val resourceRepository: ResourceRepository,
     private val nwsClient: NwsAlertClient,
     private val npsClient: NpsAlertClient,
+    private val forecastClient: OpenMeteoClient
 
 ) : AreaSafetyRepo {
 
@@ -35,7 +36,7 @@ class DefaultAreaSafetyRepo(
     }
         val forecastRequest = async {
             captureSafetyRequest {
-                nwsClient.getForecast(location)
+                forecastClient.getForecast(location)
             }
         }
 
@@ -72,6 +73,23 @@ val parkRequest = async {
                 result = weatherResult
             ),
 
+            forecastResult.fold(
+                onSuccess = {
+                    SafetySourceStatus(
+                        source = "Open-Meteo",
+                        state = SafetySourceState.SUCCESS,
+                        message = "Forecast loaded."
+                    )
+                },
+                onFailure = { error ->
+                    SafetySourceStatus(
+                        source = "Open-Meteo",
+                        state = SafetySourceState.FAILED,
+                        message = safetyErrorMessage(error)
+                    )
+                }
+            ),
+
             parkResult?.let {
                 alertStatus(
                     source = "NPS",
@@ -98,7 +116,8 @@ val parkRequest = async {
             areaName = areaName,
             notifications = notifications,
             resourceResult = nearbyResult.getOrNull(),
-            sources = sources
+            sources = sources,
+            forecast = forecastResult.getOrNull()
               )
             }
 

@@ -1,5 +1,4 @@
 package com.cos229239.team02.oto.data.resource
-
 data class WeatherForecast(
     val periodName: String,
     val temp: Int,

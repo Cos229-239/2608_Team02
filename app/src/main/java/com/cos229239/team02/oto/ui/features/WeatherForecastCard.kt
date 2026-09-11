@@ -15,7 +15,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import com.cos229239.team02.oto.ui.features.AreaSafetyUIState
 
 @Composable
 fun WeatherForecastCard(
@@ -24,7 +23,7 @@ fun WeatherForecastCard(
 ) {
     val forecast = uiState.forecast
     val forecastStatus = uiState.sources.firstOrNull {
-        it.source == "NWS Forecast"
+        it.source == "Open-Meteo"
     }
 
     Card(

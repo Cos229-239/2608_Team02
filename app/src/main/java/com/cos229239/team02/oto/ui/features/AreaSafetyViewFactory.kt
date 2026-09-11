@@ -3,18 +3,14 @@ package com.cos229239.team02.oto.ui.features
 import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
-import androidx.lifecycle.viewmodel.CreationExtras
+import com.cos229239.team02.oto.BuildConfig
 import com.cos229239.team02.oto.data.resource.NpsAlertClient
 import com.cos229239.team02.oto.data.resource.NwsAlertClient
+import com.cos229239.team02.oto.data.resource.OpenMeteoClient
 import com.cos229239.team02.oto.data.resource.OverpassResourceRepository
-import com.cos229239.team02.oto.data.resource.ResourceRepository
-import com.cos229239.team02.oto.data.safety.DefaultAreaSafetyRepo
 import com.cos229239.team02.oto.data.safety.AreaSafetyRepo
+import com.cos229239.team02.oto.data.safety.DefaultAreaSafetyRepo
 import com.cos229239.team02.oto.data.safety.createSafetyHttpClient
-import okhttp3.internal.userAgent
-import com.cos229239.team02.oto.BuildConfig
-import kotlin.getValue
-import kotlin.reflect.KClass
 
 class AreaSafetyViewFactory(
     context: Context
@@ -37,6 +33,9 @@ class AreaSafetyViewFactory(
             npsClient = NpsAlertClient(
                 http = http,
                 apiKey = BuildConfig.NPS_API_KEY
+            ),
+            forecastClient = OpenMeteoClient(
+                httpClient = http
             )
 
         )
