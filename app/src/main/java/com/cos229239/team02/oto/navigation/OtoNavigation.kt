@@ -5,6 +5,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation3.runtime.entryProvider
 import androidx.navigation3.runtime.rememberNavBackStack
 import androidx.navigation3.ui.NavDisplay
+import com.cos229239.team02.oto.data.hazard.HazardReportViewModel
 import com.cos229239.team02.oto.ui.features.PlanTripViewModel
 import com.cos229239.team02.oto.ui.screens.crisis.CrisisScreen
 import com.cos229239.team02.oto.ui.screens.crisis.EmergencyHelpScreen
@@ -14,7 +15,9 @@ import com.cos229239.team02.oto.ui.screens.crisis.OfflineMapBacktrackScreen
 import com.cos229239.team02.oto.ui.screens.crisis.ShareStatusLocationScreen
 import com.cos229239.team02.oto.ui.screens.explorer.AreaSafetyRoute
 import com.cos229239.team02.oto.ui.screens.explorer.ExplorerScreen
+import com.cos229239.team02.oto.ui.screens.explorer.FieldReportsScreen
 import com.cos229239.team02.oto.ui.screens.explorer.PlanTripScreen
+import com.cos229239.team02.oto.ui.screens.explorer.ReportHazardScreen
 import com.cos229239.team02.oto.ui.screens.explorer.WeatherReportScreen
 import com.cos229239.team02.oto.ui.screens.home.HomeScreen
 
@@ -27,14 +30,51 @@ fun OtoNavigation() {
         )
 
     /*
-     * One shared Plan Trip ViewModel.
+     * ---------------------------------------------------------
+     * SHARED PLAN TRIP VIEW MODEL
+     * ---------------------------------------------------------
      *
      * Plan Trip writes to it.
      * Explorer reads from it.
      */
+
     val planTripViewModel:
             PlanTripViewModel =
         viewModel()
+
+    /*
+     * ---------------------------------------------------------
+     * SHARED HAZARD REPORT VIEW MODEL
+     * ---------------------------------------------------------
+     *
+     * Report Hazard writes reports to it.
+     *
+     * Explorer reads the reports for:
+     *
+     * - Hazard count
+     * - Map markers
+     *
+     * Field Reports reads the same reports for:
+     *
+     * - Saved photos
+     * - Report details
+     * - Priority
+     * - Severity
+     * - Community confirmations
+     *
+     * This ViewModel also loads locally stored
+     * reports when the app starts.
+     */
+
+    val hazardReportViewModel:
+            HazardReportViewModel =
+        viewModel()
+
+    /*
+     * ---------------------------------------------------------
+     * NAVIGATION DISPLAY
+     * ---------------------------------------------------------
+     */
 
     NavDisplay(
         backStack =
@@ -54,9 +94,9 @@ fun OtoNavigation() {
             entryProvider {
 
                 /*
-                 * -------------------------------------------------
+                 * =================================================
                  * HOME
-                 * -------------------------------------------------
+                 * =================================================
                  */
 
                 entry<OtoRoute.Home> {
@@ -79,9 +119,9 @@ fun OtoNavigation() {
                 }
 
                 /*
-                 * -------------------------------------------------
+                 * =================================================
                  * EXPLORER
-                 * -------------------------------------------------
+                 * =================================================
                  */
 
                 entry<OtoRoute.Explorer> {
@@ -102,7 +142,7 @@ fun OtoNavigation() {
                         },
 
                         /*
-                         * Opens the new Weather Report screen.
+                         * Opens Weather Report.
                          */
                         onWeatherClick = {
 
@@ -111,20 +151,57 @@ fun OtoNavigation() {
                             )
                         },
 
+                        /*
+                         * Opens Report Hazard.
+                         */
+                        onReportHazardClick = {
+
+                            backStack.add(
+                                OtoRoute.ReportHazard
+                            )
+                        },
+
+                        /*
+                         * Opens Field Reports.
+                         *
+                         * Used by:
+                         *
+                         * - FIELD REPORTS dashboard card
+                         * - Hazard map popup
+                         */
+                        onFieldReportsClick = {
+
+                            backStack.add(
+                                OtoRoute.FieldReports
+                            )
+                        },
+
+                        /*
+                         * Back to Home.
+                         */
                         onBackClick = {
 
                             backStack.removeLastOrNull()
                         },
 
+                        /*
+                         * Shared trip state.
+                         */
                         tripViewModel =
-                            planTripViewModel
+                            planTripViewModel,
+
+                        /*
+                         * Shared hazard state.
+                         */
+                        hazardReportViewModel =
+                            hazardReportViewModel
                     )
                 }
 
                 /*
-                 * -------------------------------------------------
+                 * =================================================
                  * PLAN TRIP
-                 * -------------------------------------------------
+                 * =================================================
                  */
 
                 entry<OtoRoute.PlanTrip> {
@@ -146,9 +223,9 @@ fun OtoNavigation() {
                 }
 
                 /*
-                 * -------------------------------------------------
+                 * =================================================
                  * WEATHER REPORT
-                 * -------------------------------------------------
+                 * =================================================
                  */
 
                 entry<OtoRoute.WeatherReport> {
@@ -162,9 +239,58 @@ fun OtoNavigation() {
                 }
 
                 /*
-                 * -------------------------------------------------
+                 * =================================================
+                 * REPORT HAZARD / ROUTE CHANGE
+                 * =================================================
+                 */
+
+                entry<OtoRoute.ReportHazard> {
+
+                    ReportHazardScreen(
+                        onBackClick = {
+
+                            backStack.removeLastOrNull()
+                        },
+
+                        /*
+                         * Opens First Aid & Survival from
+                         * the submitted report screen.
+                         */
+                        onFirstAidSurvivalClick = {
+
+                            backStack.add(
+                                OtoRoute.FirstAidSurvival
+                            )
+                        },
+
+                        hazardReportViewModel =
+                            hazardReportViewModel
+                    )
+                }
+
+                /*
+                 * =================================================
+                 * FIELD REPORTS
+                 * =================================================
+                 */
+
+                entry<OtoRoute.FieldReports> {
+
+                    FieldReportsScreen(
+                        onBackClick = {
+
+                            backStack.removeLastOrNull()
+                        },
+
+                        hazardReportViewModel =
+                            hazardReportViewModel
+                    )
+                }
+
+                /*
+                 * =================================================
                  * AREA SAFETY
-                 * -------------------------------------------------
+                 * =================================================
                  */
 
                 entry<OtoRoute.AreaSafety> {
@@ -178,9 +304,9 @@ fun OtoNavigation() {
                 }
 
                 /*
-                 * -------------------------------------------------
+                 * =================================================
                  * CRISIS MODE
-                 * -------------------------------------------------
+                 * =================================================
                  */
 
                 entry<OtoRoute.Crisis> {
@@ -229,9 +355,9 @@ fun OtoNavigation() {
                 }
 
                 /*
-                 * -------------------------------------------------
+                 * =================================================
                  * CRISIS - EMERGENCY HELP
-                 * -------------------------------------------------
+                 * =================================================
                  */
 
                 entry<OtoRoute.EmergencyHelp> {
@@ -252,9 +378,9 @@ fun OtoNavigation() {
                 }
 
                 /*
-                 * -------------------------------------------------
+                 * =================================================
                  * CRISIS - SHARE STATUS / LOCATION
-                 * -------------------------------------------------
+                 * =================================================
                  */
 
                 entry<OtoRoute.ShareStatusLocation> {
@@ -268,9 +394,9 @@ fun OtoNavigation() {
                 }
 
                 /*
-                 * -------------------------------------------------
+                 * =================================================
                  * CRISIS - FIRST AID / SURVIVAL
-                 * -------------------------------------------------
+                 * =================================================
                  */
 
                 entry<OtoRoute.FirstAidSurvival> {
@@ -284,9 +410,9 @@ fun OtoNavigation() {
                 }
 
                 /*
-                 * -------------------------------------------------
+                 * =================================================
                  * CRISIS - NEARBY RESOURCES
-                 * -------------------------------------------------
+                 * =================================================
                  */
 
                 entry<OtoRoute.NearbyResources> {
@@ -300,9 +426,9 @@ fun OtoNavigation() {
                 }
 
                 /*
-                 * -------------------------------------------------
+                 * =================================================
                  * CRISIS - OFFLINE MAPS & BACKTRACK
-                 * -------------------------------------------------
+                 * =================================================
                  */
 
                 entry<OtoRoute.OfflineMapBacktrack> {

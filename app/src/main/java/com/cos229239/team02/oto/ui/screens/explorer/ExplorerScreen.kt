@@ -25,6 +25,7 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -44,31 +45,42 @@ import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.cos229239.team02.oto.data.hazard.HazardReportViewModel
 import com.cos229239.team02.oto.data.location.AndroidLocationRepository
 import com.cos229239.team02.oto.data.location.OtoLocation
 import com.cos229239.team02.oto.data.route.RouteClient
 import com.cos229239.team02.oto.data.route.RouteResult
+import com.cos229239.team02.oto.ui.components.OtoTopAppBar
 import com.cos229239.team02.oto.ui.components.map.OtoMap
 import com.cos229239.team02.oto.ui.features.AreaSafetyView
 import com.cos229239.team02.oto.ui.features.PlanTripViewModel
-import com.cos229239.team02.oto.ui.components.OtoTopAppBar
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
 import java.util.Locale
-import androidx.compose.material3.TextButton
 
 @Composable
 fun ExplorerScreen(
     onAreaSafetyClick: () -> Unit,
     onPlanTripClick: () -> Unit,
+    onWeatherClick: () -> Unit,
+    onReportHazardClick: () -> Unit,
 
     /*
-     * Opens the Weather Report screen.
+     * Opens Field Reports.
+     *
+     * Used by:
+     *
+     * - FIELD REPORTS dashboard card
+     * - Hazard marker popup
      */
-    onWeatherClick: () -> Unit,
+    onFieldReportsClick: () -> Unit = {},
 
     onBackClick: () -> Unit,
+
     tripViewModel: PlanTripViewModel,
+
+    hazardReportViewModel: HazardReportViewModel,
+
     safetyView: AreaSafetyView = viewModel()
 ) {
 
@@ -79,13 +91,19 @@ fun ExplorerScreen(
         rememberCoroutineScope()
 
     val darkGreen =
-        Color(0xFF063D24)
+        Color(
+            0xFF063D24
+        )
 
     val mediumGreen =
-        Color(0xFF0B5D1E)
+        Color(
+            0xFF0B5D1E
+        )
 
     val lightBackground =
-        Color(0xFFF7F8F6)
+        Color(
+            0xFFF7F8F6
+        )
 
     /*
      * ---------------------------------------------------------
@@ -98,6 +116,17 @@ fun ExplorerScreen(
 
     val savedTrip =
         tripViewModel.savedTrip
+
+    /*
+     * Active reports loaded from the shared
+     * HazardReportViewModel.
+     */
+    val activeHazardReports =
+        hazardReportViewModel
+            .activeHazardReports
+
+    val activeHazardCount =
+        activeHazardReports.size
 
     /*
      * ---------------------------------------------------------
@@ -117,19 +146,27 @@ fun ExplorerScreen(
     }
 
     var selectedRouteIndex by remember {
-        mutableIntStateOf(0)
+        mutableIntStateOf(
+            0
+        )
     }
 
     var routeLoading by remember {
-        mutableStateOf(false)
+        mutableStateOf(
+            false
+        )
     }
 
     var routeError by remember {
-        mutableStateOf<String?>(null)
+        mutableStateOf<String?>(
+            null
+        )
     }
 
     var isTripCardExpanded by remember {
-        mutableStateOf(true)
+        mutableStateOf(
+            true
+        )
     }
 
     /*
@@ -219,7 +256,9 @@ fun ExplorerScreen(
      */
 
     val locationRepository =
-        remember(context) {
+        remember(
+            context
+        ) {
 
             AndroidLocationRepository(
                 context.applicationContext
@@ -227,7 +266,9 @@ fun ExplorerScreen(
         }
 
     var currentLocation by remember {
-        mutableStateOf<OtoLocation?>(null)
+        mutableStateOf<OtoLocation?>(
+            null
+        )
     }
 
     var locationStatus by remember {
@@ -237,23 +278,21 @@ fun ExplorerScreen(
     }
 
     var loadingLocation by remember {
-        mutableStateOf(false)
+        mutableStateOf(
+            false
+        )
     }
 
-    /*
-     * Used by OtoMap when the user manually
-     * requests their current location.
-     */
     var locationFocusRequest by remember {
-        mutableIntStateOf(0)
+        mutableIntStateOf(
+            0
+        )
     }
 
-    /*
-     * Remembers whether the map should center
-     * after Android location permission is granted.
-     */
     var focusAfterPermission by remember {
-        mutableStateOf(false)
+        mutableStateOf(
+            false
+        )
     }
 
     var hasLocationPermission by remember {
@@ -495,15 +534,17 @@ fun ExplorerScreen(
     ) {
 
         /*
-        * -----------------------------------------------------
-        * HEADER
-        * -----------------------------------------------------
-        */
+         * -----------------------------------------------------
+         * HEADER
+         * -----------------------------------------------------
+         */
 
-        //Use OTO's shared Material 3 top app bar.
         OtoTopAppBar(
-            title = "EXPLORER MODE",
-            onBackClick = onBackClick
+            title =
+                "EXPLORER MODE",
+
+            onBackClick =
+                onBackClick
         )
 
         /*
@@ -554,6 +595,34 @@ fun ExplorerScreen(
 
                 selectedRouteIndex =
                     selectedRouteIndex,
+
+                /*
+                 * -------------------------------------------------
+                 * ACTIVE HAZARDS
+                 * -------------------------------------------------
+                 */
+
+                hazardReports =
+                    activeHazardReports,
+
+                /*
+                 * -------------------------------------------------
+                 * MAP POPUP -> FIELD REPORTS
+                 * -------------------------------------------------
+                 *
+                 * OtoMap tells us which reports were in the
+                 * selected marker.
+                 *
+                 * For now, FieldReportsScreen opens the complete
+                 * active report list.
+                 *
+                 * Later we can pass the selected IDs through
+                 * navigation if we want the screen filtered.
+                 */
+                onViewHazardReportsClick = {
+
+                    onFieldReportsClick()
+                },
 
                 onMyLocationClick = {
 
@@ -1202,6 +1271,9 @@ fun ExplorerScreen(
                 isSample =
                     safetyState.isSampleData,
 
+                hazardCount =
+                    activeHazardCount,
+
                 onAreaSafetyClick =
                     onAreaSafetyClick,
 
@@ -1216,6 +1288,12 @@ fun ExplorerScreen(
                     )
             )
 
+            /*
+             * -------------------------------------------------
+             * REPORT HAZARD / ROUTE CHANGE
+             * -------------------------------------------------
+             */
+
             DashboardWideCard(
                 title =
                     "⚠️  REPORT HAZARD / ROUTE CHANGE",
@@ -1223,9 +1301,8 @@ fun ExplorerScreen(
                 subtitle =
                     "Help keep trails safe for everyone",
 
-                onClick = {
-                    // Future feature.
-                }
+                onClick =
+                    onReportHazardClick
             )
 
             Spacer(
@@ -1344,6 +1421,8 @@ fun ExplorerScreen(
              * -------------------------------------------------
              * FIELD REPORTS
              * -------------------------------------------------
+             *
+             * This now opens the actual FieldReportsScreen.
              */
 
             DashboardWideCard(
@@ -1351,11 +1430,22 @@ fun ExplorerScreen(
                     "📋  FIELD REPORTS",
 
                 subtitle =
-                    "View recent reports from this area",
+                    when (
+                        activeHazardCount
+                    ) {
 
-                onClick = {
-                    // Future feature.
-                }
+                        0 ->
+                            "No active hazard reports"
+
+                        1 ->
+                            "1 active hazard report"
+
+                        else ->
+                            "$activeHazardCount active hazard reports"
+                    },
+
+                onClick =
+                    onFieldReportsClick
             )
 
             Spacer(
@@ -1369,9 +1459,12 @@ fun ExplorerScreen(
 }
 
 
-/**
- * Small Explorer action card.
+/*
+ * -------------------------------------------------------------
+ * SMALL EXPLORER ACTION CARD
+ * -------------------------------------------------------------
  */
+
 @Composable
 private fun ExplorerActionCard(
     title: String,
@@ -1479,20 +1572,19 @@ private fun ExplorerActionCard(
 }
 
 
-/**
- * Explorer Safety Overview summary.
- *
- * Weather opens its own Weather Report screen.
- *
- * "View Area Safety" still opens Eric's existing
- * Area Safety screen.
+/*
+ * -------------------------------------------------------------
+ * SAFETY OVERVIEW
+ * -------------------------------------------------------------
  */
+
 @Composable
 private fun SafetyOverviewCard(
     areaName: String,
     isLoading: Boolean,
     isOffline: Boolean,
     isSample: Boolean,
+    hazardCount: Int,
     onAreaSafetyClick: () -> Unit,
     onWeatherClick: () -> Unit
 ) {
@@ -1512,12 +1604,6 @@ private fun SafetyOverviewCard(
             0xFFE1E5E1
         )
 
-    /*
-     * The entire card is intentionally NOT clickable.
-     *
-     * Individual features can now have separate
-     * destinations.
-     */
     Card(
         modifier =
             Modifier.fillMaxWidth(),
@@ -1540,12 +1626,6 @@ private fun SafetyOverviewCard(
                     16.dp
                 )
         ) {
-
-            /*
-             * -------------------------------------------------
-             * HEADER
-             * -------------------------------------------------
-             */
 
             Row(
                 modifier =
@@ -1594,10 +1674,6 @@ private fun SafetyOverviewCard(
                     )
                 }
 
-                /*
-                 * This remains connected to Eric's
-                 * Area Safety screen.
-                 */
                 Text(
                     text =
                         "View Area Safety ›",
@@ -1617,12 +1693,6 @@ private fun SafetyOverviewCard(
                         FontWeight.Bold
                 )
             }
-
-            /*
-             * -------------------------------------------------
-             * AREA
-             * -------------------------------------------------
-             */
 
             if (
                 areaName.isNotBlank()
@@ -1659,12 +1729,6 @@ private fun SafetyOverviewCard(
                     )
             )
 
-            /*
-             * -------------------------------------------------
-             * SUMMARY CONTENT
-             * -------------------------------------------------
-             */
-
             if (
                 isLoading
             ) {
@@ -1697,13 +1761,6 @@ private fun SafetyOverviewCard(
                         Alignment.Top
                 ) {
 
-                    /*
-                     * -------------------------------------------------
-                     * WEATHER
-                     * -------------------------------------------------
-                     *
-                     * Weather now has its own click action.
-                     */
                     SafetyOverviewItem(
                         title =
                             "WEATHER",
@@ -1732,9 +1789,6 @@ private fun SafetyOverviewCard(
                             dividerColor
                     )
 
-                    /*
-                     * HAZARDS
-                     */
                     SafetyOverviewItem(
                         title =
                             "HAZARDS",
@@ -1743,10 +1797,23 @@ private fun SafetyOverviewCard(
                             "⚠️",
 
                         mainValue =
-                            "—",
+                            hazardCount
+                                .toString(),
 
                         description =
-                            "Not connected",
+                            when (
+                                hazardCount
+                            ) {
+
+                                0 ->
+                                    "No active reports"
+
+                                1 ->
+                                    "1 active report"
+
+                                else ->
+                                    "$hazardCount active reports"
+                            },
 
                         modifier =
                             Modifier.weight(
@@ -1759,9 +1826,6 @@ private fun SafetyOverviewCard(
                             dividerColor
                     )
 
-                    /*
-                     * CLOSURES
-                     */
                     SafetyOverviewItem(
                         title =
                             "CLOSURES",
@@ -1786,9 +1850,6 @@ private fun SafetyOverviewCard(
                             dividerColor
                     )
 
-                    /*
-                     * AIR QUALITY
-                     */
                     SafetyOverviewItem(
                         title =
                             "AIR QUALITY",
@@ -1809,12 +1870,6 @@ private fun SafetyOverviewCard(
                     )
                 }
             }
-
-            /*
-             * -------------------------------------------------
-             * STATUS INFORMATION
-             * -------------------------------------------------
-             */
 
             if (
                 isOffline
@@ -1873,9 +1928,12 @@ private fun SafetyOverviewCard(
 }
 
 
-/**
- * One Safety Overview category.
+/*
+ * -------------------------------------------------------------
+ * SAFETY OVERVIEW ITEM
+ * -------------------------------------------------------------
  */
+
 @Composable
 private fun SafetyOverviewItem(
     title: String,
@@ -1990,9 +2048,12 @@ private fun SafetyOverviewItem(
 }
 
 
-/**
- * Divider between Safety Overview categories.
+/*
+ * -------------------------------------------------------------
+ * SAFETY OVERVIEW DIVIDER
+ * -------------------------------------------------------------
  */
+
 @Composable
 private fun SafetyOverviewDivider(
     color: Color
@@ -2018,9 +2079,12 @@ private fun SafetyOverviewDivider(
 }
 
 
-/**
- * Full-width dashboard card.
+/*
+ * -------------------------------------------------------------
+ * DASHBOARD WIDE CARD
+ * -------------------------------------------------------------
  */
+
 @Composable
 private fun DashboardWideCard(
     title: String,
@@ -2114,12 +2178,19 @@ private fun DashboardWideCard(
 }
 
 
-/**
- * Formats GPS coordinates.
+/*
+ * -------------------------------------------------------------
+ * FORMAT CURRENT LOCATION
+ * -------------------------------------------------------------
  */
+
 private fun formatExplorerLocation(
     location: OtoLocation
 ): String {
+
+    val accuracy =
+        location.accuracyMeters
+            ?: 0f
 
     return "Latitude: ${
         String.format(
@@ -2137,15 +2208,18 @@ private fun formatExplorerLocation(
         String.format(
             Locale.US,
             "%.0f",
-            location.accuracyMeters
+            accuracy
         )
     } m"
 }
 
 
-/**
- * Converts meters to miles.
+/*
+ * -------------------------------------------------------------
+ * FORMAT ROUTE DISTANCE
+ * -------------------------------------------------------------
  */
+
 private fun formatRouteDistance(
     distanceMeters: Double
 ): String {
@@ -2162,9 +2236,12 @@ private fun formatRouteDistance(
 }
 
 
-/**
- * Converts seconds to minutes/hours.
+/*
+ * -------------------------------------------------------------
+ * FORMAT ROUTE DURATION
+ * -------------------------------------------------------------
  */
+
 private fun formatRouteDuration(
     durationSeconds: Double
 ): String {

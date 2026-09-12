@@ -6,8 +6,20 @@ import kotlinx.serialization.Serializable
 @Serializable
 sealed interface OtoRoute : NavKey {
 
+    /*
+     * ---------------------------------------------------------
+     * HOME
+     * ---------------------------------------------------------
+     */
+
     @Serializable
     data object Home : OtoRoute
+
+    /*
+     * ---------------------------------------------------------
+     * EXPLORER
+     * ---------------------------------------------------------
+     */
 
     @Serializable
     data object Explorer : OtoRoute
@@ -24,6 +36,21 @@ sealed interface OtoRoute : NavKey {
     @Serializable
     data object WeatherReport : OtoRoute
 
+    /*
+     * Explorer hazard and route change reporting screen.
+     */
+    @Serializable
+    data object ReportHazard : OtoRoute
+
+    /*
+     * Explorer field reports screen.
+     *
+     * Displays saved hazard reports, photos,
+     * priority, severity, location, and status.
+     */
+    @Serializable
+    data object FieldReports : OtoRoute
+
     @Serializable
     data object ExplorerMap : OtoRoute
 
@@ -38,6 +65,12 @@ sealed interface OtoRoute : NavKey {
 
     @Serializable
     data object TripPlanCheckIn : OtoRoute
+
+    /*
+     * ---------------------------------------------------------
+     * CRISIS
+     * ---------------------------------------------------------
+     */
 
     @Serializable
     data object Crisis : OtoRoute
