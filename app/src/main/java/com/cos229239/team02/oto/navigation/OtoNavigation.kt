@@ -74,6 +74,13 @@ fun OtoNavigation() {
                             backStack.add(
                                 OtoRoute.Crisis
                             )
+                        },
+
+                        //Open preparedness tools directly from Home.
+                        onOfflineToolsClick = {
+                            backStack.add(
+                                OtoRoute.OfflineMapBacktrack
+                            )
                         }
                     )
                 }
