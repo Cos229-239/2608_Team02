@@ -1,0 +1,36 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="116dp"
+    android:height="56dp"
+    android:viewportWidth="165"
+    android:viewportHeight="65">
+
+    <!--Draw the filled OTO mountain logo.-->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="
+            M8,54
+            L52,20
+            L66,34
+            L95,3
+            L103,14
+            L67,48
+            L52,34
+            L22,54
+            Z
+
+            M95,3
+            L122,50
+            L109,40
+            L106,60
+            L88,35
+            Z
+
+            M111,28
+            L126,18
+            L157,54
+            L145,52
+            L126,34
+            L119,46
+            Z" />
+
+</vector>
