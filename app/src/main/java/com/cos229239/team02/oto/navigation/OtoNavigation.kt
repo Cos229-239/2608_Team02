@@ -1,10 +1,14 @@
 package com.cos229239.team02.oto.navigation
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
+import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation3.runtime.entryProvider
 import androidx.navigation3.runtime.rememberNavBackStack
 import androidx.navigation3.ui.NavDisplay
+import com.cos229239.team02.oto.ui.features.AreaSafetyView
+import com.cos229239.team02.oto.ui.features.AreaSafetyViewFactory
 import com.cos229239.team02.oto.ui.features.PlanTripViewModel
 import com.cos229239.team02.oto.ui.screens.crisis.CrisisScreen
 import com.cos229239.team02.oto.ui.screens.crisis.EmergencyHelpScreen
@@ -35,7 +39,17 @@ fun OtoNavigation() {
     val planTripViewModel:
             PlanTripViewModel =
         viewModel()
+    val context = LocalContext.current.applicationContext
 
+    val safetyFactory = remember(context) {
+        AreaSafetyViewFactory(
+            context = context
+        )
+    }
+
+    val safetyView: AreaSafetyView = viewModel(
+        factory = safetyFactory
+    )
     NavDisplay(
         backStack =
             backStack,
@@ -112,12 +126,13 @@ fun OtoNavigation() {
                         },
 
                         onBackClick = {
-
-                            backStack.removeLastOrNull()
+                            if (backStack.size > 1) {
+                                backStack.removeLastOrNull()
+                            }
                         },
 
-                        tripViewModel =
-                            planTripViewModel
+                        tripViewModel = planTripViewModel,
+                        safetyView = safetyView
                     )
                 }
 
@@ -155,9 +170,12 @@ fun OtoNavigation() {
 
                     WeatherReportScreen(
                         onBackClick = {
+                            if (backStack.size > 1) {
+                                backStack.removeLastOrNull()
+                            }
+                        },
+                        safetyView = safetyView
 
-                            backStack.removeLastOrNull()
-                        }
                     )
                 }
 
@@ -171,9 +189,12 @@ fun OtoNavigation() {
 
                     AreaSafetyRoute(
                         onBackClick = {
+                            if (backStack.size > 1) {
 
-                            backStack.removeLastOrNull()
-                        }
+                                backStack.removeLastOrNull()
+                            }
+                        },
+                        safetyView = safetyView
                     )
                 }
 
