@@ -18,6 +18,7 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -25,6 +26,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.cos229239.team02.oto.ui.features.AreaSafetyView
 
 /**
  * Weather details screen for Explorer.
@@ -34,8 +37,24 @@ import androidx.compose.ui.unit.sp
  */
 @Composable
 fun WeatherReportScreen(
-    onBackClick: () -> Unit
+    onBackClick: () -> Unit,
+    safetyView: AreaSafetyView
 ) {
+    val uiState by safetyView.uiState.collectAsStateWithLifecycle()
+    val weatherAlerts = uiState.weatherNotifications
+    val nwsStatus = uiState.sources.firstOrNull{
+        it.source == "NWS"
+    }
+
+    val weatherServiceMessage = when {
+        uiState.isLoading -> "Checking NWS alerts... "
+        !uiState.hasLocation ->
+            "Select a trip destination or use Locate Me in Explorer."
+        uiState.errorMessage != null ->
+            uiState.errorMessage.orEmpty()
+        else ->
+            nwsStatus?.message ?: "NWS alerts have not been loaded."
+    }
 
     val darkGreen =
         Color(0xFF063D24)
