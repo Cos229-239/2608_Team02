@@ -47,28 +47,49 @@ import org.maplibre.compose.util.ClickResult
 import org.maplibre.spatialk.geojson.LineString
 import org.maplibre.spatialk.geojson.Point
 import org.maplibre.spatialk.geojson.Position
+import kotlin.math.PI
 import kotlin.math.abs
+import kotlin.math.atan2
+import kotlin.math.cos
+import kotlin.math.sin
+import kotlin.math.sqrt
 
-// The style OTO's offline regions must match so maps work offline.
+// Map style used throughout OTO.
 const val OTO_MAP_STYLE_URL =
     "https://tiles.openfreemap.org/styles/liberty"
 
 /*
  * -------------------------------------------------------------
+ * HAZARD MAP SETTINGS
+ * -------------------------------------------------------------
+ */
+
+// Same-category reports inside this distance become one marker.
+private const val SAME_CATEGORY_CLUSTER_DISTANCE_METERS =
+    150.0
+
+/*
+ * Different-category markers inside this distance are
+ * considered to occupy essentially the same map location.
+ */
+private const val SPIDER_GROUP_DISTANCE_METERS =
+    55.0
+
+/*
+ * Distance used only while the user has expanded a
+ * spider group.
+ *
+ * This does NOT change the report's real coordinates.
+ */
+private const val SPIDER_RADIUS_METERS =
+    32.0
+
+/*
+ * -------------------------------------------------------------
  * HAZARD MAP CLUSTER
  * -------------------------------------------------------------
- *
- * Nearby reports from the same broad category
- * are grouped into one map marker.
- *
- * Example:
- *
- * Bear Sighting
- * Coyote Sighting
- *
- * become one Wildlife marker when they are
- * reported close to each other.
  */
+
 private data class HazardMapCluster(
     val category: String,
     val latitude: Double,
@@ -77,13 +98,34 @@ private data class HazardMapCluster(
 )
 
 /*
- * Reports closer than roughly this latitude /
- * longitude difference can be grouped.
+ * -------------------------------------------------------------
+ * SPIDER GROUP
+ * -------------------------------------------------------------
  *
- * This is intentionally simple for the prototype.
+ * A SpiderGroup contains multiple different-category
+ * clusters that occupy nearly the same location.
+ *
+ * The center remains the truthful map location.
  */
-private const val HAZARD_CLUSTER_DISTANCE =
-    0.01
+private data class HazardSpiderGroup(
+    val key: String,
+    val latitude: Double,
+    val longitude: Double,
+    val clusters: List<HazardMapCluster>
+)
+
+/*
+ * -------------------------------------------------------------
+ * SPIDER MARKER
+ * -------------------------------------------------------------
+ *
+ * Contains the temporarily offset display coordinate.
+ */
+private data class SpiderMarker(
+    val cluster: HazardMapCluster,
+    val displayLatitude: Double,
+    val displayLongitude: Double
+)
 
 /**
  * Shared interactive map used throughout OTO.
@@ -105,42 +147,23 @@ fun OtoMap(
 
     selectedRouteIndex: Int = 0,
 
-    /*
-     * Active hazard reports shown on the map.
-     */
     hazardReports: List<HazardReport> = emptyList(),
 
     /*
-     * Called when the user chooses to open the
-     * reports represented by a hazard marker.
+     * Returns the exact reports represented by the
+     * hazard marker selected by the user.
      */
     onViewHazardReportsClick:
         (List<HazardReport>) -> Unit = {},
 
-    /*
-     * Called when the My Location button is pressed.
-     */
     onMyLocationClick: () -> Unit = {},
 
-    /*
-     * Explorer increments this after receiving
-     * a fresh location.
-     */
     locationFocusRequest: Int = 0,
 
-    /*
-     * Recorded route points used by Backtrack.
-     */
     routePoints: List<OtoLocation> = emptyList(),
 
-    /*
-     * Backtrack follow-camera mode.
-     */
     followCamera: Boolean = true,
 
-    /*
-     * Explorer shows the location button.
-     */
     showMyLocationButton: Boolean = true
 ) {
 
@@ -177,15 +200,24 @@ fun OtoMap(
     }
 
     /*
-     * Selected hazard marker.
+     * Normal hazard popup selection.
      */
     var selectedHazardCluster by remember {
         mutableStateOf<HazardMapCluster?>(null)
     }
 
     /*
+     * Which overlapping marker group is currently expanded.
+     *
+     * null = all groups collapsed
+     */
+    var expandedSpiderGroupKey by remember {
+        mutableStateOf<String?>(null)
+    }
+
+    /*
      * ---------------------------------------------------------
-     * GROUP HAZARDS
+     * HAZARD GROUPING
      * ---------------------------------------------------------
      */
 
@@ -195,6 +227,45 @@ fun OtoMap(
                 it.isActive
             }
         )
+
+    /*
+     * Different-category clusters sharing approximately
+     * the same location.
+     */
+    val spiderGroups =
+        buildSpiderGroups(
+            hazardClusters
+        )
+
+    /*
+     * All clusters belonging to a spider group.
+     *
+     * These should not also be rendered independently.
+     */
+    val groupedClusterKeys =
+        spiderGroups
+            .flatMap { group ->
+
+                group.clusters.map { cluster ->
+                    hazardClusterKey(
+                        cluster
+                    )
+                }
+            }
+            .toSet()
+
+    /*
+     * Clusters that do not overlap another category
+     * are drawn normally.
+     */
+    val standaloneClusters =
+        hazardClusters.filter { cluster ->
+
+            hazardClusterKey(
+                cluster
+            ) !in
+                    groupedClusterKeys
+        }
 
     val routeKey =
         if (
@@ -808,7 +879,7 @@ fun OtoMap(
 
             /*
              * -------------------------------------------------
-             * TRACKED / BACKTRACK ROUTE
+             * BACKTRACK ROUTE
              * -------------------------------------------------
              */
 
@@ -865,7 +936,7 @@ fun OtoMap(
 
             /*
              * -------------------------------------------------
-             * START AND DESTINATION
+             * START + DESTINATION
              * -------------------------------------------------
              */
 
@@ -966,125 +1037,311 @@ fun OtoMap(
 
             /*
              * -------------------------------------------------
-             * GROUPED HAZARD MARKERS
+             * STANDALONE HAZARD MARKERS
              * -------------------------------------------------
              */
 
-            hazardClusters.forEachIndexed { index, cluster ->
+            standaloneClusters.forEachIndexed { index, cluster ->
 
-                val clusterSource =
-                    rememberGeoJsonSource(
-                        GeoJsonData.Features(
-                            Point(
-                                Position(
-                                    longitude =
-                                        cluster.longitude,
-
-                                    latitude =
-                                        cluster.latitude
-                                )
-                            )
-                        )
-                    )
-
-                /*
-                 * Category controls marker color.
-                 */
-                val categoryColor =
-                    hazardCategoryColor(
-                        cluster.category
-                    )
-
-                /*
-                 * Highest priority inside the cluster
-                 * controls marker size and border.
-                 */
-                val highestPriority =
-                    highestPriority(
-                        cluster.reports
-                    )
-
-                val markerRadius =
-                    when (
-                        highestPriority
-                    ) {
-
-                        HazardPriority.CRITICAL ->
-                            21.dp
-
-                        HazardPriority.HIGH ->
-                            18.dp
-
-                        HazardPriority.NORMAL ->
-                            16.dp
-                    }
-
-                val borderWidth =
-                    when (
-                        highestPriority
-                    ) {
-
-                        HazardPriority.CRITICAL ->
-                            5.dp
-
-                        HazardPriority.HIGH ->
-                            4.dp
-
-                        HazardPriority.NORMAL ->
-                            3.dp
-                    }
-
-                CircleLayer(
+                HazardCircleLayer(
                     id =
-                        "oto-hazard-cluster-$index",
+                        "oto-hazard-single-$index",
 
-                    source =
-                        clusterSource,
+                    cluster =
+                        cluster,
 
-                    radius =
-                        const(
-                            markerRadius
-                        ),
+                    latitude =
+                        cluster.latitude,
 
-                    color =
-                        const(
-                            categoryColor
-                        ),
+                    longitude =
+                        cluster.longitude,
 
-                    strokeColor =
-                        const(
-                            if (
-                                highestPriority ==
-                                HazardPriority.CRITICAL
-                            ) {
-
-                                Color(
-                                    0xFFB00020
-                                )
-
-                            } else {
-
-                                Color.White
-                            }
-                        ),
-
-                    strokeWidth =
-                        const(
-                            borderWidth
-                        ),
-
-                    /*
-                     * Tap the marker to show
-                     * the report summary popup.
-                     */
                     onClick = {
+
+                        expandedSpiderGroupKey =
+                            null
 
                         selectedHazardCluster =
                             cluster
-
-                        ClickResult.Consume
                     }
                 )
+            }
+
+            /*
+             * -------------------------------------------------
+             * SPIDER GROUPS
+             * -------------------------------------------------
+             */
+
+            spiderGroups.forEachIndexed { groupIndex, group ->
+
+                val isExpanded =
+                    expandedSpiderGroupKey ==
+                            group.key
+
+                /*
+                 * -------------------------------------------------
+                 * COLLAPSED
+                 * -------------------------------------------------
+                 *
+                 * All markers remain at their true location.
+                 *
+                 * We draw multiple concentric category colors so
+                 * the user can immediately see that more than one
+                 * category exists here.
+                 */
+
+                if (
+                    !isExpanded
+                ) {
+
+                    val visibleClusters =
+                        group.clusters.take(
+                            3
+                        )
+
+                    /*
+                     * Draw largest ring first.
+                     */
+                    visibleClusters
+                        .reversed()
+                        .forEachIndexed { ringIndex, cluster ->
+
+                            val source =
+                                rememberGeoJsonSource(
+                                    GeoJsonData.Features(
+                                        Point(
+                                            Position(
+                                                longitude =
+                                                    group.longitude,
+
+                                                latitude =
+                                                    group.latitude
+                                            )
+                                        )
+                                    )
+                                )
+
+                            val ringRadius =
+                                when (
+                                    ringIndex
+                                ) {
+
+                                    0 ->
+                                        24.dp
+
+                                    1 ->
+                                        20.dp
+
+                                    else ->
+                                        16.dp
+                                }
+
+                            CircleLayer(
+                                id =
+                                    "oto-spider-collapsed-$groupIndex-$ringIndex",
+
+                                source =
+                                    source,
+
+                                radius =
+                                    const(
+                                        ringRadius
+                                    ),
+
+                                color =
+                                    const(
+                                        hazardCategoryColor(
+                                            cluster.category
+                                        )
+                                    ),
+
+                                strokeColor =
+                                    const(
+                                        Color.White
+                                    ),
+
+                                strokeWidth =
+                                    const(
+                                        3.dp
+                                    ),
+
+                                onClick = {
+
+                                    /*
+                                     * Expand this stack instead
+                                     * of opening a report immediately.
+                                     */
+                                    selectedHazardCluster =
+                                        null
+
+                                    expandedSpiderGroupKey =
+                                        group.key
+
+                                    ClickResult.Consume
+                                }
+                            )
+                        }
+
+                } else {
+
+                    /*
+                     * -------------------------------------------------
+                     * EXPANDED / SPIDERFIED
+                     * -------------------------------------------------
+                     */
+
+                    val spiderMarkers =
+                        createSpiderMarkers(
+                            group
+                        )
+
+                    /*
+                     * Draw lines from the truthful location to the
+                     * temporary marker positions.
+                     */
+                    spiderMarkers.forEachIndexed { markerIndex, marker ->
+
+                        val lineSource =
+                            rememberGeoJsonSource(
+                                GeoJsonData.Features(
+                                    LineString(
+                                        listOf(
+                                            Position(
+                                                longitude =
+                                                    group.longitude,
+
+                                                latitude =
+                                                    group.latitude
+                                            ),
+
+                                            Position(
+                                                longitude =
+                                                    marker.displayLongitude,
+
+                                                latitude =
+                                                    marker.displayLatitude
+                                            )
+                                        )
+                                    )
+                                )
+                            )
+
+                        LineLayer(
+                            id =
+                                "oto-spider-line-$groupIndex-$markerIndex",
+
+                            source =
+                                lineSource,
+
+                            color =
+                                const(
+                                    Color(
+                                        0xFF5F6368
+                                    )
+                                ),
+
+                            width =
+                                const(
+                                    2.dp
+                                ),
+
+                            opacity =
+                                const(
+                                    0.75f
+                                )
+                        )
+                    }
+
+                    /*
+                     * Small center marker showing the truthful
+                     * hazard location.
+                     *
+                     * Tapping this collapses the spider.
+                     */
+                    val centerSource =
+                        rememberGeoJsonSource(
+                            GeoJsonData.Features(
+                                Point(
+                                    Position(
+                                        longitude =
+                                            group.longitude,
+
+                                        latitude =
+                                            group.latitude
+                                    )
+                                )
+                            )
+                        )
+
+                    CircleLayer(
+                        id =
+                            "oto-spider-center-$groupIndex",
+
+                        source =
+                            centerSource,
+
+                        radius =
+                            const(
+                                8.dp
+                            ),
+
+                        color =
+                            const(
+                                Color(
+                                    0xFF455A64
+                                )
+                            ),
+
+                        strokeColor =
+                            const(
+                                Color.White
+                            ),
+
+                        strokeWidth =
+                            const(
+                                2.dp
+                            ),
+
+                        onClick = {
+
+                            expandedSpiderGroupKey =
+                                null
+
+                            selectedHazardCluster =
+                                null
+
+                            ClickResult.Consume
+                        }
+                    )
+
+                    /*
+                     * Draw each category marker at its temporary
+                     * spider location.
+                     */
+                    spiderMarkers.forEachIndexed { markerIndex, marker ->
+
+                        HazardCircleLayer(
+                            id =
+                                "oto-spider-marker-$groupIndex-$markerIndex",
+
+                            cluster =
+                                marker.cluster,
+
+                            latitude =
+                                marker.displayLatitude,
+
+                            longitude =
+                                marker.displayLongitude,
+
+                            onClick = {
+
+                                selectedHazardCluster =
+                                    marker.cluster
+                            }
+                        )
+                    }
+                }
             }
 
             /*
@@ -1113,10 +1370,6 @@ fun OtoMap(
                         )
                     )
 
-                /*
-                 * Purple current-location dot stays smaller
-                 * so a hazard underneath remains visible.
-                 */
                 CircleLayer(
                     id =
                         "oto-current-location",
@@ -1183,10 +1436,20 @@ fun OtoMap(
 
                         selectedHazardCluster =
                             null
+
+                        /*
+                         * Closing the popup collapses the spider.
+                         */
+                        expandedSpiderGroupKey =
+                            null
                     },
 
                     onViewReportsClick = {
 
+                        /*
+                         * Only send reports belonging to the
+                         * selected category marker.
+                         */
                         onViewHazardReportsClick(
                             cluster.reports
                         )
@@ -1443,7 +1706,129 @@ fun OtoMap(
 
 /*
  * -------------------------------------------------------------
- * HAZARD CLUSTER POPUP CARD
+ * HAZARD CIRCLE
+ * -------------------------------------------------------------
+ *
+ * Reusable marker used for both standalone hazards
+ * and expanded spider markers.
+ */
+
+@Composable
+private fun HazardCircleLayer(
+    id: String,
+    cluster: HazardMapCluster,
+    latitude: Double,
+    longitude: Double,
+    onClick: () -> Unit
+) {
+
+    val source =
+        rememberGeoJsonSource(
+            GeoJsonData.Features(
+                Point(
+                    Position(
+                        longitude =
+                            longitude,
+
+                        latitude =
+                            latitude
+                    )
+                )
+            )
+        )
+
+    val categoryColor =
+        hazardCategoryColor(
+            cluster.category
+        )
+
+    val priority =
+        highestPriority(
+            cluster.reports
+        )
+
+    val markerRadius =
+        when (
+            priority
+        ) {
+
+            HazardPriority.CRITICAL ->
+                21.dp
+
+            HazardPriority.HIGH ->
+                18.dp
+
+            HazardPriority.NORMAL ->
+                16.dp
+        }
+
+    val borderWidth =
+        when (
+            priority
+        ) {
+
+            HazardPriority.CRITICAL ->
+                5.dp
+
+            HazardPriority.HIGH ->
+                4.dp
+
+            HazardPriority.NORMAL ->
+                3.dp
+        }
+
+    CircleLayer(
+        id =
+            id,
+
+        source =
+            source,
+
+        radius =
+            const(
+                markerRadius
+            ),
+
+        color =
+            const(
+                categoryColor
+            ),
+
+        strokeColor =
+            const(
+                if (
+                    priority ==
+                    HazardPriority.CRITICAL
+                ) {
+
+                    Color(
+                        0xFFB00020
+                    )
+
+                } else {
+
+                    Color.White
+                }
+            ),
+
+        strokeWidth =
+            const(
+                borderWidth
+            ),
+
+        onClick = {
+
+            onClick()
+
+            ClickResult.Consume
+        }
+    )
+}
+
+
+/*
+ * -------------------------------------------------------------
+ * HAZARD POPUP
  * -------------------------------------------------------------
  */
 
@@ -1538,10 +1923,6 @@ private fun HazardClusterCard(
                 }
             }
 
-            /*
-             * Show each different report type
-             * inside this marker.
-             */
             cluster.reports
                 .map {
                     it.reportType
@@ -1616,7 +1997,7 @@ private fun HazardClusterCard(
 
 /*
  * -------------------------------------------------------------
- * BUILD HAZARD CLUSTERS
+ * SAME-CATEGORY CLUSTERING
  * -------------------------------------------------------------
  */
 
@@ -1629,34 +2010,31 @@ private fun buildHazardClusters(
 
     reports.forEach { report ->
 
-        /*
-         * Find an existing cluster from the
-         * same category that is nearby.
-         */
         val existingIndex =
             clusters.indexOfFirst { cluster ->
 
                 cluster.category ==
                         report.category &&
-                        abs(
-                            cluster.latitude -
-                                    report.latitude
+                        distanceMeters(
+                            latitude1 =
+                                cluster.latitude,
+
+                            longitude1 =
+                                cluster.longitude,
+
+                            latitude2 =
+                                report.latitude,
+
+                            longitude2 =
+                                report.longitude
                         ) <=
-                        HAZARD_CLUSTER_DISTANCE &&
-                        abs(
-                            cluster.longitude -
-                                    report.longitude
-                        ) <=
-                        HAZARD_CLUSTER_DISTANCE
+                        SAME_CATEGORY_CLUSTER_DISTANCE_METERS
             }
 
         if (
             existingIndex == -1
         ) {
 
-            /*
-             * First report in this area/category.
-             */
             clusters.add(
                 HazardMapCluster(
                     category =
@@ -1686,10 +2064,6 @@ private fun buildHazardClusters(
                 existingCluster.reports +
                         report
 
-            /*
-             * Average all coordinates so the grouped
-             * marker sits roughly in the center.
-             */
             val averageLatitude =
                 updatedReports
                     .map {
@@ -1726,6 +2100,424 @@ private fun buildHazardClusters(
 
 /*
  * -------------------------------------------------------------
+ * BUILD SPIDER GROUPS
+ * -------------------------------------------------------------
+ *
+ * This uses connected groups.
+ *
+ * So if:
+ *
+ * A is close to B
+ * and B is close to C
+ *
+ * they are treated as one overlapping map group.
+ */
+
+private fun buildSpiderGroups(
+    clusters: List<HazardMapCluster>
+): List<HazardSpiderGroup> {
+
+    val groups =
+        mutableListOf<HazardSpiderGroup>()
+
+    val visited =
+        mutableSetOf<Int>()
+
+    for (
+    startIndex in clusters.indices
+    ) {
+
+        if (
+            startIndex in visited
+        ) {
+
+            continue
+        }
+
+        val queue =
+            mutableListOf(
+                startIndex
+            )
+
+        val memberIndices =
+            mutableListOf<Int>()
+
+        visited.add(
+            startIndex
+        )
+
+        while (
+            queue.isNotEmpty()
+        ) {
+
+            val currentIndex =
+                queue.removeAt(
+                    0
+                )
+
+            memberIndices.add(
+                currentIndex
+            )
+
+            val current =
+                clusters[
+                    currentIndex
+                ]
+
+            for (
+            candidateIndex in clusters.indices
+            ) {
+
+                if (
+                    candidateIndex in visited
+                ) {
+
+                    continue
+                }
+
+                val candidate =
+                    clusters[
+                        candidateIndex
+                    ]
+
+                /*
+                 * Same-category clusters are already handled
+                 * by the normal 150-meter clustering.
+                 */
+                if (
+                    current.category ==
+                    candidate.category
+                ) {
+
+                    continue
+                }
+
+                val distance =
+                    distanceMeters(
+                        latitude1 =
+                            current.latitude,
+
+                        longitude1 =
+                            current.longitude,
+
+                        latitude2 =
+                            candidate.latitude,
+
+                        longitude2 =
+                            candidate.longitude
+                    )
+
+                if (
+                    distance <=
+                    SPIDER_GROUP_DISTANCE_METERS
+                ) {
+
+                    visited.add(
+                        candidateIndex
+                    )
+
+                    queue.add(
+                        candidateIndex
+                    )
+                }
+            }
+        }
+
+        /*
+         * Only make a spider group if two or more
+         * different-category clusters overlap.
+         */
+        if (
+            memberIndices.size > 1
+        ) {
+
+            val members =
+                memberIndices.map {
+                    clusters[
+                        it
+                    ]
+                }
+
+            val centerLatitude =
+                members
+                    .map {
+                        it.latitude
+                    }
+                    .average()
+
+            val centerLongitude =
+                members
+                    .map {
+                        it.longitude
+                    }
+                    .average()
+
+            groups.add(
+                HazardSpiderGroup(
+                    key =
+                        members
+                            .flatMap {
+                                it.reports
+                            }
+                            .map {
+                                it.id
+                            }
+                            .sorted()
+                            .joinToString(
+                                separator =
+                                    "|"
+                            ),
+
+                    latitude =
+                        centerLatitude,
+
+                    longitude =
+                        centerLongitude,
+
+                    clusters =
+                        members
+                )
+            )
+        }
+    }
+
+    return groups
+}
+
+
+/*
+ * -------------------------------------------------------------
+ * CREATE TEMPORARY SPIDER POSITIONS
+ * -------------------------------------------------------------
+ */
+
+private fun createSpiderMarkers(
+    group: HazardSpiderGroup
+): List<SpiderMarker> {
+
+    val result =
+        mutableListOf<SpiderMarker>()
+
+    group.clusters
+        .forEachIndexed { index, cluster ->
+
+            val angle =
+                (
+                        2.0 *
+                                PI *
+                                index
+                        ) /
+                        group.clusters.size
+
+            val northMeters =
+                cos(
+                    angle
+                ) *
+                        SPIDER_RADIUS_METERS
+
+            val eastMeters =
+                sin(
+                    angle
+                ) *
+                        SPIDER_RADIUS_METERS
+
+            val displayPosition =
+                offsetCoordinateByMeters(
+                    latitude =
+                        group.latitude,
+
+                    longitude =
+                        group.longitude,
+
+                    northMeters =
+                        northMeters,
+
+                    eastMeters =
+                        eastMeters
+                )
+
+            result.add(
+                SpiderMarker(
+                    cluster =
+                        cluster,
+
+                    displayLatitude =
+                        displayPosition.first,
+
+                    displayLongitude =
+                        displayPosition.second
+                )
+            )
+        }
+
+    return result
+}
+
+
+/*
+ * -------------------------------------------------------------
+ * UNIQUE CLUSTER KEY
+ * -------------------------------------------------------------
+ */
+
+private fun hazardClusterKey(
+    cluster: HazardMapCluster
+): String {
+
+    return cluster.reports
+        .map {
+            it.id
+        }
+        .sorted()
+        .joinToString(
+            separator =
+                "|"
+        )
+}
+
+
+/*
+ * -------------------------------------------------------------
+ * TEMPORARY COORDINATE OFFSET
+ * -------------------------------------------------------------
+ *
+ * Used only while a spider group is expanded.
+ */
+
+private fun offsetCoordinateByMeters(
+    latitude: Double,
+    longitude: Double,
+    northMeters: Double,
+    eastMeters: Double
+): Pair<Double, Double> {
+
+    val metersPerDegreeLatitude =
+        111_320.0
+
+    val latitudeRadians =
+        Math.toRadians(
+            latitude
+        )
+
+    val metersPerDegreeLongitude =
+        111_320.0 *
+                cos(
+                    latitudeRadians
+                )
+
+    val latitudeOffset =
+        northMeters /
+                metersPerDegreeLatitude
+
+    val longitudeOffset =
+        if (
+            abs(
+                metersPerDegreeLongitude
+            ) > 0.0001
+        ) {
+
+            eastMeters /
+                    metersPerDegreeLongitude
+
+        } else {
+
+            0.0
+        }
+
+    return Pair(
+        latitude +
+                latitudeOffset,
+
+        longitude +
+                longitudeOffset
+    )
+}
+
+
+/*
+ * -------------------------------------------------------------
+ * REAL DISTANCE BETWEEN LOCATIONS
+ * -------------------------------------------------------------
+ *
+ * Haversine formula.
+ */
+
+private fun distanceMeters(
+    latitude1: Double,
+    longitude1: Double,
+    latitude2: Double,
+    longitude2: Double
+): Double {
+
+    val earthRadiusMeters =
+        6_371_000.0
+
+    val latitude1Radians =
+        Math.toRadians(
+            latitude1
+        )
+
+    val latitude2Radians =
+        Math.toRadians(
+            latitude2
+        )
+
+    val latitudeDifference =
+        Math.toRadians(
+            latitude2 -
+                    latitude1
+        )
+
+    val longitudeDifference =
+        Math.toRadians(
+            longitude2 -
+                    longitude1
+        )
+
+    val a =
+        sin(
+            latitudeDifference /
+                    2.0
+        ) *
+                sin(
+                    latitudeDifference /
+                            2.0
+                ) +
+                cos(
+                    latitude1Radians
+                ) *
+                cos(
+                    latitude2Radians
+                ) *
+                sin(
+                    longitudeDifference /
+                            2.0
+                ) *
+                sin(
+                    longitudeDifference /
+                            2.0
+                )
+
+    val c =
+        2.0 *
+                atan2(
+                    sqrt(
+                        a
+                    ),
+
+                    sqrt(
+                        1.0 -
+                                a
+                    )
+                )
+
+    return earthRadiusMeters *
+            c
+}
+
+
+/*
+ * -------------------------------------------------------------
  * CATEGORY COLOR
  * -------------------------------------------------------------
  */
@@ -1738,64 +2530,36 @@ private fun hazardCategoryColor(
         category
     ) {
 
-        /*
-         * Red:
-         * accidents / emergencies
-         */
         "Accident / Emergency" ->
             Color(
                 0xFFD32F2F
             )
 
-        /*
-         * Orange:
-         * bears, coyotes, snakes, etc.
-         */
         "Wildlife" ->
             Color(
                 0xFFF57C00
             )
 
-        /*
-         * Brown:
-         * trees, plants, rockfall, etc.
-         */
         "Nature / Plants" ->
             Color(
                 0xFF8D6E36
             )
 
-        /*
-         * Yellow:
-         * roads / trails
-         */
         "Trail / Road Hazard" ->
             Color(
                 0xFFFBC02D
             )
 
-        /*
-         * Blue:
-         * weather / environmental
-         */
         "Weather / Environmental" ->
             Color(
                 0xFF1976D2
             )
 
-        /*
-         * Purple:
-         * infrastructure / facilities
-         */
         "Facility / Infrastructure" ->
             Color(
                 0xFF7E57C2
             )
 
-        /*
-         * Gray:
-         * anything else
-         */
         else ->
             Color(
                 0xFF757575
@@ -1806,7 +2570,7 @@ private fun hazardCategoryColor(
 
 /*
  * -------------------------------------------------------------
- * HIGHEST PRIORITY IN CLUSTER
+ * HIGHEST PRIORITY
  * -------------------------------------------------------------
  */
 

@@ -54,7 +54,10 @@ import java.util.Locale
  * The screen can show:
  *
  * - Every active report
- * - Only a selected group of reports from a map marker
+ * - Only reports selected from a specific map marker
+ *
+ * Which reports appear is controlled by the shared
+ * HazardReportViewModel.
  *
  * Reports are currently stored locally on the device.
  */
@@ -62,15 +65,7 @@ import java.util.Locale
 @Composable
 fun FieldReportsScreen(
     onBackClick: () -> Unit,
-    hazardReportViewModel: HazardReportViewModel,
-
-    /*
-     * Optional IDs supplied by a map marker.
-     *
-     * Empty means:
-     * show all active reports.
-     */
-    selectedReportIds: Set<String> = emptySet()
+    hazardReportViewModel: HazardReportViewModel
 ) {
 
     val darkGreen =
@@ -85,33 +80,33 @@ fun FieldReportsScreen(
 
     /*
      * ---------------------------------------------------------
-     * REPORTS TO DISPLAY
+     * REPORT SELECTION
      * ---------------------------------------------------------
+     *
+     * The ViewModel decides what should appear.
+     *
+     * Empty selected ID set:
+     * show every active report.
+     *
+     * Selected IDs present:
+     * show only the reports selected from the map marker.
      */
 
-    val activeReports =
+    val selectedReportIds =
         hazardReportViewModel
-            .activeHazardReports
+            .selectedFieldReportIds
 
     val reports =
-        if (
-            selectedReportIds.isEmpty()
-        ) {
-
-            activeReports
-
-        } else {
-
-            activeReports.filter {
-                it.id in selectedReportIds
-            }
-        }
+        hazardReportViewModel
+            .selectedFieldReports
 
     /*
      * Report currently expanded by the user.
      */
     var selectedReportId by remember {
-        mutableStateOf<String?>(null)
+        mutableStateOf<String?>(
+            null
+        )
     }
 
     Column(
@@ -244,7 +239,16 @@ fun FieldReportsScreen(
 
                     Text(
                         text =
-                            "Community reports shown here are currently stored on this device. Shared community reporting will require the future backend.",
+                            if (
+                                selectedReportIds.isEmpty()
+                            ) {
+
+                                "Showing all active reports currently saved on this device."
+
+                            } else {
+
+                                "Showing only the reports connected to the map marker you selected."
+                            },
 
                         style =
                             MaterialTheme
@@ -254,6 +258,28 @@ fun FieldReportsScreen(
                         color =
                             Color(
                                 0xFF666666
+                            )
+                    )
+
+                    Spacer(
+                        modifier =
+                            Modifier.height(
+                                4.dp
+                            )
+                    )
+
+                    Text(
+                        text =
+                            "Shared community reporting will require the future backend.",
+
+                        style =
+                            MaterialTheme
+                                .typography
+                                .bodySmall,
+
+                        color =
+                            Color(
+                                0xFF777777
                             )
                     )
                 }
@@ -335,7 +361,16 @@ fun FieldReportsScreen(
 
                         Text(
                             text =
-                                "Submitted hazard reports will appear here.",
+                                if (
+                                    selectedReportIds.isEmpty()
+                                ) {
+
+                                    "Submitted hazard reports will appear here."
+
+                                } else {
+
+                                    "The reports connected to this marker are no longer active."
+                                },
 
                             style =
                                 MaterialTheme
@@ -788,6 +823,22 @@ private fun FieldReportCard(
                             report.latitude,
                             report.longitude
                         )
+                )
+
+                /*
+                 * GPS ACCURACY
+                 */
+
+                FieldReportDetail(
+                    title =
+                        "LOCATION ACCURACY",
+
+                    value =
+                        "±${String.format(
+                            Locale.US,
+                            "%.0f",
+                            report.accuracyMeters
+                        )} meters"
                 )
 
                 /*

@@ -3,6 +3,7 @@ package com.cos229239.team02.oto.data.hazard
 import android.app.Application
 import android.graphics.Bitmap
 import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.lifecycle.AndroidViewModel
 
 /*
@@ -13,7 +14,7 @@ import androidx.lifecycle.AndroidViewModel
  * Stores hazard reports for the app and keeps them
  * synchronized with local device storage.
  *
- * Reports now survive:
+ * Reports survive:
  *
  * - Screen changes
  * - Navigation
@@ -61,6 +62,30 @@ class HazardReportViewModel(
     val hazardReports: List<HazardReport>
         get() =
             _hazardReports
+
+    /*
+     * ---------------------------------------------------------
+     * FIELD REPORT SELECTION
+     * ---------------------------------------------------------
+     *
+     * This stores the IDs of reports selected from
+     * a specific map marker.
+     *
+     * Empty set:
+     * Show every active report.
+     *
+     * IDs present:
+     * Show only those selected reports.
+     */
+
+    private val _selectedFieldReportIds =
+        mutableStateOf<Set<String>>(
+            emptySet()
+        )
+
+    val selectedFieldReportIds: Set<String>
+        get() =
+            _selectedFieldReportIds.value
 
     /*
      * ---------------------------------------------------------
@@ -170,6 +195,81 @@ class HazardReportViewModel(
     val activeHazardCount: Int
         get() =
             activeHazardReports.size
+
+    /*
+     * ---------------------------------------------------------
+     * SELECT FIELD REPORTS
+     * ---------------------------------------------------------
+     *
+     * Used when the user taps:
+     *
+     * Hazard marker
+     * -> VIEW FIELD REPORTS
+     *
+     * Only the reports represented by that marker
+     * are selected.
+     */
+
+    fun selectFieldReports(
+        reports: List<HazardReport>
+    ) {
+
+        _selectedFieldReportIds.value =
+            reports
+                .map {
+                    it.id
+                }
+                .toSet()
+    }
+
+    /*
+     * ---------------------------------------------------------
+     * CLEAR FIELD REPORT SELECTION
+     * ---------------------------------------------------------
+     *
+     * Used when the user opens FIELD REPORTS
+     * from the normal Explorer dashboard card.
+     *
+     * Empty selection means:
+     * show every active report.
+     */
+
+    fun clearFieldReportSelection() {
+
+        _selectedFieldReportIds.value =
+            emptySet()
+    }
+
+    /*
+     * ---------------------------------------------------------
+     * SELECTED FIELD REPORTS
+     * ---------------------------------------------------------
+     *
+     * Returns:
+     *
+     * - All active reports when no map selection exists
+     * - Only selected active reports when opened from a marker
+     */
+
+    val selectedFieldReports: List<HazardReport>
+        get() {
+
+            val selectedIds =
+                _selectedFieldReportIds.value
+
+            return if (
+                selectedIds.isEmpty()
+            ) {
+
+                activeHazardReports
+
+            } else {
+
+                activeHazardReports.filter {
+                    it.id in selectedIds
+                }
+            }
+        }
 
     /*
      * ---------------------------------------------------------
@@ -352,6 +452,14 @@ class HazardReportViewModel(
             }
 
             /*
+             * Remove the deleted report from
+             * the current Field Reports selection too.
+             */
+            _selectedFieldReportIds.value =
+                _selectedFieldReportIds.value -
+                        reportId
+
+            /*
              * Save updated list.
              */
             saveReports()
@@ -370,11 +478,15 @@ class HazardReportViewModel(
      * - Report JSON
      * - Saved photos
      * - Current ViewModel report list
+     * - Current Field Reports selection
      */
 
     fun clearHazardReports() {
 
         _hazardReports.clear()
+
+        _selectedFieldReportIds.value =
+            emptySet()
 
         hazardStorage
             .clearAllStorage()

@@ -610,16 +610,18 @@ fun ExplorerScreen(
                  * MAP POPUP -> FIELD REPORTS
                  * -------------------------------------------------
                  *
-                 * OtoMap tells us which reports were in the
-                 * selected marker.
+                 * OtoMap gives Explorer the exact reports
+                 * represented by the marker the user selected.
                  *
-                 * For now, FieldReportsScreen opens the complete
-                 * active report list.
-                 *
-                 * Later we can pass the selected IDs through
-                 * navigation if we want the screen filtered.
+                 * Save those reports into the shared ViewModel
+                 * before navigating to Field Reports.
                  */
-                onViewHazardReportsClick = {
+                onViewHazardReportsClick = { selectedReports ->
+
+                    hazardReportViewModel
+                        .selectFieldReports(
+                            selectedReports
+                        )
 
                     onFieldReportsClick()
                 },
@@ -1422,7 +1424,10 @@ fun ExplorerScreen(
              * FIELD REPORTS
              * -------------------------------------------------
              *
-             * This now opens the actual FieldReportsScreen.
+             * Opening Field Reports from the dashboard
+             * should always show every active report.
+             *
+             * Clear any previous map-marker selection first.
              */
 
             DashboardWideCard(
@@ -1444,8 +1449,13 @@ fun ExplorerScreen(
                             "$activeHazardCount active hazard reports"
                     },
 
-                onClick =
-                    onFieldReportsClick
+                onClick = {
+
+                    hazardReportViewModel
+                        .clearFieldReportSelection()
+
+                    onFieldReportsClick()
+                }
             )
 
             Spacer(
