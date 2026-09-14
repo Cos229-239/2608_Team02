@@ -154,7 +154,7 @@ fun HomeScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .background(
-                    if (isSystemInDarkTheme()) {
+                    if (darkTheme) {
                         Color.Black.copy(
                             alpha = 0.30f
                         )
