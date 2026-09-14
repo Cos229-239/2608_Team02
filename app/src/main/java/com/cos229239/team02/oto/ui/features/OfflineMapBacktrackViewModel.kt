@@ -15,7 +15,12 @@ import com.cos229239.team02.oto.data.route.TrackedRoute
 import com.cos229239.team02.oto.data.route.toOtoLocation
 import com.cos229239.team02.oto.data.route.toRoutePoint
 import com.cos229239.team02.oto.ui.components.map.OTO_MAP_STYLE_URL
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
 import org.maplibre.compose.offline.OfflineManager
 import org.maplibre.compose.offline.OfflinePack
 import org.maplibre.compose.offline.OfflinePackDefinition
@@ -103,6 +108,28 @@ class OfflineMapBacktrackViewModel(
     private var lastAutoSavePointCount = 0
 
     private var lastGuideIndex = 0
+
+    /**
+     * Serializes all foreground saves so two overlapping writes cannot
+     * produce checkpoints in the wrong order. The ON_STOP durability
+     * path acquires this before blocking so it waits for an in-flight
+     * write to finish rather than racing with it.
+     */
+    private val routeSaveMutex = Mutex()
+
+    /**
+     * Persists a route asynchronously on [Dispatchers.IO] while
+     * holding [routeSaveMutex], guaranteeing that two saves never
+     * write at the same time and the result order is preserved.
+     */
+    private suspend fun saveRoute(
+        route: TrackedRoute
+    ): Boolean =
+        withContext(Dispatchers.IO) {
+            routeSaveMutex.withLock {
+                routeStorage.save(route)
+            }
+        }
 
     var guideTarget by mutableStateOf<OtoLocation?>(null)
         private set
@@ -308,15 +335,24 @@ class OfflineMapBacktrackViewModel(
             routeSummary =
                 buildRouteSummary(route)
 
-            val saved =
-                routeStorage.saveBlocking(route)
+            val savedPointCount =
+                routePoints.size
 
-            trackingStatus =
-                if (saved) {
-                    "Route saved (${routePoints.size} points)"
-                } else {
-                    "Could not save your route"
+            viewModelScope.launch {
+
+                val saved =
+                    saveRoute(route)
+
+                if (!isTracking) {
+                    trackingStatus =
+                        if (saved) {
+                            "Route saved " +
+                                "($savedPointCount points)"
+                        } else {
+                            "Could not save your route"
+                        }
                 }
+            }
 
         } else {
 
@@ -334,7 +370,7 @@ class OfflineMapBacktrackViewModel(
      * up to the last checkpoint. Saves whenever the route has grown by
      * enough recorded points, or after a fixed time has passed.
      */
-    private fun autoSaveIfDue() {
+    private suspend fun autoSaveIfDue() {
 
         val now = System.currentTimeMillis()
         val routeId = currentRouteId ?: return
@@ -351,7 +387,7 @@ class OfflineMapBacktrackViewModel(
             lastAutoSaveAtMillis = now
             lastAutoSavePointCount = routePoints.size
 
-if (routePoints.size >= MIN_ROUTE_POINTS) {
+            if (routePoints.size >= MIN_ROUTE_POINTS) {
 
                 val checkpoint =
                     TrackedRoute(
@@ -362,14 +398,17 @@ if (routePoints.size >= MIN_ROUTE_POINTS) {
                     )
 
                 val saved =
-                    routeStorage.saveBlocking(checkpoint)
+                    saveRoute(checkpoint)
 
-                trackingStatus =
-                    if (saved) {
-                        "Checkpoint saved (${routePoints.size} points)"
-                    } else {
-                        "Checkpoint failed to save"
-                    }
+                if (isTracking) {
+                    trackingStatus =
+                        if (saved) {
+                            "Checkpoint saved " +
+                                "(${routePoints.size} points)"
+                        } else {
+                            "Checkpoint failed to save"
+                        }
+                }
             }
         }
     }
@@ -397,7 +436,11 @@ if (routePoints.size >= MIN_ROUTE_POINTS) {
                     points = routePoints
                 )
 
-            routeStorage.saveBlocking(checkpoint)
+            runBlocking {
+                routeSaveMutex.withLock {
+                    routeStorage.saveBlocking(checkpoint)
+                }
+            }
         }
     }
 
