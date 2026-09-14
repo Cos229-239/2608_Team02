@@ -1,11 +1,15 @@
 package com.cos229239.team02.oto.navigation
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
+import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation3.runtime.entryProvider
 import androidx.navigation3.runtime.rememberNavBackStack
 import androidx.navigation3.ui.NavDisplay
 import com.cos229239.team02.oto.data.hazard.HazardReportViewModel
+import com.cos229239.team02.oto.ui.features.AreaSafetyView
+import com.cos229239.team02.oto.ui.features.AreaSafetyViewFactory
 import com.cos229239.team02.oto.ui.features.PlanTripViewModel
 import com.cos229239.team02.oto.ui.screens.crisis.CrisisScreen
 import com.cos229239.team02.oto.ui.screens.crisis.EmergencyHelpScreen
@@ -44,6 +48,49 @@ fun OtoNavigation() {
 
     /*
      * ---------------------------------------------------------
+     * APPLICATION CONTEXT
+     * ---------------------------------------------------------
+     *
+     * Used by the shared Area Safety ViewModel factory.
+     */
+
+    val context =
+        LocalContext
+            .current
+            .applicationContext
+
+    /*
+     * ---------------------------------------------------------
+     * SHARED AREA SAFETY VIEW MODEL
+     * ---------------------------------------------------------
+     *
+     * Shared between:
+     *
+     * - Explorer
+     * - Weather Report
+     * - Area Safety
+     */
+
+    val safetyFactory =
+        remember(
+            context
+        ) {
+
+            AreaSafetyViewFactory(
+                context =
+                    context
+            )
+        }
+
+    val safetyView:
+            AreaSafetyView =
+        viewModel(
+            factory =
+                safetyFactory
+        )
+
+    /*
+     * ---------------------------------------------------------
      * SHARED HAZARD REPORT VIEW MODEL
      * ---------------------------------------------------------
      *
@@ -61,8 +108,9 @@ fun OtoNavigation() {
      * - Priority
      * - Severity
      * - Community confirmations
+     * - Selected map-marker reports
      *
-     * This ViewModel also loads locally stored
+     * The ViewModel also loads locally stored
      * reports when the app starts.
      */
 
@@ -113,6 +161,18 @@ fun OtoNavigation() {
 
                             backStack.add(
                                 OtoRoute.Crisis
+                            )
+                        },
+
+                        /*
+                         * Team update:
+                         * Opens preparedness/offline tools
+                         * directly from Home.
+                         */
+                        onOfflineToolsClick = {
+
+                            backStack.add(
+                                OtoRoute.OfflineMapBacktrack
                             )
                         }
                     )
@@ -181,7 +241,12 @@ fun OtoNavigation() {
                          */
                         onBackClick = {
 
-                            backStack.removeLastOrNull()
+                            if (
+                                backStack.size > 1
+                            ) {
+
+                                backStack.removeLastOrNull()
+                            }
                         },
 
                         /*
@@ -194,7 +259,13 @@ fun OtoNavigation() {
                          * Shared hazard state.
                          */
                         hazardReportViewModel =
-                            hazardReportViewModel
+                            hazardReportViewModel,
+
+                        /*
+                         * Team's shared safety/weather state.
+                         */
+                        safetyView =
+                            safetyView
                     )
                 }
 
@@ -233,8 +304,20 @@ fun OtoNavigation() {
                     WeatherReportScreen(
                         onBackClick = {
 
-                            backStack.removeLastOrNull()
-                        }
+                            if (
+                                backStack.size > 1
+                            ) {
+
+                                backStack.removeLastOrNull()
+                            }
+                        },
+
+                        /*
+                         * Team update:
+                         * Uses the same shared safety ViewModel.
+                         */
+                        safetyView =
+                            safetyView
                     )
                 }
 
@@ -298,8 +381,21 @@ fun OtoNavigation() {
                     AreaSafetyRoute(
                         onBackClick = {
 
-                            backStack.removeLastOrNull()
-                        }
+                            if (
+                                backStack.size > 1
+                            ) {
+
+                                backStack.removeLastOrNull()
+                            }
+                        },
+
+                        /*
+                         * Team update:
+                         * Area Safety shares the same safety state
+                         * as Explorer and Weather.
+                         */
+                        safetyView =
+                            safetyView
                     )
                 }
 

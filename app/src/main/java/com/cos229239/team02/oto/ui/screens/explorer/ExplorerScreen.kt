@@ -44,16 +44,19 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.lifecycle.viewmodel.compose.viewModel
 import com.cos229239.team02.oto.data.hazard.HazardReportViewModel
 import com.cos229239.team02.oto.data.location.AndroidLocationRepository
 import com.cos229239.team02.oto.data.location.OtoLocation
 import com.cos229239.team02.oto.data.route.RouteClient
 import com.cos229239.team02.oto.data.route.RouteResult
+import com.cos229239.team02.oto.data.safety.SafetySourceState
 import com.cos229239.team02.oto.ui.components.OtoTopAppBar
 import com.cos229239.team02.oto.ui.components.map.OtoMap
+import com.cos229239.team02.oto.ui.features.AreaSafetyUIState
 import com.cos229239.team02.oto.ui.features.AreaSafetyView
 import com.cos229239.team02.oto.ui.features.PlanTripViewModel
+import com.cos229239.team02.oto.ui.theme.OtoCrisisRed
+import com.cos229239.team02.oto.ui.theme.OtoExplorerGreenDark
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
 import java.util.Locale
@@ -79,9 +82,19 @@ fun ExplorerScreen(
 
     tripViewModel: PlanTripViewModel,
 
+    /*
+     * Shared hazard report state.
+     */
     hazardReportViewModel: HazardReportViewModel,
 
-    safetyView: AreaSafetyView = viewModel()
+    /*
+     * Shared safety / weather state.
+     *
+     * This comes from OtoNavigation so Explorer,
+     * Weather Report, and Area Safety all use
+     * the same AreaSafetyView.
+     */
+    safetyView: AreaSafetyView
 ) {
 
     val context =
@@ -112,14 +125,15 @@ fun ExplorerScreen(
      */
 
     val safetyState by
-    safetyView.uiState.collectAsStateWithLifecycle()
+    safetyView
+        .uiState
+        .collectAsStateWithLifecycle()
 
     val savedTrip =
         tripViewModel.savedTrip
 
     /*
-     * Active reports loaded from the shared
-     * HazardReportViewModel.
+     * Active hazard reports.
      */
     val activeHazardReports =
         hazardReportViewModel
@@ -269,6 +283,89 @@ fun ExplorerScreen(
         mutableStateOf<OtoLocation?>(
             null
         )
+    }
+
+    /*
+     * ---------------------------------------------------------
+     * SAFETY AREA SELECTION
+     * ---------------------------------------------------------
+     *
+     * Team update:
+     *
+     * If a trip exists, use the trip destination
+     * for weather and safety information.
+     *
+     * Otherwise use the user's current location.
+     */
+
+    val destinationLatitude =
+        savedTrip
+            ?.destinationLatitude
+
+    val destinationLongitude =
+        savedTrip
+            ?.destinationLongitude
+
+    val destinationName =
+        savedTrip
+            ?.destinationName
+
+    LaunchedEffect(
+        destinationLatitude,
+        destinationLongitude,
+        destinationName,
+        currentLocation?.latitude,
+        currentLocation?.longitude
+    ) {
+
+        val destination =
+            if (
+                destinationLatitude != null &&
+                destinationLongitude != null
+            ) {
+
+                OtoLocation(
+                    latitude =
+                        destinationLatitude,
+
+                    longitude =
+                        destinationLongitude
+                )
+
+            } else {
+
+                null
+            }
+
+        val selectedArea =
+            destination
+                ?: currentLocation
+
+        if (
+            selectedArea != null
+        ) {
+
+            safetyView.setArea(
+                location =
+                    selectedArea,
+
+                areaName =
+                    if (
+                        destination != null
+                    ) {
+
+                        destinationName
+                            ?.takeIf {
+                                it.isNotBlank()
+                            }
+                            ?: "Trip destination"
+
+                    } else {
+
+                        "Current area"
+                    }
+            )
+        }
     }
 
     var locationStatus by remember {
@@ -610,12 +707,10 @@ fun ExplorerScreen(
                  * MAP POPUP -> FIELD REPORTS
                  * -------------------------------------------------
                  *
-                 * OtoMap gives Explorer the exact reports
-                 * represented by the marker the user selected.
-                 *
-                 * Save those reports into the shared ViewModel
-                 * before navigating to Field Reports.
+                 * Save only the reports represented by
+                 * the selected marker before navigating.
                  */
+
                 onViewHazardReportsClick = { selectedReports ->
 
                     hazardReportViewModel
@@ -1261,17 +1356,8 @@ fun ExplorerScreen(
              */
 
             SafetyOverviewCard(
-                areaName =
-                    safetyState.areaName,
-
-                isLoading =
-                    safetyState.isLoading,
-
-                isOffline =
-                    safetyState.isOffline,
-
-                isSample =
-                    safetyState.isSampleData,
+                uiState =
+                    safetyState,
 
                 hazardCount =
                     activeHazardCount,
@@ -1424,10 +1510,7 @@ fun ExplorerScreen(
              * FIELD REPORTS
              * -------------------------------------------------
              *
-             * Opening Field Reports from the dashboard
-             * should always show every active report.
-             *
-             * Clear any previous map-marker selection first.
+             * Dashboard path always shows ALL active reports.
              */
 
             DashboardWideCard(
@@ -1586,23 +1669,20 @@ private fun ExplorerActionCard(
  * -------------------------------------------------------------
  * SAFETY OVERVIEW
  * -------------------------------------------------------------
+ *
+ * Combines:
+ *
+ * - Team's live NWS / NPS safety state
+ * - Our local hazard report count
  */
 
 @Composable
 private fun SafetyOverviewCard(
-    areaName: String,
-    isLoading: Boolean,
-    isOffline: Boolean,
-    isSample: Boolean,
+    uiState: AreaSafetyUIState,
     hazardCount: Int,
     onAreaSafetyClick: () -> Unit,
     onWeatherClick: () -> Unit
 ) {
-
-    val darkGreen =
-        Color(
-            0xFF063D24
-        )
 
     val mediumGreen =
         Color(
@@ -1613,6 +1693,77 @@ private fun SafetyOverviewCard(
         Color(
             0xFFE1E5E1
         )
+
+    /*
+     * ---------------------------------------------------------
+     * SOURCE STATUS
+     * ---------------------------------------------------------
+     */
+
+    val nwsStatus =
+        uiState.sources
+            .firstOrNull {
+                it.source == "NWS"
+            }
+
+    val npsStatus =
+        uiState.sources
+            .firstOrNull {
+                it.source == "NPS"
+            }
+
+    /*
+     * ---------------------------------------------------------
+     * WEATHER SUMMARY
+     * ---------------------------------------------------------
+     */
+
+    val weatherSummary =
+        when {
+
+            uiState.isLoading ->
+                "Loading..."
+
+            !uiState.hasLocation ->
+                "Select a location"
+
+            uiState.errorMessage != null ->
+                "Unavailable"
+
+            nwsStatus?.state ==
+                    SafetySourceState.SUCCESS ->
+                "${uiState.weatherNotifications.size} weather alerts"
+
+            else ->
+                nwsStatus?.message
+                    ?: "Not loaded"
+        }
+
+    /*
+     * ---------------------------------------------------------
+     * PARK SUMMARY
+     * ---------------------------------------------------------
+     */
+
+    val parkSummary =
+        when {
+
+            uiState.selectedParkCode == null ->
+                "Select a park"
+
+            uiState.isLoading ->
+                "Loading..."
+
+            !uiState.hasLocation ->
+                "Location required"
+
+            uiState.errorMessage != null ->
+                "Unavailable"
+
+            else ->
+                npsStatus?.message
+                    ?: "Not loaded"
+        }
 
     Card(
         modifier =
@@ -1634,8 +1785,19 @@ private fun SafetyOverviewCard(
             modifier =
                 Modifier.padding(
                     16.dp
+                ),
+
+            verticalArrangement =
+                Arrangement.spacedBy(
+                    10.dp
                 )
         ) {
+
+            /*
+             * -------------------------------------------------
+             * HEADER
+             * -------------------------------------------------
+             */
 
             Row(
                 modifier =
@@ -1648,41 +1810,19 @@ private fun SafetyOverviewCard(
                     Alignment.CenterVertically
             ) {
 
-                Row(
-                    verticalAlignment =
-                        Alignment.CenterVertically
-                ) {
+                Text(
+                    text =
+                        "🛡️  SAFETY OVERVIEW",
 
-                    Text(
-                        text =
-                            "🛡️",
+                    color =
+                        OtoExplorerGreenDark,
 
-                        fontSize =
-                            22.sp
-                    )
+                    fontSize =
+                        17.sp,
 
-                    Spacer(
-                        modifier =
-                            Modifier.padding(
-                                horizontal =
-                                    4.dp
-                            )
-                    )
-
-                    Text(
-                        text =
-                            "SAFETY OVERVIEW",
-
-                        color =
-                            darkGreen,
-
-                        fontSize =
-                            17.sp,
-
-                        fontWeight =
-                            FontWeight.Bold
-                    )
-                }
+                    fontWeight =
+                        FontWeight.Bold
+                )
 
                 Text(
                     text =
@@ -1704,20 +1844,19 @@ private fun SafetyOverviewCard(
                 )
             }
 
-            if (
-                areaName.isNotBlank()
-            ) {
+            /*
+             * -------------------------------------------------
+             * AREA NAME
+             * -------------------------------------------------
+             */
 
-                Spacer(
-                    modifier =
-                        Modifier.height(
-                            8.dp
-                        )
-                )
+            if (
+                uiState.areaName.isNotBlank()
+            ) {
 
                 Text(
                     text =
-                        areaName,
+                        uiState.areaName,
 
                     color =
                         Color(
@@ -1732,174 +1871,273 @@ private fun SafetyOverviewCard(
                 )
             }
 
-            Spacer(
-                modifier =
-                    Modifier.height(
-                        16.dp
-                    )
-            )
+            /*
+             * -------------------------------------------------
+             * LOADING
+             * -------------------------------------------------
+             */
 
             if (
-                isLoading
+                uiState.isLoading
             ) {
 
-                Box(
-                    modifier =
-                        Modifier
-                            .fillMaxWidth()
-                            .height(
-                                120.dp
-                            ),
-
-                    contentAlignment =
-                        Alignment.Center
-                ) {
-
-                    CircularProgressIndicator(
-                        color =
-                            mediumGreen
-                    )
-                }
-
-            } else {
-
-                Row(
-                    modifier =
-                        Modifier.fillMaxWidth(),
-
-                    verticalAlignment =
-                        Alignment.Top
-                ) {
-
-                    SafetyOverviewItem(
-                        title =
-                            "WEATHER",
-
-                        icon =
-                            "☀️",
-
-                        mainValue =
-                            "—",
-
-                        description =
-                            "View weather",
-
-                        modifier =
-                            Modifier
-                                .weight(
-                                    1f
-                                )
-                                .clickable {
-                                    onWeatherClick()
-                                }
-                    )
-
-                    SafetyOverviewDivider(
-                        color =
-                            dividerColor
-                    )
-
-                    SafetyOverviewItem(
-                        title =
-                            "HAZARDS",
-
-                        icon =
-                            "⚠️",
-
-                        mainValue =
-                            hazardCount
-                                .toString(),
-
-                        description =
-                            when (
-                                hazardCount
-                            ) {
-
-                                0 ->
-                                    "No active reports"
-
-                                1 ->
-                                    "1 active report"
-
-                                else ->
-                                    "$hazardCount active reports"
-                            },
-
-                        modifier =
-                            Modifier.weight(
-                                1f
-                            )
-                    )
-
-                    SafetyOverviewDivider(
-                        color =
-                            dividerColor
-                    )
-
-                    SafetyOverviewItem(
-                        title =
-                            "CLOSURES",
-
-                        icon =
-                            "⛔",
-
-                        mainValue =
-                            "—",
-
-                        description =
-                            "Not connected",
-
-                        modifier =
-                            Modifier.weight(
-                                1f
-                            )
-                    )
-
-                    SafetyOverviewDivider(
-                        color =
-                            dividerColor
-                    )
-
-                    SafetyOverviewItem(
-                        title =
-                            "AIR QUALITY",
-
-                        icon =
-                            "🍃",
-
-                        mainValue =
-                            "—",
-
-                        description =
-                            "Not connected",
-
-                        modifier =
-                            Modifier.weight(
-                                1f
-                            )
-                    )
-                }
+                CircularProgressIndicator(
+                    color =
+                        mediumGreen
+                )
             }
 
-            if (
-                isOffline
-            ) {
+            /*
+             * -------------------------------------------------
+             * LIVE SOURCE SUMMARIES
+             * -------------------------------------------------
+             */
 
-                Spacer(
-                    modifier =
-                        Modifier.height(
-                            12.dp
-                        )
-                )
+            Text(
+                text =
+                    "Weather: $weatherSummary",
+
+                style =
+                    MaterialTheme
+                        .typography
+                        .bodySmall
+            )
+
+            TextButton(
+                onClick =
+                    onWeatherClick
+            ) {
 
                 Text(
                     text =
-                        "⚠ Offline — live safety information may be unavailable",
+                        "View Weather Report ›"
+                )
+            }
+
+            Text(
+                text =
+                    "Park Notices: $parkSummary",
+
+                style =
+                    MaterialTheme
+                        .typography
+                        .bodySmall
+            )
+
+            uiState.selectedParkCode
+                ?.let { code ->
+
+                    Text(
+                        text =
+                            "Selected park code: $code",
+
+                        style =
+                            MaterialTheme
+                                .typography
+                                .bodySmall
+                    )
+                }
+
+            /*
+             * -------------------------------------------------
+             * FOUR-COLUMN SAFETY SUMMARY
+             * -------------------------------------------------
+             */
+
+            Spacer(
+                modifier =
+                    Modifier.height(
+                        4.dp
+                    )
+            )
+
+            Row(
+                modifier =
+                    Modifier.fillMaxWidth(),
+
+                verticalAlignment =
+                    Alignment.Top
+            ) {
+
+                SafetyOverviewItem(
+                    title =
+                        "WEATHER",
+
+                    icon =
+                        "☀️",
+
+                    mainValue =
+                        if (
+                            nwsStatus?.state ==
+                            SafetySourceState.SUCCESS
+                        ) {
+
+                            uiState
+                                .weatherNotifications
+                                .size
+                                .toString()
+
+                        } else {
+
+                            "—"
+                        },
+
+                    description =
+                        when {
+
+                            uiState.isLoading ->
+                                "Loading"
+
+                            nwsStatus?.state ==
+                                    SafetySourceState.SUCCESS -> {
+
+                                when (
+                                    uiState.weatherNotifications.size
+                                ) {
+
+                                    0 ->
+                                        "No alerts"
+
+                                    1 ->
+                                        "1 alert"
+
+                                    else ->
+                                        "${uiState.weatherNotifications.size} alerts"
+                                }
+                            }
+
+                            else ->
+                                "View weather"
+                        },
+
+                    modifier =
+                        Modifier
+                            .weight(
+                                1f
+                            )
+                            .clickable {
+                                onWeatherClick()
+                            }
+                )
+
+                SafetyOverviewDivider(
+                    color =
+                        dividerColor
+                )
+
+                /*
+                 * Our locally submitted community hazards.
+                 */
+                SafetyOverviewItem(
+                    title =
+                        "HAZARDS",
+
+                    icon =
+                        "⚠️",
+
+                    mainValue =
+                        hazardCount
+                            .toString(),
+
+                    description =
+                        when (
+                            hazardCount
+                        ) {
+
+                            0 ->
+                                "No active reports"
+
+                            1 ->
+                                "1 active report"
+
+                            else ->
+                                "$hazardCount active reports"
+                        },
+
+                    modifier =
+                        Modifier.weight(
+                            1f
+                        )
+                )
+
+                SafetyOverviewDivider(
+                    color =
+                        dividerColor
+                )
+
+                SafetyOverviewItem(
+                    title =
+                        "CLOSURES",
+
+                    icon =
+                        "⛔",
+
+                    mainValue =
+                        "—",
+
+                    description =
+                        if (
+                            uiState.selectedParkCode != null
+                        ) {
+
+                            "View park notices"
+
+                        } else {
+
+                            "Select park"
+                        },
+
+                    modifier =
+                        Modifier
+                            .weight(
+                                1f
+                            )
+                            .clickable {
+                                onAreaSafetyClick()
+                            }
+                )
+
+                SafetyOverviewDivider(
+                    color =
+                        dividerColor
+                )
+
+                SafetyOverviewItem(
+                    title =
+                        "AIR QUALITY",
+
+                    icon =
+                        "🍃",
+
+                    mainValue =
+                        "—",
+
+                    description =
+                        "Not connected",
+
+                    modifier =
+                        Modifier.weight(
+                            1f
+                        )
+                )
+            }
+
+            /*
+             * -------------------------------------------------
+             * SOURCE WARNING
+             * -------------------------------------------------
+             */
+
+            if (
+                uiState.hasUnavailableSources
+            ) {
+
+                Text(
+                    text =
+                        "Some safety sources are unavailable. Results may be incomplete.",
 
                     color =
-                        MaterialTheme
-                            .colorScheme
-                            .error,
+                        OtoCrisisRed,
 
                     fontSize =
                         11.sp,
@@ -1909,28 +2147,20 @@ private fun SafetyOverviewCard(
                 )
             }
 
-            if (
-                isSample
-            ) {
+            /*
+             * -------------------------------------------------
+             * AREA SAFETY BUTTON
+             * -------------------------------------------------
+             */
 
-                Spacer(
-                    modifier =
-                        Modifier.height(
-                            8.dp
-                        )
-                )
+            TextButton(
+                onClick =
+                    onAreaSafetyClick
+            ) {
 
                 Text(
                     text =
-                        "Area Alerts currently contains sample safety data",
-
-                    color =
-                        Color(
-                            0xFF737373
-                        ),
-
-                    fontSize =
-                        10.sp
+                        "View Area Safety / Select Park ›"
                 )
             }
         }

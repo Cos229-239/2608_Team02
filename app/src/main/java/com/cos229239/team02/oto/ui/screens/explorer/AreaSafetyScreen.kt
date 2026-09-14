@@ -27,6 +27,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalUriHandler
@@ -34,22 +35,35 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.cos229239.team02.oto.BuildConfig
+import com.cos229239.team02.oto.data.resource.NpsAlertClient
+import com.cos229239.team02.oto.data.resource.NpsParkPicker
 import com.cos229239.team02.oto.ui.features.AreaSafetyUIState
 import com.cos229239.team02.oto.ui.features.AreaSafetyView
-import com.cos229239.team02.oto.ui.features.SafetyFilter
-import com.cos229239.team02.oto.ui.features.SafetyLevel
-import com.cos229239.team02.oto.ui.features.SafetyNotification
+import com.cos229239.team02.oto.data.safety.SafetyFilter
+import com.cos229239.team02.oto.data.safety.SafetyLevel
+import com.cos229239.team02.oto.data.safety.SafetyNotification
+import com.cos229239.team02.oto.data.safety.createSafetyHttpClient
 import com.cos229239.team02.oto.ui.components.OtoTopAppBar //Use OTO's shared Material 3 top app bar.
+import com.cos229239.team02.oto.ui.features.WeatherForecastCard
+import androidx.compose.foundation.layout.PaddingValues
 
-
+//Connects ViewModel's state and actions to the Area Safety screen.
 @Composable
 fun AreaSafetyRoute( onBackClick: () -> Unit,
-                     safetyView: AreaSafetyView = viewModel()
+                     safetyView: AreaSafetyView
 )
 {
 
     val uiState by safetyView.uiState.collectAsStateWithLifecycle()
     val uriHandler = LocalUriHandler.current
+
+    val parkClient = remember {
+        NpsAlertClient(
+            http = createSafetyHttpClient(),
+            apiKey = BuildConfig.NPS_API_KEY
+        )
+    }
 
     AreaSafetyScreen(
         uiState = uiState,
@@ -58,6 +72,13 @@ fun AreaSafetyRoute( onBackClick: () -> Unit,
         onFilterSelected = safetyView::selectFilter,
         onSourceClick = { sourceUrl ->
             uriHandler.openUri(sourceUrl)
+        },
+        parkCodeContent = {
+            NpsParkPicker(
+                client = parkClient,
+                selectedParkCode = uiState.selectedParkCode,
+                onParkSelected = safetyView::selectParkCode
+            )
         }
     )
 }
@@ -70,19 +91,18 @@ fun AreaSafetyScreen(
     onBackClick: () -> Unit,
     onRefresh: () -> Unit,
     onFilterSelected: (SafetyFilter) -> Unit,
-    onSourceClick: (String) -> Unit
-)
-{
+    onSourceClick: (String) -> Unit,
+    parkCodeContent: @Composable () -> Unit
+) {
     Scaffold(
         topBar = {
-            //Use OTO's shared Material 3 top app bar.
             OtoTopAppBar(
                 title = "AREA ALERTS",
                 onBackClick = onBackClick,
                 actions = {
                     TextButton(
                         onClick = onRefresh,
-                        enabled = !uiState.isLoading
+                        enabled = uiState.hasLocation && !uiState.isLoading
                     ) {
                         Text(
                             text = "Refresh",
@@ -92,161 +112,141 @@ fun AreaSafetyScreen(
                 }
             )
         }
-    ){ paddingValues ->
-        Column(modifier = Modifier
-            .fillMaxSize()
-            .padding(paddingValues)
-            .padding(horizontal = 16.dp)
+    ) { paddingValues ->
+        LazyColumn(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(paddingValues),
+            contentPadding = PaddingValues(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            Spacer(modifier = Modifier.height(8.dp))
-
-            Text(
-                text = uiState.areaName,
-                style = MaterialTheme.typography.headlineSmall,
-                fontWeight = FontWeight.Bold
-            )
-            Spacer(modifier = Modifier.height(8.dp))
-
-            Surface(
-                modifier = Modifier.fillMaxWidth(),
-                color = MaterialTheme.colorScheme.secondaryContainer,
-                shape = MaterialTheme.shapes.medium
-                ) {
+            item {
                 Text(
-                    text = """
-                        Conditions can change quickly. Review official 
-                        information, posted signs, and instructions from
-                        local authorities. 
-                    """.trimIndent(),
-                    modifier = Modifier.padding(12.dp),
-                    style = MaterialTheme.typography.bodySmall
+                    text = uiState.areaName,
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.Bold
                 )
             }
 
-            if (uiState.isSampleData){
-                Spacer(modifier = Modifier.height(16.dp))
-
+            item {
                 Surface(
                     modifier = Modifier.fillMaxWidth(),
-                    color = MaterialTheme.colorScheme.tertiaryContainer,
+                    color = MaterialTheme.colorScheme.secondaryContainer,
                     shape = MaterialTheme.shapes.medium
                 ) {
                     Text(
-                        text = """
-                            Sample notifications do not represent current conditions. 
-                        """.trimIndent(),
+                        text = "Conditions can change quickly. Review " +
+                                "official information, posted signs, and " +
+                                "instructions from local authorities.",
                         modifier = Modifier.padding(12.dp),
-                        style = MaterialTheme.typography.bodySmall,
-                        fontWeight = FontWeight.Bold
-
+                        style = MaterialTheme.typography.bodySmall
                     )
                 }
             }
-            if (uiState.isOffline) {
-                Spacer(modifier = Modifier.height(8.dp))
-                Surface(
-                    modifier = Modifier.fillMaxWidth(),
-                    color = MaterialTheme.colorScheme.errorContainer,
-                    shape = MaterialTheme.shapes.medium
-                ) {
+
+            item {
+                parkCodeContent()
+            }
+
+            item {
+                WeatherForecastCard(
+                    uiState = uiState,
+                    onRefresh = onRefresh
+                )
+            }
+
+            if (uiState.hasUnavailableSources) {
+                item {
                     Text(
-                        text = """
-                            Offline: Saved information may be outdated.  
-                        """.trimIndent(),
-                        modifier = Modifier.padding(12.dp),
-                        style = MaterialTheme.typography.bodySmall,
-                        fontWeight = FontWeight.Bold
-
+                        text = "Some sources are unavailable. " +
+                                "Results may be incomplete.",
+                        color = MaterialTheme.colorScheme.error
                     )
                 }
             }
-            Spacer(modifier = Modifier.height(16.dp))
 
+            item {
+                Text(
+                    text = "Safety Notifications",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold
+                )
+            }
 
-            Text(
-                text = "Safety Notifications",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold
-            )
-
-            Spacer(modifier = Modifier.height(8.dp))
-
-            SafetyFilterRow(
-                selectedFilter = uiState.filterSelected,
-                onFilterSelected = onFilterSelected
-            )
-
-            Spacer(modifier = Modifier.height(12.dp))
-
-            val errorMessage = uiState.errorMessage
+            item {
+                SafetyFilterRow(
+                    selectedFilter = uiState.filterSelected,
+                    onFilterSelected = onFilterSelected
+                )
+            }
 
             when {
                 uiState.isLoading -> {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(32.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        CircularProgressIndicator()
+                    item {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(24.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            CircularProgressIndicator()
+                        }
                     }
                 }
 
-                errorMessage != null -> {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(24.dp),
-                        horizontalAlignment =
-                            Alignment.CenterHorizontally
-                    ) {
+                !uiState.hasLocation -> {
+                    item {
                         Text(
-                            text = errorMessage,
-                            color = MaterialTheme.colorScheme.error
+                            text = "Select a trip destination or use " +
+                                    "Locate Me in Explorer."
                         )
-                        Spacer(modifier = Modifier.height(12.dp))
+                    }
+                }
 
-                        Button(
-                            onClick = onRefresh
-                        )
-                        {
-                            Text("Try Again")
+                uiState.errorMessage != null -> {
+                    item {
+                        Column(
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Text(
+                                text = uiState.errorMessage.orEmpty(),
+                                color = MaterialTheme.colorScheme.error
+                            )
+
+                            Button(onClick = onRefresh) {
+                                Text("Try Again")
+                            }
                         }
                     }
                 }
+
                 uiState.notifications.isEmpty() -> {
-                    Text(
-                        text = """
-                            No Notifications Data Available. 
-                            This does not mean to not be alert of potential 
-                            hazards Please Be Aware
-                        """.trimIndent(),
-                        modifier = Modifier.padding(24.dp),
-                        style = MaterialTheme.typography.bodyMedium
-                    )
+                    item {
+                        Text(
+                            text = "No notifications to display for this " +
+                                    "filter. Check source status; an empty " +
+                                    "list does not establish that the area is safe."
+                        )
+                    }
                 }
+
                 else -> {
-                    LazyColumn(modifier = Modifier.fillMaxSize(),
-                        verticalArrangement =
-                            Arrangement.spacedBy(12.dp)
-                    ) {
-                        items(
-                            items = uiState.notifications,
-                            key = { notification ->
-                                notification.id
-                            }
-                        ) { notification ->
-                            SafetyNotificationCard(
-                                notification = notification,
-                                onSourceClick = onSourceClick
-                            )
-                        }
+                    items(
+                        items = uiState.notifications,
+                        key = { it.id }
+                    ) { notification ->
+                        SafetyNotificationCard(
+                            notification = notification,
+                            onSourceClick = onSourceClick
+                        )
                     }
                 }
             }
         }
     }
 }
+
+
 @Composable
 private fun SafetyFilterRow(
     selectedFilter: SafetyFilter,
@@ -378,18 +378,11 @@ private fun SafetyNotificationCard(
                 )
             }
 
-            if (notification.sampleData) {
-                Text(
-                    text = "SAMPLE DATA",
-                    color = MaterialTheme.colorScheme.error,
-                    fontWeight = FontWeight.Bold,
-                    style = MaterialTheme.typography.bodySmall
-                )
-            }
+
 
             TextButton(
                 onClick = {
-                    onSourceClick(notification.sourceURL)
+                    onSourceClick(notification.sourceUrl)
                 }
             ) {
                 Text("View Source")

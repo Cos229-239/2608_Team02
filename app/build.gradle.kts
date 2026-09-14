@@ -1,8 +1,24 @@
+import java.util.Properties
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.kotlin.serialization)
 }
+val safetyProperties = Properties().apply {
+    val propertiesFile = rootProject.file("local.properties")
+
+    if(propertiesFile.exists()) {
+        propertiesFile.inputStream().use { load(it) }
+  }
+}
+
+fun quotedBuildConfigString(value: String): String =
+    "\"" + value
+.replace(" \\ ", "\\\\")
+.replace("\"", "\\\"" )
+.replace("\n", "\\n")
+.replace("\r", "\\r") + "\""
+
 
 android {
     namespace = "com.cos229239.team02.oto"
@@ -19,6 +35,25 @@ android {
         versionName = "1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+
+        buildConfigField(
+            "String",
+            "NPS_API_KEY",
+            quotedBuildConfigString(
+                safetyProperties.getProperty("NPS_API_KEY", "")
+            )
+        )
+buildConfigField(
+    "String",
+    "NWS_USER_AGENT",
+    quotedBuildConfigString(
+        safetyProperties.getProperty(
+            "NWS_USER_AGENT",
+            "OTO-Explorer/1.0"
+        )
+    )
+)
+
     }
 
     buildTypes {
@@ -36,6 +71,7 @@ android {
 
     buildFeatures {
         compose = true
+        buildConfig = true
     }
 }
 
