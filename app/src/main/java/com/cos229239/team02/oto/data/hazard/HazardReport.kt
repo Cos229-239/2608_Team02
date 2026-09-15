@@ -21,8 +21,11 @@ enum class HazardPriority {
  *
  * Represents one submitted hazard report.
  *
- * Reports will be saved locally so they can survive
+ * Reports are currently saved locally so they can survive
  * app restarts.
+ *
+ * A future backend will allow these reports and confirmations
+ * to be shared between different OTO users.
  */
 data class HazardReport(
 
@@ -96,10 +99,6 @@ data class HazardReport(
      * Path to the photo saved inside OTO's
      * internal application storage.
      *
-     * Example:
-     *
-     * /data/user/0/.../files/hazard_photos/report123.jpg
-     *
      * null means no photo was attached.
      */
     val photoPath: String? = null,
@@ -117,17 +116,42 @@ data class HazardReport(
      * ---------------------------------------------------------
      */
 
+    /*
+     * True once the report reaches OTO's required number
+     * of unique confirmations.
+     *
+     * For the current prototype, two unique confirmations
+     * can still mark the report as verified.
+     */
     val isVerified: Boolean = false,
 
     /*
-     * Number of users who confirmed the hazard.
+     * Number of UNIQUE users/devices that confirmed
+     * the hazard is still present.
+     *
+     * This should match confirmedByIds.size.
      */
     val confirmationCount: Int = 0,
 
     /*
+     * IDs belonging to the users/devices that have already
+     * confirmed this report.
+     *
+     * During the current local prototype these can be
+     * installation/device IDs.
+     *
+     * Once the onboarding/profile system is ready, these
+     * can become actual user/profile IDs instead.
+     *
+     * This prevents one person from repeatedly pressing
+     * STILL HERE and increasing the count forever.
+     */
+    val confirmedByIds: Set<String> = emptySet(),
+
+    /*
      * Whether this report is still active.
      *
-     * Resolved hazards will eventually become false.
+     * Resolved hazards eventually become false.
      */
     val isActive: Boolean = true
 )

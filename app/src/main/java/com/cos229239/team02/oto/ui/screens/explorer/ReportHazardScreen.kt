@@ -1,6 +1,7 @@
 package com.cos229239.team02.oto.ui.screens.explorer
 
 import android.Manifest
+import android.content.ActivityNotFoundException
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -91,6 +92,20 @@ fun ReportHazardScreen(
         )
 
     /*
+     * Explicit dark text colors used on cards that have
+     * hardcoded light backgrounds.
+     */
+    val cardPrimaryText =
+        Color(
+            0xFF1B1B1F
+        )
+
+    val cardSecondaryText =
+        Color(
+            0xFF4E4E53
+        )
+
+    /*
      * ---------------------------------------------------------
      * LOCATION REPOSITORY
      * ---------------------------------------------------------
@@ -138,18 +153,10 @@ fun ReportHazardScreen(
         mutableStateOf(false)
     }
 
-    /*
-     * Stores the priority of the report
-     * that was successfully submitted.
-     */
     var submittedPriority by remember {
         mutableStateOf<HazardPriority?>(null)
     }
 
-    /*
-     * Remembers whether the submitted report
-     * successfully saved a photo.
-     */
     var submittedPhotoSaved by remember {
         mutableStateOf(false)
     }
@@ -163,6 +170,25 @@ fun ReportHazardScreen(
     var reportPhoto by remember {
         mutableStateOf<Bitmap?>(null)
     }
+
+    var cameraError by remember {
+        mutableStateOf<String?>(null)
+    }
+
+    /*
+     * ---------------------------------------------------------
+     * CAMERA AVAILABILITY
+     * ---------------------------------------------------------
+     */
+
+    val hasCamera =
+        remember(context) {
+
+            context.packageManager
+                .hasSystemFeature(
+                    PackageManager.FEATURE_CAMERA_ANY
+                )
+        }
 
     /*
      * ---------------------------------------------------------
@@ -182,8 +208,54 @@ fun ReportHazardScreen(
 
                 reportPhoto =
                     bitmap
+
+                cameraError =
+                    null
             }
         }
+
+    /*
+     * ---------------------------------------------------------
+     * SAFE CAMERA LAUNCH
+     * ---------------------------------------------------------
+     */
+
+    fun openCamera() {
+
+        if (
+            !hasCamera
+        ) {
+
+            cameraError =
+                "Camera unavailable on this device."
+
+            return
+        }
+
+        try {
+
+            cameraLauncher.launch(
+                null
+            )
+
+            cameraError =
+                null
+
+        } catch (
+            error: ActivityNotFoundException
+        ) {
+
+            cameraError =
+                "No camera app is available on this device."
+
+        } catch (
+            error: Exception
+        ) {
+
+            cameraError =
+                "Unable to open the camera."
+        }
+    }
 
     /*
      * ---------------------------------------------------------
@@ -522,6 +594,9 @@ fun ReportHazardScreen(
         reportPhoto =
             null
 
+        cameraError =
+            null
+
         reportLocation =
             null
 
@@ -577,6 +652,9 @@ fun ReportHazardScreen(
                     ""
 
                 reportPhoto =
+                    null
+
+                cameraError =
                     null
 
                 reportLocation =
@@ -730,12 +808,6 @@ fun ReportHazardScreen(
                         )
                     }
 
-                    /*
-                     * -------------------------------------------------
-                     * SAVED LOCALLY
-                     * -------------------------------------------------
-                     */
-
                     Card(
                         modifier =
                             Modifier.fillMaxWidth(),
@@ -820,12 +892,6 @@ fun ReportHazardScreen(
                         }
                     }
 
-                    /*
-                     * -------------------------------------------------
-                     * SAFETY GUIDANCE
-                     * -------------------------------------------------
-                     */
-
                     Card(
                         modifier =
                             Modifier.fillMaxWidth(),
@@ -879,7 +945,10 @@ fun ReportHazardScreen(
                                     "Visit First Aid & Survival in Crisis Mode for emergency and outdoor safety information.",
 
                                 style =
-                                    MaterialTheme.typography.bodyMedium
+                                    MaterialTheme.typography.bodyMedium,
+
+                                color =
+                                    cardSecondaryText
                             )
 
                             Spacer(
@@ -1114,12 +1183,6 @@ fun ReportHazardScreen(
                             null
                     )
 
-                    /*
-                     * -------------------------------------------------
-                     * PHOTO
-                     * -------------------------------------------------
-                     */
-
                     if (
                         reportPhoto != null
                     ) {
@@ -1184,12 +1247,6 @@ fun ReportHazardScreen(
                         )
                     }
 
-                    /*
-                     * -------------------------------------------------
-                     * EDIT REPORT
-                     * -------------------------------------------------
-                     */
-
                     OutlinedButton(
                         onClick = {
 
@@ -1215,130 +1272,107 @@ fun ReportHazardScreen(
                      * -------------------------------------------------
                      * SUBMIT REPORT
                      * -------------------------------------------------
+                     *
+                     * Photo saving is now a suspend operation.
+                     *
+                     * The complete submit flow runs inside the
+                     * existing Compose coroutine scope.
                      */
 
                     Button(
                         onClick = {
 
-                            /*
-                             * Generate the report ID first.
-                             *
-                             * The same ID is used for both:
-                             *
-                             * - HazardReport
-                             * - Saved photo filename
-                             */
-                            val reportId =
-                                UUID.randomUUID()
-                                    .toString()
+                            scope.launch {
 
-                            /*
-                             * -------------------------------------------------
-                             * SAVE PHOTO
-                             * -------------------------------------------------
-                             *
-                             * If the user attached a photo, save
-                             * the actual Bitmap to internal storage.
-                             */
+                                val reportId =
+                                    UUID.randomUUID()
+                                        .toString()
 
-                            val savedPhotoPath =
-                                if (
-                                    reportPhoto != null
-                                ) {
+                                /*
+                                 * Photo compression and file writing
+                                 * are now moved off the UI thread by
+                                 * HazardStorage.
+                                 */
+                                val savedPhotoPath =
+                                    if (
+                                        reportPhoto != null
+                                    ) {
 
-                                    hazardReportViewModel
-                                        .saveHazardPhoto(
-                                            bitmap =
-                                                reportPhoto!!,
+                                        hazardReportViewModel
+                                            .saveHazardPhoto(
+                                                bitmap =
+                                                    reportPhoto!!,
 
-                                            reportId =
-                                                reportId
-                                        )
+                                                reportId =
+                                                    reportId
+                                            )
 
-                                } else {
+                                    } else {
 
-                                    null
-                                }
+                                        null
+                                    }
 
-                            /*
-                             * Create the persistent report.
-                             */
-                            val newReport =
-                                HazardReport(
+                                val newReport =
+                                    HazardReport(
 
-                                    id =
-                                        reportId,
+                                        id =
+                                            reportId,
 
-                                    category =
-                                        category.name,
+                                        category =
+                                            category.name,
 
-                                    reportType =
-                                        reportType,
+                                        reportType =
+                                            reportType,
 
-                                    severity =
-                                        severity,
+                                        severity =
+                                            severity,
 
-                                    priority =
-                                        priority,
+                                        priority =
+                                            priority,
 
-                                    latitude =
-                                        location.latitude,
+                                        latitude =
+                                            location.latitude,
 
-                                    longitude =
-                                        location.longitude,
+                                        longitude =
+                                            location.longitude,
 
-                                    accuracyMeters =
-                                        location.accuracyMeters
-                                            ?: 0f,
+                                        accuracyMeters =
+                                            location.accuracyMeters
+                                                ?: 0f,
 
-                                    landmark =
-                                        landmarkDescription,
+                                        landmark =
+                                            landmarkDescription,
 
-                                    description =
-                                        reportDescription,
+                                        description =
+                                            reportDescription,
 
-                                    /*
-                                     * Only mark the report as having
-                                     * a photo if the Bitmap was
-                                     * successfully written to storage.
-                                     */
-                                    hasPhoto =
-                                        savedPhotoPath != null,
+                                        hasPhoto =
+                                            savedPhotoPath != null,
 
-                                    /*
-                                     * Persistent image location.
-                                     */
-                                    photoPath =
-                                        savedPhotoPath,
+                                        photoPath =
+                                            savedPhotoPath,
 
-                                    createdAt =
-                                        System.currentTimeMillis()
-                                )
+                                        createdAt =
+                                            System.currentTimeMillis()
+                                    )
 
-                            /*
-                             * -------------------------------------------------
-                             * SAVE REPORT
-                             * -------------------------------------------------
-                             *
-                             * addHazardReport now also writes
-                             * the report list to local JSON storage.
-                             */
-                            hazardReportViewModel
-                                .addHazardReport(
-                                    newReport
-                                )
+                                hazardReportViewModel
+                                    .addHazardReport(
+                                        newReport
+                                    )
 
-                            submittedPriority =
-                                priority
+                                submittedPriority =
+                                    priority
 
-                            submittedPhotoSaved =
-                                savedPhotoPath != null
+                                submittedPhotoSaved =
+                                    savedPhotoPath != null
 
-                            reportSubmitted =
-                                true
+                                reportSubmitted =
+                                    true
 
-                            isReviewingReport =
-                                false
+                                isReviewingReport =
+                                    false
+                            }
                         },
 
                         modifier =
@@ -1420,9 +1454,6 @@ fun ReportHazardScreen(
 
                 val category =
                     selectedCategory!!
-
-                val reportType =
-                    selectedReportType!!
 
                 Column(
                     modifier =
@@ -1529,7 +1560,7 @@ fun ReportHazardScreen(
 
                                 Text(
                                     text =
-                                        reportType,
+                                        selectedReportType!!,
 
                                     style =
                                         MaterialTheme.typography.titleMedium,
@@ -1543,12 +1574,6 @@ fun ReportHazardScreen(
                             }
                         }
                     }
-
-                    /*
-                     * -------------------------------------------------
-                     * SEVERITY
-                     * -------------------------------------------------
-                     */
 
                     Text(
                         text =
@@ -1612,12 +1637,6 @@ fun ReportHazardScreen(
                         }
                     )
 
-                    /*
-                     * -------------------------------------------------
-                     * CURRENT LOCATION
-                     * -------------------------------------------------
-                     */
-
                     Text(
                         text =
                             "Report location",
@@ -1675,7 +1694,10 @@ fun ReportHazardScreen(
 
                                         Text(
                                             text =
-                                                "Finding your current location..."
+                                                "Finding your current location...",
+
+                                            color =
+                                                cardPrimaryText
                                         )
                                     }
                                 }
@@ -1707,7 +1729,10 @@ fun ReportHazardScreen(
                                             ),
 
                                         style =
-                                            MaterialTheme.typography.bodyMedium
+                                            MaterialTheme.typography.bodyMedium,
+
+                                        color =
+                                            cardPrimaryText
                                     )
 
                                     Spacer(
@@ -1740,7 +1765,10 @@ fun ReportHazardScreen(
 
                                     Text(
                                         text =
-                                            locationStatus
+                                            locationStatus,
+
+                                        color =
+                                            cardPrimaryText
                                     )
 
                                     Spacer(
@@ -1765,12 +1793,6 @@ fun ReportHazardScreen(
                             }
                         }
                     }
-
-                    /*
-                     * -------------------------------------------------
-                     * LANDMARK
-                     * -------------------------------------------------
-                     */
 
                     Text(
                         text =
@@ -1825,12 +1847,6 @@ fun ReportHazardScreen(
                             )
                         }
                     )
-
-                    /*
-                     * -------------------------------------------------
-                     * DESCRIPTION
-                     * -------------------------------------------------
-                     */
 
                     Text(
                         text =
@@ -1890,12 +1906,6 @@ fun ReportHazardScreen(
                         }
                     )
 
-                    /*
-                     * -------------------------------------------------
-                     * PHOTO
-                     * -------------------------------------------------
-                     */
-
                     Text(
                         text =
                             "Photo",
@@ -1921,72 +1931,161 @@ fun ReportHazardScreen(
                     )
 
                     if (
+                        cameraError != null
+                    ) {
+
+                        Text(
+                            text =
+                                cameraError.orEmpty(),
+
+                            style =
+                                MaterialTheme.typography.bodySmall,
+
+                            color =
+                                MaterialTheme.colorScheme.error
+                        )
+                    }
+
+                    if (
                         reportPhoto == null
                     ) {
 
-                        Card(
-                            modifier =
-                                Modifier
-                                    .fillMaxWidth()
-                                    .clickable {
-
-                                        cameraLauncher.launch(
-                                            null
-                                        )
-                                    },
-
-                            colors =
-                                CardDefaults.cardColors(
-                                    containerColor =
-                                        Color(
-                                            0xFFF3F4F2
-                                        )
-                                ),
-
-                            shape =
-                                RoundedCornerShape(
-                                    14.dp
-                                )
+                        if (
+                            hasCamera
                         ) {
 
-                            Column(
+                            Card(
                                 modifier =
                                     Modifier
                                         .fillMaxWidth()
-                                        .padding(
-                                            22.dp
-                                        ),
+                                        .clickable {
 
-                                horizontalAlignment =
-                                    Alignment.CenterHorizontally
+                                            openCamera()
+                                        },
+
+                                colors =
+                                    CardDefaults.cardColors(
+                                        containerColor =
+                                            Color(
+                                                0xFFF3F4F2
+                                            )
+                                    ),
+
+                                shape =
+                                    RoundedCornerShape(
+                                        14.dp
+                                    )
                             ) {
 
-                                Text(
-                                    text =
-                                        "📷",
+                                Column(
+                                    modifier =
+                                        Modifier
+                                            .fillMaxWidth()
+                                            .padding(
+                                                22.dp
+                                            ),
 
-                                    fontSize =
-                                        38.sp
-                                )
+                                    horizontalAlignment =
+                                        Alignment.CenterHorizontally
+                                ) {
 
-                                Text(
-                                    text =
-                                        "Take a photo",
+                                    Text(
+                                        text =
+                                            "📷",
 
-                                    fontWeight =
-                                        FontWeight.Bold,
+                                        fontSize =
+                                            38.sp
+                                    )
 
-                                    color =
-                                        darkGreen
-                                )
+                                    Text(
+                                        text =
+                                            "Take a photo",
 
-                                Text(
-                                    text =
-                                        "Tap to open the camera",
+                                        fontWeight =
+                                            FontWeight.Bold,
 
-                                    style =
-                                        MaterialTheme.typography.bodySmall
-                                )
+                                        color =
+                                            darkGreen
+                                    )
+
+                                    Text(
+                                        text =
+                                            "Tap to open the camera",
+
+                                        style =
+                                            MaterialTheme.typography.bodySmall,
+
+                                        color =
+                                            cardSecondaryText
+                                    )
+                                }
+                            }
+
+                        } else {
+
+                            Card(
+                                modifier =
+                                    Modifier.fillMaxWidth(),
+
+                                colors =
+                                    CardDefaults.cardColors(
+                                        containerColor =
+                                            Color(
+                                                0xFFF3F4F2
+                                            )
+                                    ),
+
+                                shape =
+                                    RoundedCornerShape(
+                                        14.dp
+                                    )
+                            ) {
+
+                                Column(
+                                    modifier =
+                                        Modifier
+                                            .fillMaxWidth()
+                                            .padding(
+                                                22.dp
+                                            ),
+
+                                    horizontalAlignment =
+                                        Alignment.CenterHorizontally
+                                ) {
+
+                                    Text(
+                                        text =
+                                            "📷",
+
+                                        fontSize =
+                                            38.sp
+                                    )
+
+                                    Text(
+                                        text =
+                                            "Camera unavailable",
+
+                                        fontWeight =
+                                            FontWeight.Bold,
+
+                                        color =
+                                            cardPrimaryText
+                                    )
+
+                                    Text(
+                                        text =
+                                            "This device does not have an available camera.",
+
+                                        style =
+                                            MaterialTheme.typography.bodySmall,
+
+                                        color =
+                                            cardSecondaryText,
+
+                                        textAlign =
+                                            TextAlign.Center
+                                    )
+                                }
                             }
                         }
 
@@ -2063,30 +2162,36 @@ fun ReportHazardScreen(
                                         )
                                 ) {
 
-                                    Button(
-                                        onClick = {
-
-                                            cameraLauncher.launch(
-                                                null
-                                            )
-                                        },
-
-                                        modifier =
-                                            Modifier.weight(
-                                                1f
-                                            )
+                                    if (
+                                        hasCamera
                                     ) {
 
-                                        Text(
-                                            text =
-                                                "RETAKE"
-                                        )
+                                        Button(
+                                            onClick = {
+
+                                                openCamera()
+                                            },
+
+                                            modifier =
+                                                Modifier.weight(
+                                                    1f
+                                                )
+                                        ) {
+
+                                            Text(
+                                                text =
+                                                    "RETAKE"
+                                            )
+                                        }
                                     }
 
                                     OutlinedButton(
                                         onClick = {
 
                                             reportPhoto =
+                                                null
+
+                                            cameraError =
                                                 null
                                         },
 
@@ -2105,12 +2210,6 @@ fun ReportHazardScreen(
                             }
                         }
                     }
-
-                    /*
-                     * -------------------------------------------------
-                     * REVIEW REPORT
-                     * -------------------------------------------------
-                     */
 
                     Button(
                         onClick = {
@@ -2499,6 +2598,16 @@ private fun SeverityCard(
     onClick: () -> Unit
 ) {
 
+    val primaryText =
+        Color(
+            0xFF1B1B1F
+        )
+
+    val secondaryText =
+        Color(
+            0xFF4E4E53
+        )
+
     Card(
         modifier =
             Modifier
@@ -2551,6 +2660,9 @@ private fun SeverityCard(
                     text =
                         title,
 
+                    color =
+                        primaryText,
+
                     fontWeight =
                         FontWeight.Bold
                 )
@@ -2560,7 +2672,10 @@ private fun SeverityCard(
                         description,
 
                     style =
-                        MaterialTheme.typography.bodySmall
+                        MaterialTheme.typography.bodySmall,
+
+                    color =
+                        secondaryText
                 )
             }
 
@@ -2655,6 +2770,11 @@ private fun ReviewCard(
                 style =
                     MaterialTheme.typography.titleMedium,
 
+                color =
+                    Color(
+                        0xFF1B1B1F
+                    ),
+
                 fontWeight =
                     FontWeight.Bold
             )
@@ -2679,7 +2799,7 @@ private fun ReviewCard(
 
                     color =
                         Color(
-                            0xFF666666
+                            0xFF4E4E53
                         )
                 )
             }
@@ -2817,7 +2937,12 @@ private fun PriorityCard(
                     description,
 
                 style =
-                    MaterialTheme.typography.bodySmall
+                    MaterialTheme.typography.bodySmall,
+
+                color =
+                    Color(
+                        0xFF4E4E53
+                    )
             )
         }
     }

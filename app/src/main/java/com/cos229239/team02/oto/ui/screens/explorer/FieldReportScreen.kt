@@ -1,5 +1,6 @@
 package com.cos229239.team02.oto.ui.screens.explorer
 
+import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
@@ -24,6 +25,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -43,6 +45,8 @@ import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 /*
  * -------------------------------------------------------------
@@ -55,9 +59,6 @@ import java.util.Locale
  *
  * - Every active report
  * - Only reports selected from a specific map marker
- *
- * Which reports appear is controlled by the shared
- * HazardReportViewModel.
  *
  * Reports are currently stored locally on the device.
  */
@@ -79,17 +80,23 @@ fun FieldReportsScreen(
         )
 
     /*
+     * Explicit dark text colors for cards that keep
+     * hardcoded light backgrounds in dark mode.
+     */
+    val cardPrimaryText =
+        Color(
+            0xFF1B1B1F
+        )
+
+    val cardSecondaryText =
+        Color(
+            0xFF4E4E53
+        )
+
+    /*
      * ---------------------------------------------------------
      * REPORT SELECTION
      * ---------------------------------------------------------
-     *
-     * The ViewModel decides what should appear.
-     *
-     * Empty selected ID set:
-     * show every active report.
-     *
-     * Selected IDs present:
-     * show only the reports selected from the map marker.
      */
 
     val selectedReportIds =
@@ -111,8 +118,7 @@ fun FieldReportsScreen(
 
     Column(
         modifier =
-            Modifier
-                .fillMaxSize()
+            Modifier.fillMaxSize()
     ) {
 
         /*
@@ -227,7 +233,10 @@ fun FieldReportsScreen(
                         style =
                             MaterialTheme
                                 .typography
-                                .bodyMedium
+                                .bodyMedium,
+
+                        color =
+                            cardPrimaryText
                     )
 
                     Spacer(
@@ -256,9 +265,7 @@ fun FieldReportsScreen(
                                 .bodySmall,
 
                         color =
-                            Color(
-                                0xFF666666
-                            )
+                            cardSecondaryText
                     )
 
                     Spacer(
@@ -278,9 +285,7 @@ fun FieldReportsScreen(
                                 .bodySmall,
 
                         color =
-                            Color(
-                                0xFF777777
-                            )
+                            cardSecondaryText
                     )
                 }
             }
@@ -376,6 +381,9 @@ fun FieldReportsScreen(
                                 MaterialTheme
                                     .typography
                                     .bodySmall,
+
+                            color =
+                                cardSecondaryText,
 
                             textAlign =
                                 TextAlign.Center
@@ -498,6 +506,16 @@ private fun FieldReportCard(
             0xFF063D24
         )
 
+    val cardPrimaryText =
+        Color(
+            0xFF1B1B1F
+        )
+
+    val cardSecondaryText =
+        Color(
+            0xFF4E4E53
+        )
+
     val categoryColor =
         fieldReportCategoryColor(
             report.category
@@ -613,9 +631,7 @@ private fun FieldReportCard(
                         .bodySmall,
 
                 color =
-                    Color(
-                        0xFF666666
-                    )
+                    cardSecondaryText
             )
 
             /*
@@ -639,6 +655,9 @@ private fun FieldReportCard(
                         MaterialTheme
                             .typography
                             .bodySmall,
+
+                    color =
+                        cardPrimaryText,
 
                     fontWeight =
                         FontWeight.Medium
@@ -713,61 +732,85 @@ private fun FieldReportCard(
                 )
 
                 /*
+                 * -------------------------------------------------
                  * PHOTO
+                 * -------------------------------------------------
+                 *
+                 * BitmapFactory.decodeFile can take time,
+                 * especially with larger images.
+                 *
+                 * produceState launches a coroutine and the actual
+                 * file check + bitmap decoding runs on Dispatchers.IO
+                 * instead of the Compose UI thread.
                  */
 
                 if (
                     !report.photoPath.isNullOrBlank()
                 ) {
 
-                    val photoFile =
-                        File(
-                            report.photoPath
-                        )
+                    val bitmap by produceState<Bitmap?>(
+                        initialValue =
+                            null,
 
-                    if (
-                        photoFile.exists()
+                        key1 =
+                            report.photoPath
                     ) {
 
-                        val bitmap =
-                            remember(
-                                report.photoPath
+                        value =
+                            withContext(
+                                Dispatchers.IO
                             ) {
 
-                                BitmapFactory
-                                    .decodeFile(
+                                val photoFile =
+                                    File(
                                         report.photoPath
                                     )
+
+                                if (
+                                    photoFile.exists()
+                                ) {
+
+                                    BitmapFactory
+                                        .decodeFile(
+                                            report.photoPath
+                                        )
+
+                                } else {
+
+                                    null
+                                }
                             }
+                    }
 
-                        if (
-                            bitmap != null
-                        ) {
+                    if (
+                        bitmap != null
+                    ) {
 
-                            Image(
-                                bitmap =
-                                    bitmap
-                                        .asImageBitmap(),
+                        Image(
+                            bitmap =
+                                bitmap!!
+                                    .asImageBitmap(),
 
-                                contentDescription =
-                                    "Field report photo",
+                            contentDescription =
+                                "Field report photo",
 
-                                modifier =
-                                    Modifier
-                                        .fillMaxWidth()
-                                        .height(
-                                            220.dp
-                                        ),
+                            modifier =
+                                Modifier
+                                    .fillMaxWidth()
+                                    .height(
+                                        220.dp
+                                    ),
 
-                                contentScale =
-                                    ContentScale.Crop
-                            )
-                        }
+                            contentScale =
+                                ContentScale.Crop
+                        )
                     }
                 }
 
                 /*
+                 * -------------------------------------------------
                  * DESCRIPTION
+                 * -------------------------------------------------
                  */
 
                 FieldReportDetail(
@@ -788,7 +831,9 @@ private fun FieldReportCard(
                 )
 
                 /*
+                 * -------------------------------------------------
                  * LANDMARK
+                 * -------------------------------------------------
                  */
 
                 FieldReportDetail(
@@ -809,7 +854,9 @@ private fun FieldReportCard(
                 )
 
                 /*
+                 * -------------------------------------------------
                  * LOCATION
+                 * -------------------------------------------------
                  */
 
                 FieldReportDetail(
@@ -826,7 +873,9 @@ private fun FieldReportCard(
                 )
 
                 /*
+                 * -------------------------------------------------
                  * GPS ACCURACY
+                 * -------------------------------------------------
                  */
 
                 FieldReportDetail(
@@ -842,7 +891,9 @@ private fun FieldReportCard(
                 )
 
                 /*
+                 * -------------------------------------------------
                  * CONFIRMATIONS
+                 * -------------------------------------------------
                  */
 
                 FieldReportDetail(
@@ -910,7 +961,10 @@ private fun FieldReportCard(
 
                     Text(
                         text =
-                            "NO LONGER HERE"
+                            "NO LONGER HERE",
+
+                        color =
+                            cardPrimaryText
                     )
                 }
 
@@ -984,7 +1038,12 @@ private fun FieldReportDetail(
             style =
                 MaterialTheme
                     .typography
-                    .bodyMedium
+                    .bodyMedium,
+
+            color =
+                Color(
+                    0xFF1B1B1F
+                )
         )
     }
 }
@@ -1101,8 +1160,6 @@ private fun PriorityBadge(
  * -------------------------------------------------------------
  * CATEGORY COLOR
  * -------------------------------------------------------------
- *
- * Uses the same category color system as the map.
  */
 
 private fun fieldReportCategoryColor(
@@ -1128,9 +1185,13 @@ private fun fieldReportCategoryColor(
                 0xFF8D6E36
             )
 
+        /*
+         * Darker amber instead of bright yellow so the
+         * category label remains readable on white.
+         */
         "Trail / Road Hazard" ->
             Color(
-                0xFFFBC02D
+                0xFF8A6D00
             )
 
         "Weather / Environmental" ->

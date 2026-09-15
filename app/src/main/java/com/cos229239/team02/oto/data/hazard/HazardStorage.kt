@@ -2,6 +2,10 @@ package com.cos229239.team02.oto.data.hazard
 
 import android.content.Context
 import android.graphics.Bitmap
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
@@ -14,15 +18,15 @@ import java.io.FileOutputStream
  *
  * Handles local storage for hazard reports.
  *
- * This class does two main things:
+ * All file and photo work is performed on Dispatchers.IO
+ * so disk operations do not block the Compose UI thread.
  *
- * 1. Saves and loads hazard report information.
- * 2. Saves hazard report photos to app storage.
+ * A Mutex protects local hazard storage so multiple save,
+ * delete, or clear operations do not write to the files
+ * at the same time.
  *
- * This allows reports to survive an app restart.
- *
- * This is still LOCAL storage only.
- * A future backend will be needed to share reports
+ * This remains LOCAL storage only.
+ * A future backend will be required to share reports
  * between different OTO users/devices.
  */
 
@@ -39,11 +43,17 @@ class HazardStorage(
 
     /*
      * ---------------------------------------------------------
+     * STORAGE MUTEX
+     * ---------------------------------------------------------
+     */
+
+    private val storageMutex =
+        Mutex()
+
+    /*
+     * ---------------------------------------------------------
      * REPORT FILE
      * ---------------------------------------------------------
-     *
-     * Hazard report information is saved into one
-     * JSON file inside OTO's private app storage.
      */
 
     private val reportsFile =
@@ -56,8 +66,6 @@ class HazardStorage(
      * ---------------------------------------------------------
      * PHOTO DIRECTORY
      * ---------------------------------------------------------
-     *
-     * Each report photo is saved as its own JPEG file.
      */
 
     private val photoDirectory =
@@ -68,10 +76,6 @@ class HazardStorage(
 
     init {
 
-        /*
-         * Create the photo folder if it does
-         * not already exist.
-         */
         if (
             !photoDirectory.exists()
         ) {
@@ -84,47 +88,56 @@ class HazardStorage(
      * ---------------------------------------------------------
      * SAVE PHOTO
      * ---------------------------------------------------------
-     *
-     * Saves the Bitmap returned by the camera.
-     *
-     * Returns the saved file path.
-     *
-     * If something goes wrong, returns null.
      */
 
-    fun savePhoto(
+    suspend fun savePhoto(
         bitmap: Bitmap,
         reportId: String
     ): String? {
 
-        return try {
-
-            val photoFile =
-                File(
-                    photoDirectory,
-                    "$reportId.jpg"
-                )
-
-            FileOutputStream(
-                photoFile
-            ).use { outputStream ->
-
-                bitmap.compress(
-                    Bitmap.CompressFormat.JPEG,
-                    90,
-                    outputStream
-                )
-            }
-
-            photoFile.absolutePath
-
-        } catch (
-            exception: Exception
+        return withContext(
+            Dispatchers.IO
         ) {
 
-            exception.printStackTrace()
+            storageMutex.withLock {
 
-            null
+                try {
+
+                    if (
+                        !photoDirectory.exists()
+                    ) {
+
+                        photoDirectory.mkdirs()
+                    }
+
+                    val photoFile =
+                        File(
+                            photoDirectory,
+                            "$reportId.jpg"
+                        )
+
+                    FileOutputStream(
+                        photoFile
+                    ).use { outputStream ->
+
+                        bitmap.compress(
+                            Bitmap.CompressFormat.JPEG,
+                            90,
+                            outputStream
+                        )
+                    }
+
+                    photoFile.absolutePath
+
+                } catch (
+                    exception: Exception
+                ) {
+
+                    exception.printStackTrace()
+
+                    null
+                }
+            }
         }
     }
 
@@ -132,11 +145,9 @@ class HazardStorage(
      * ---------------------------------------------------------
      * DELETE PHOTO
      * ---------------------------------------------------------
-     *
-     * Useful later when a report is permanently removed.
      */
 
-    fun deletePhoto(
+    suspend fun deletePhoto(
         photoPath: String?
     ) {
 
@@ -147,25 +158,33 @@ class HazardStorage(
             return
         }
 
-        try {
-
-            val photoFile =
-                File(
-                    photoPath
-                )
-
-            if (
-                photoFile.exists()
-            ) {
-
-                photoFile.delete()
-            }
-
-        } catch (
-            exception: Exception
+        withContext(
+            Dispatchers.IO
         ) {
 
-            exception.printStackTrace()
+            storageMutex.withLock {
+
+                try {
+
+                    val photoFile =
+                        File(
+                            photoPath
+                        )
+
+                    if (
+                        photoFile.exists()
+                    ) {
+
+                        photoFile.delete()
+                    }
+
+                } catch (
+                    exception: Exception
+                ) {
+
+                    exception.printStackTrace()
+                }
+            }
         }
     }
 
@@ -178,130 +197,172 @@ class HazardStorage(
      * the complete list to local app storage.
      */
 
-    fun saveReports(
+    suspend fun saveReports(
         reports: List<HazardReport>
     ) {
 
-        try {
-
-            val jsonArray =
-                JSONArray()
-
-            reports.forEach { report ->
-
-                val jsonReport =
-                    JSONObject()
-
-                jsonReport.put(
-                    "id",
-                    report.id
-                )
-
-                jsonReport.put(
-                    "category",
-                    report.category
-                )
-
-                jsonReport.put(
-                    "reportType",
-                    report.reportType
-                )
-
-                jsonReport.put(
-                    "severity",
-                    report.severity
-                )
-
-                jsonReport.put(
-                    "priority",
-                    report.priority.name
-                )
-
-                jsonReport.put(
-                    "latitude",
-                    report.latitude
-                )
-
-                jsonReport.put(
-                    "longitude",
-                    report.longitude
-                )
-
-                jsonReport.put(
-                    "accuracyMeters",
-                    report.accuracyMeters
-                )
-
-                jsonReport.put(
-                    "landmark",
-                    report.landmark
-                )
-
-                jsonReport.put(
-                    "description",
-                    report.description
-                )
-
-                jsonReport.put(
-                    "hasPhoto",
-                    report.hasPhoto
-                )
-
-                /*
-                 * JSONObject.NULL represents an actual
-                 * null value inside JSON.
-                 */
-                if (
-                    report.photoPath == null
-                ) {
-
-                    jsonReport.put(
-                        "photoPath",
-                        JSONObject.NULL
-                    )
-
-                } else {
-
-                    jsonReport.put(
-                        "photoPath",
-                        report.photoPath
-                    )
-                }
-
-                jsonReport.put(
-                    "createdAt",
-                    report.createdAt
-                )
-
-                jsonReport.put(
-                    "isVerified",
-                    report.isVerified
-                )
-
-                jsonReport.put(
-                    "confirmationCount",
-                    report.confirmationCount
-                )
-
-                jsonReport.put(
-                    "isActive",
-                    report.isActive
-                )
-
-                jsonArray.put(
-                    jsonReport
-                )
-            }
-
-            reportsFile.writeText(
-                jsonArray.toString()
-            )
-
-        } catch (
-            exception: Exception
+        withContext(
+            Dispatchers.IO
         ) {
 
-            exception.printStackTrace()
+            storageMutex.withLock {
+
+                try {
+
+                    val jsonArray =
+                        JSONArray()
+
+                    reports.forEach { report ->
+
+                        val jsonReport =
+                            JSONObject()
+
+                        jsonReport.put(
+                            "id",
+                            report.id
+                        )
+
+                        jsonReport.put(
+                            "category",
+                            report.category
+                        )
+
+                        jsonReport.put(
+                            "reportType",
+                            report.reportType
+                        )
+
+                        jsonReport.put(
+                            "severity",
+                            report.severity
+                        )
+
+                        jsonReport.put(
+                            "priority",
+                            report.priority.name
+                        )
+
+                        jsonReport.put(
+                            "latitude",
+                            report.latitude
+                        )
+
+                        jsonReport.put(
+                            "longitude",
+                            report.longitude
+                        )
+
+                        jsonReport.put(
+                            "accuracyMeters",
+                            report.accuracyMeters
+                        )
+
+                        jsonReport.put(
+                            "landmark",
+                            report.landmark
+                        )
+
+                        jsonReport.put(
+                            "description",
+                            report.description
+                        )
+
+                        jsonReport.put(
+                            "hasPhoto",
+                            report.hasPhoto
+                        )
+
+                        /*
+                         * JSONObject.NULL represents an
+                         * actual null value inside JSON.
+                         */
+                        if (
+                            report.photoPath == null
+                        ) {
+
+                            jsonReport.put(
+                                "photoPath",
+                                JSONObject.NULL
+                            )
+
+                        } else {
+
+                            jsonReport.put(
+                                "photoPath",
+                                report.photoPath
+                            )
+                        }
+
+                        jsonReport.put(
+                            "createdAt",
+                            report.createdAt
+                        )
+
+                        jsonReport.put(
+                            "isVerified",
+                            report.isVerified
+                        )
+
+                        /*
+                         * -------------------------------------------------
+                         * CONFIRMATION COUNT
+                         * -------------------------------------------------
+                         *
+                         * Kept as a stored value for easy display.
+                         */
+                        jsonReport.put(
+                            "confirmationCount",
+                            report.confirmationCount
+                        )
+
+                        /*
+                         * -------------------------------------------------
+                         * UNIQUE CONFIRMERS
+                         * -------------------------------------------------
+                         *
+                         * Stores every device/profile ID that has
+                         * already confirmed this report.
+                         *
+                         * This prevents one device/profile from
+                         * repeatedly increasing the count.
+                         */
+                        val confirmedByJsonArray =
+                            JSONArray()
+
+                        report.confirmedByIds
+                            .forEach { confirmerId ->
+
+                                confirmedByJsonArray.put(
+                                    confirmerId
+                                )
+                            }
+
+                        jsonReport.put(
+                            "confirmedByIds",
+                            confirmedByJsonArray
+                        )
+
+                        jsonReport.put(
+                            "isActive",
+                            report.isActive
+                        )
+
+                        jsonArray.put(
+                            jsonReport
+                        )
+                    }
+
+                    reportsFile.writeText(
+                        jsonArray.toString()
+                    )
+
+                } catch (
+                    exception: Exception
+                ) {
+
+                    exception.printStackTrace()
+                }
+            }
         }
     }
 
@@ -314,209 +375,286 @@ class HazardStorage(
      * HazardReport objects when OTO starts.
      */
 
-    fun loadReports(): List<HazardReport> {
+    suspend fun loadReports(): List<HazardReport> {
 
-        /*
-         * First launch:
-         * no saved report file exists yet.
-         */
-        if (
-            !reportsFile.exists()
+        return withContext(
+            Dispatchers.IO
         ) {
 
-            return emptyList()
-        }
+            storageMutex.withLock {
 
-        return try {
+                if (
+                    !reportsFile.exists()
+                ) {
 
-            val fileText =
-                reportsFile.readText()
+                    return@withLock emptyList()
+                }
 
-            if (
-                fileText.isBlank()
-            ) {
+                try {
 
-                return emptyList()
-            }
+                    val fileText =
+                        reportsFile.readText()
 
-            val jsonArray =
-                JSONArray(
-                    fileText
-                )
+                    if (
+                        fileText.isBlank()
+                    ) {
 
-            val loadedReports =
-                mutableListOf<HazardReport>()
+                        return@withLock emptyList()
+                    }
 
-            for (
-            index in 0 until jsonArray.length()
-            ) {
+                    val jsonArray =
+                        JSONArray(
+                            fileText
+                        )
 
-                val jsonReport =
-                    jsonArray.getJSONObject(
-                        index
-                    )
+                    val loadedReports =
+                        mutableListOf<HazardReport>()
 
-                /*
-                 * -------------------------------------------------
-                 * PRIORITY
-                 * -------------------------------------------------
-                 *
-                 * If an invalid priority somehow exists,
-                 * fall back to NORMAL instead of crashing.
-                 */
+                    for (
+                    index in 0 until jsonArray.length()
+                    ) {
 
-                val priority =
-                    try {
-
-                        HazardPriority.valueOf(
-                            jsonReport.optString(
-                                "priority",
-                                HazardPriority.NORMAL.name
+                        val jsonReport =
+                            jsonArray.getJSONObject(
+                                index
                             )
-                        )
 
-                    } catch (
-                        exception: IllegalArgumentException
-                    ) {
+                        /*
+                         * -------------------------------------------------
+                         * PRIORITY
+                         * -------------------------------------------------
+                         */
 
-                        HazardPriority.NORMAL
-                    }
+                        val priority =
+                            try {
 
-                /*
-                 * -------------------------------------------------
-                 * PHOTO PATH
-                 * -------------------------------------------------
-                 */
+                                HazardPriority.valueOf(
+                                    jsonReport.optString(
+                                        "priority",
+                                        HazardPriority.NORMAL.name
+                                    )
+                                )
 
-                val photoPath =
-                    if (
-                        jsonReport.isNull(
-                            "photoPath"
-                        )
-                    ) {
+                            } catch (
+                                exception: IllegalArgumentException
+                            ) {
 
-                        null
+                                HazardPriority.NORMAL
+                            }
 
-                    } else {
+                        /*
+                         * -------------------------------------------------
+                         * PHOTO PATH
+                         * -------------------------------------------------
+                         */
 
-                        jsonReport.optString(
-                            "photoPath"
-                        )
-                    }
+                        val photoPath =
+                            if (
+                                jsonReport.isNull(
+                                    "photoPath"
+                                )
+                            ) {
 
-                /*
-                 * If the file no longer exists,
-                 * treat the report as having no photo.
-                 */
-                val validPhotoPath =
-                    if (
-                        !photoPath.isNullOrBlank() &&
-                        File(photoPath).exists()
-                    ) {
+                                null
 
-                        photoPath
+                            } else {
 
-                    } else {
+                                jsonReport.optString(
+                                    "photoPath"
+                                )
+                            }
 
-                        null
-                    }
+                        val validPhotoPath =
+                            if (
+                                !photoPath.isNullOrBlank() &&
+                                File(
+                                    photoPath
+                                ).exists()
+                            ) {
 
-                val report =
-                    HazardReport(
+                                photoPath
 
-                        id =
-                            jsonReport.optString(
-                                "id"
-                            ),
+                            } else {
 
-                        category =
-                            jsonReport.optString(
-                                "category"
-                            ),
+                                null
+                            }
 
-                        reportType =
-                            jsonReport.optString(
-                                "reportType"
-                            ),
+                        /*
+                         * -------------------------------------------------
+                         * UNIQUE CONFIRMERS
+                         * -------------------------------------------------
+                         *
+                         * Older saved report files will not contain
+                         * confirmedByIds yet.
+                         *
+                         * In that case we simply load an empty set.
+                         */
+                        val confirmedByIds =
+                            mutableSetOf<String>()
 
-                        severity =
-                            jsonReport.optString(
-                                "severity"
-                            ),
+                        val confirmedByJsonArray =
+                            jsonReport.optJSONArray(
+                                "confirmedByIds"
+                            )
 
-                        priority =
-                            priority,
+                        if (
+                            confirmedByJsonArray != null
+                        ) {
 
-                        latitude =
-                            jsonReport.optDouble(
-                                "latitude"
-                            ),
+                            for (
+                            confirmerIndex in 0 until
+                                    confirmedByJsonArray.length()
+                            ) {
 
-                        longitude =
-                            jsonReport.optDouble(
-                                "longitude"
-                            ),
+                                val confirmerId =
+                                    confirmedByJsonArray
+                                        .optString(
+                                            confirmerIndex
+                                        )
 
-                        accuracyMeters =
-                            jsonReport.optDouble(
-                                "accuracyMeters",
-                                0.0
-                            ).toFloat(),
+                                if (
+                                    confirmerId.isNotBlank()
+                                ) {
 
-                        landmark =
-                            jsonReport.optString(
-                                "landmark"
-                            ),
+                                    confirmedByIds.add(
+                                        confirmerId
+                                    )
+                                }
+                            }
+                        }
 
-                        description =
-                            jsonReport.optString(
-                                "description"
-                            ),
-
-                        hasPhoto =
-                            validPhotoPath != null,
-
-                        photoPath =
-                            validPhotoPath,
-
-                        createdAt =
-                            jsonReport.optLong(
-                                "createdAt"
-                            ),
-
-                        isVerified =
-                            jsonReport.optBoolean(
-                                "isVerified",
-                                false
-                            ),
-
-                        confirmationCount =
+                        /*
+                         * -------------------------------------------------
+                         * CONFIRMATION COUNT
+                         * -------------------------------------------------
+                         *
+                         * New reports should use the size of
+                         * confirmedByIds.
+                         *
+                         * For older saved reports that do not yet have
+                         * confirmer IDs, preserve the old count so
+                         * existing test data does not suddenly become 0.
+                         */
+                        val storedConfirmationCount =
                             jsonReport.optInt(
                                 "confirmationCount",
                                 0
-                            ),
-
-                        isActive =
-                            jsonReport.optBoolean(
-                                "isActive",
-                                true
                             )
-                    )
 
-                loadedReports.add(
-                    report
-                )
+                        val confirmationCount =
+                            if (
+                                confirmedByJsonArray != null
+                            ) {
+
+                                confirmedByIds.size
+
+                            } else {
+
+                                storedConfirmationCount
+                            }
+
+                        val report =
+                            HazardReport(
+
+                                id =
+                                    jsonReport.optString(
+                                        "id"
+                                    ),
+
+                                category =
+                                    jsonReport.optString(
+                                        "category"
+                                    ),
+
+                                reportType =
+                                    jsonReport.optString(
+                                        "reportType"
+                                    ),
+
+                                severity =
+                                    jsonReport.optString(
+                                        "severity"
+                                    ),
+
+                                priority =
+                                    priority,
+
+                                latitude =
+                                    jsonReport.optDouble(
+                                        "latitude"
+                                    ),
+
+                                longitude =
+                                    jsonReport.optDouble(
+                                        "longitude"
+                                    ),
+
+                                accuracyMeters =
+                                    jsonReport.optDouble(
+                                        "accuracyMeters",
+                                        0.0
+                                    ).toFloat(),
+
+                                landmark =
+                                    jsonReport.optString(
+                                        "landmark"
+                                    ),
+
+                                description =
+                                    jsonReport.optString(
+                                        "description"
+                                    ),
+
+                                hasPhoto =
+                                    validPhotoPath != null,
+
+                                photoPath =
+                                    validPhotoPath,
+
+                                createdAt =
+                                    jsonReport.optLong(
+                                        "createdAt"
+                                    ),
+
+                                /*
+                                 * Verification is recalculated from
+                                 * the loaded unique confirmation count.
+                                 *
+                                 * Two unique confirmations still mark
+                                 * a report verified for the prototype.
+                                 */
+                                isVerified =
+                                    confirmationCount >= 2,
+
+                                confirmationCount =
+                                    confirmationCount,
+
+                                confirmedByIds =
+                                    confirmedByIds.toSet(),
+
+                                isActive =
+                                    jsonReport.optBoolean(
+                                        "isActive",
+                                        true
+                                    )
+                            )
+
+                        loadedReports.add(
+                            report
+                        )
+                    }
+
+                    loadedReports
+
+                } catch (
+                    exception: Exception
+                ) {
+
+                    exception.printStackTrace()
+
+                    emptyList()
+                }
             }
-
-            loadedReports
-
-        } catch (
-            exception: Exception
-        ) {
-
-            exception.printStackTrace()
-
-            emptyList()
         }
     }
 
@@ -524,44 +662,50 @@ class HazardStorage(
      * ---------------------------------------------------------
      * CLEAR EVERYTHING
      * ---------------------------------------------------------
-     *
-     * Mainly useful during emulator testing.
      */
 
-    fun clearAllStorage() {
+    suspend fun clearAllStorage() {
 
-        try {
-
-            /*
-             * Delete report JSON.
-             */
-            if (
-                reportsFile.exists()
-            ) {
-
-                reportsFile.delete()
-            }
-
-            /*
-             * Delete every saved hazard photo.
-             */
-            if (
-                photoDirectory.exists()
-            ) {
-
-                photoDirectory
-                    .listFiles()
-                    ?.forEach { file ->
-
-                        file.delete()
-                    }
-            }
-
-        } catch (
-            exception: Exception
+        withContext(
+            Dispatchers.IO
         ) {
 
-            exception.printStackTrace()
+            storageMutex.withLock {
+
+                try {
+
+                    /*
+                     * Delete report JSON.
+                     */
+                    if (
+                        reportsFile.exists()
+                    ) {
+
+                        reportsFile.delete()
+                    }
+
+                    /*
+                     * Delete every saved hazard photo.
+                     */
+                    if (
+                        photoDirectory.exists()
+                    ) {
+
+                        photoDirectory
+                            .listFiles()
+                            ?.forEach { file ->
+
+                                file.delete()
+                            }
+                    }
+
+                } catch (
+                    exception: Exception
+                ) {
+
+                    exception.printStackTrace()
+                }
+            }
         }
     }
 }

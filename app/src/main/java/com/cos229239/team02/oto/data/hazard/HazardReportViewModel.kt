@@ -5,6 +5,11 @@ import android.graphics.Bitmap
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.lifecycle.AndroidViewModel
+import androidx.lifecycle.viewModelScope
+import java.util.UUID
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 
 /*
  * -------------------------------------------------------------
@@ -21,9 +26,19 @@ import androidx.lifecycle.AndroidViewModel
  * - App refreshes
  * - App restarts
  *
+ * Hazard file operations are handled asynchronously so
+ * report actions do not block the main UI thread.
+ *
+ * Community confirmations currently use a persistent
+ * installation ID.
+ *
+ * Later, when OTO's onboarding/profile system is ready,
+ * this installation ID can be replaced with the user's
+ * real profile/account ID.
+ *
  * This is still local-device storage only.
- * A future backend will be needed for reports to
- * appear on other users' devices.
+ * A future backend will be needed for reports to appear
+ * on other users' devices.
  */
 
 class HazardReportViewModel(
@@ -45,11 +60,47 @@ class HazardReportViewModel(
 
     /*
      * ---------------------------------------------------------
-     * REPORT LIST
+     * PERSISTENCE MUTEX
      * ---------------------------------------------------------
      *
-     * mutableStateListOf lets Compose automatically
-     * update whenever a report changes.
+     * Keeps higher-level persistence operations ordered.
+     *
+     * HazardStorage also has its own file Mutex.
+     */
+    private val persistenceMutex =
+        Mutex()
+
+    /*
+     * ---------------------------------------------------------
+     * INSTALLATION ID
+     * ---------------------------------------------------------
+     *
+     * This acts as the temporary identity for community
+     * confirmations.
+     *
+     * The value is created once and stored in SharedPreferences,
+     * so restarting the app does NOT create a new ID.
+     *
+     * This prevents the same app installation from repeatedly
+     * pressing STILL HERE on the same report.
+     *
+     * Later:
+     *
+     * installation ID
+     *
+     * can be replaced with:
+     *
+     * profile ID / user ID
+     */
+    private val installationId: String =
+        getOrCreateInstallationId(
+            application
+        )
+
+    /*
+     * ---------------------------------------------------------
+     * REPORT LIST
+     * ---------------------------------------------------------
      */
 
     private val _hazardReports =
@@ -57,7 +108,7 @@ class HazardReportViewModel(
 
     /*
      * Screens can read the reports,
-     * but should make changes through this ViewModel.
+     * but changes should happen through this ViewModel.
      */
     val hazardReports: List<HazardReport>
         get() =
@@ -67,15 +118,6 @@ class HazardReportViewModel(
      * ---------------------------------------------------------
      * FIELD REPORT SELECTION
      * ---------------------------------------------------------
-     *
-     * This stores the IDs of reports selected from
-     * a specific map marker.
-     *
-     * Empty set:
-     * Show every active report.
-     *
-     * IDs present:
-     * Show only those selected reports.
      */
 
     private val _selectedFieldReportIds =
@@ -92,19 +134,24 @@ class HazardReportViewModel(
      * INITIAL LOAD
      * ---------------------------------------------------------
      *
-     * Load reports previously saved on this device
-     * whenever the ViewModel is created.
+     * HazardStorage performs the actual JSON read and parsing
+     * on Dispatchers.IO.
      */
 
     init {
 
-        val savedReports =
-            hazardStorage
-                .loadReports()
+        viewModelScope.launch {
 
-        _hazardReports.addAll(
-            savedReports
-        )
+            val savedReports =
+                hazardStorage
+                    .loadReports()
+
+            _hazardReports.clear()
+
+            _hazardReports.addAll(
+                savedReports
+            )
+        }
     }
 
     /*
@@ -112,15 +159,28 @@ class HazardReportViewModel(
      * SAVE CURRENT REPORT LIST
      * ---------------------------------------------------------
      *
-     * Central helper used whenever reports change.
+     * Persistence happens asynchronously.
+     *
+     * The report snapshot is created inside the Mutex so
+     * queued saves always write the newest state available
+     * when their turn begins.
      */
 
     private fun saveReports() {
 
-        hazardStorage
-            .saveReports(
-                _hazardReports
-            )
+        viewModelScope.launch {
+
+            persistenceMutex.withLock {
+
+                val reportsSnapshot =
+                    _hazardReports.toList()
+
+                hazardStorage
+                    .saveReports(
+                        reportsSnapshot
+                    )
+            }
+        }
     }
 
     /*
@@ -128,33 +188,32 @@ class HazardReportViewModel(
      * SAVE HAZARD PHOTO
      * ---------------------------------------------------------
      *
-     * Saves the Bitmap captured by the camera into
-     * OTO's private app storage.
-     *
-     * Returns the file path if successful.
+     * JPEG compression and file writing are handled by
+     * HazardStorage on Dispatchers.IO.
      */
 
-    fun saveHazardPhoto(
+    suspend fun saveHazardPhoto(
         bitmap: Bitmap,
         reportId: String
     ): String? {
 
-        return hazardStorage
-            .savePhoto(
-                bitmap =
-                    bitmap,
+        return persistenceMutex.withLock {
 
-                reportId =
-                    reportId
-            )
+            hazardStorage
+                .savePhoto(
+                    bitmap =
+                        bitmap,
+
+                    reportId =
+                        reportId
+                )
+        }
     }
 
     /*
      * ---------------------------------------------------------
      * ADD REPORT
      * ---------------------------------------------------------
-     *
-     * Called when the user presses Submit Report.
      */
 
     fun addHazardReport(
@@ -165,9 +224,6 @@ class HazardReportViewModel(
             report
         )
 
-        /*
-         * Save the updated list immediately.
-         */
         saveReports()
     }
 
@@ -175,9 +231,6 @@ class HazardReportViewModel(
      * ---------------------------------------------------------
      * ACTIVE REPORTS
      * ---------------------------------------------------------
-     *
-     * Only active hazards should count toward
-     * the Explorer hazard total and map markers.
      */
 
     val activeHazardReports: List<HazardReport>
@@ -200,14 +253,6 @@ class HazardReportViewModel(
      * ---------------------------------------------------------
      * SELECT FIELD REPORTS
      * ---------------------------------------------------------
-     *
-     * Used when the user taps:
-     *
-     * Hazard marker
-     * -> VIEW FIELD REPORTS
-     *
-     * Only the reports represented by that marker
-     * are selected.
      */
 
     fun selectFieldReports(
@@ -226,12 +271,6 @@ class HazardReportViewModel(
      * ---------------------------------------------------------
      * CLEAR FIELD REPORT SELECTION
      * ---------------------------------------------------------
-     *
-     * Used when the user opens FIELD REPORTS
-     * from the normal Explorer dashboard card.
-     *
-     * Empty selection means:
-     * show every active report.
      */
 
     fun clearFieldReportSelection() {
@@ -244,11 +283,6 @@ class HazardReportViewModel(
      * ---------------------------------------------------------
      * SELECTED FIELD REPORTS
      * ---------------------------------------------------------
-     *
-     * Returns:
-     *
-     * - All active reports when no map selection exists
-     * - Only selected active reports when opened from a marker
      */
 
     val selectedFieldReports: List<HazardReport>
@@ -275,12 +309,6 @@ class HazardReportViewModel(
      * ---------------------------------------------------------
      * MARK HAZARD RESOLVED
      * ---------------------------------------------------------
-     *
-     * Later this can be triggered by:
-     *
-     * - No longer here
-     * - Official resolution
-     * - Moderator action
      */
 
     fun markHazardResolved(
@@ -309,9 +337,6 @@ class HazardReportViewModel(
                         false
                 )
 
-            /*
-             * Save the change.
-             */
             saveReports()
         }
     }
@@ -321,7 +346,16 @@ class HazardReportViewModel(
      * CONFIRM HAZARD
      * ---------------------------------------------------------
      *
-     * Adds one community confirmation.
+     * One installation/profile may confirm each report once.
+     *
+     * Example:
+     *
+     * Device A -> count becomes 1
+     * Device A again -> count stays 1
+     * Device B -> count becomes 2
+     * Device C -> count becomes 3
+     *
+     * There is NO maximum total confirmation count.
      */
 
     fun confirmHazard(
@@ -334,51 +368,120 @@ class HazardReportViewModel(
             }
 
         if (
-            index != -1
+            index == -1
         ) {
 
-            val currentReport =
-                _hazardReports[
-                    index
-                ]
+            return
+        }
 
-            val newConfirmationCount =
-                currentReport.confirmationCount +
-                        1
-
+        val currentReport =
             _hazardReports[
                 index
-            ] =
-                currentReport.copy(
+            ]
 
-                    confirmationCount =
-                        newConfirmationCount,
+        /*
+         * -----------------------------------------------------
+         * ALREADY CONFIRMED
+         * -----------------------------------------------------
+         *
+         * This installation has already confirmed
+         * the report.
+         *
+         * Do not change the report.
+         */
+        if (
+            installationId in
+            currentReport.confirmedByIds
+        ) {
 
-                    /*
-                     * For the prototype,
-                     * two confirmations make
-                     * the report verified.
-                     */
-                    isVerified =
-                        newConfirmationCount >= 2
-                )
-
-            /*
-             * Save the change.
-             */
-            saveReports()
+            return
         }
+
+        /*
+         * Add this installation to the unique
+         * confirmer list.
+         */
+        val updatedConfirmedByIds =
+            currentReport.confirmedByIds +
+                    installationId
+
+        /*
+         * -----------------------------------------------------
+         * NEW CONFIRMATION COUNT
+         * -----------------------------------------------------
+         *
+         * New reports normally keep confirmationCount equal
+         * to confirmedByIds.size.
+         *
+         * maxOf also protects older locally saved reports that
+         * may already contain a legacy confirmation count but
+         * did not have confirmer IDs.
+         */
+        val newConfirmationCount =
+            maxOf(
+                currentReport.confirmationCount,
+                currentReport.confirmedByIds.size
+            ) + 1
+
+        _hazardReports[
+            index
+        ] =
+            currentReport.copy(
+
+                confirmationCount =
+                    newConfirmationCount,
+
+                confirmedByIds =
+                    updatedConfirmedByIds,
+
+                /*
+                 * Two UNIQUE confirmations currently mark
+                 * the report verified.
+                 *
+                 * Verification does NOT stop the count from
+                 * continuing to increase.
+                 */
+                isVerified =
+                    newConfirmationCount >= 2
+            )
+
+        saveReports()
+    }
+
+    /*
+     * ---------------------------------------------------------
+     * HAS CURRENT INSTALLATION CONFIRMED
+     * ---------------------------------------------------------
+     *
+     * Useful for UI later.
+     *
+     * For example:
+     *
+     * STILL HERE
+     *
+     * could change to:
+     *
+     * ✓ YOU CONFIRMED THIS
+     */
+    fun hasCurrentInstallationConfirmed(
+        reportId: String
+    ): Boolean {
+
+        val report =
+            _hazardReports
+                .firstOrNull {
+                    it.id == reportId
+                }
+
+        return report != null &&
+                installationId in
+                report.confirmedByIds
     }
 
     /*
      * ---------------------------------------------------------
      * MARK REPORT INCORRECT
      * ---------------------------------------------------------
-     *
-     * For now, an incorrect report is simply
-     * made inactive.
-     *
-     * Later we can keep a separate moderation state.
      */
 
     fun markHazardIncorrect(
@@ -416,10 +519,12 @@ class HazardReportViewModel(
      * REMOVE REPORT
      * ---------------------------------------------------------
      *
-     * Permanently removes a report from local storage.
+     * Permanently removes a report locally.
      *
-     * If that report had a saved photo,
-     * the photo is deleted too.
+     * The report disappears from Compose immediately.
+     *
+     * Photo deletion and JSON persistence happen
+     * asynchronously.
      */
 
     fun removeHazardReport(
@@ -433,36 +538,53 @@ class HazardReportViewModel(
                 }
 
         if (
-            report != null
+            report == null
         ) {
 
-            /*
-             * Delete saved photo first.
-             */
-            hazardStorage
-                .deletePhoto(
-                    report.photoPath
-                )
+            return
+        }
 
-            /*
-             * Remove report.
-             */
-            _hazardReports.removeAll {
-                it.id == reportId
+        /*
+         * Remove report from UI state.
+         */
+        _hazardReports.removeAll {
+            it.id == reportId
+        }
+
+        /*
+         * Remove the deleted report from the
+         * Field Reports selection too.
+         */
+        _selectedFieldReportIds.value =
+            _selectedFieldReportIds.value -
+                    reportId
+
+        viewModelScope.launch {
+
+            persistenceMutex.withLock {
+
+                /*
+                 * Delete the saved photo.
+                 */
+                hazardStorage
+                    .deletePhoto(
+                        report.photoPath
+                    )
+
+                /*
+                 * Capture the current list after deletion.
+                 */
+                val reportsSnapshot =
+                    _hazardReports.toList()
+
+                /*
+                 * Save the updated report list.
+                 */
+                hazardStorage
+                    .saveReports(
+                        reportsSnapshot
+                    )
             }
-
-            /*
-             * Remove the deleted report from
-             * the current Field Reports selection too.
-             */
-            _selectedFieldReportIds.value =
-                _selectedFieldReportIds.value -
-                        reportId
-
-            /*
-             * Save updated list.
-             */
-            saveReports()
         }
     }
 
@@ -470,15 +592,6 @@ class HazardReportViewModel(
      * ---------------------------------------------------------
      * CLEAR ALL REPORTS
      * ---------------------------------------------------------
-     *
-     * Mainly useful for emulator testing.
-     *
-     * This removes:
-     *
-     * - Report JSON
-     * - Saved photos
-     * - Current ViewModel report list
-     * - Current Field Reports selection
      */
 
     fun clearHazardReports() {
@@ -488,7 +601,78 @@ class HazardReportViewModel(
         _selectedFieldReportIds.value =
             emptySet()
 
-        hazardStorage
-            .clearAllStorage()
+        viewModelScope.launch {
+
+            persistenceMutex.withLock {
+
+                hazardStorage
+                    .clearAllStorage()
+            }
+        }
+    }
+
+    /*
+     * ---------------------------------------------------------
+     * INSTALLATION ID HELPER
+     * ---------------------------------------------------------
+     *
+     * Generates an ID once and saves it using Android
+     * SharedPreferences.
+     *
+     * The same installation will continue using this ID
+     * across app restarts.
+     *
+     * Uninstalling/reinstalling the app can create a new ID,
+     * which is acceptable for this temporary prototype.
+     *
+     * Once profiles are available, confirmation identity
+     * should come from the signed-in user/profile instead.
+     */
+
+    private fun getOrCreateInstallationId(
+        application: Application
+    ): String {
+
+        val preferences =
+            application.getSharedPreferences(
+                INSTALLATION_PREFERENCES_NAME,
+                Application.MODE_PRIVATE
+            )
+
+        val existingId =
+            preferences.getString(
+                INSTALLATION_ID_KEY,
+                null
+            )
+
+        if (
+            !existingId.isNullOrBlank()
+        ) {
+
+            return existingId
+        }
+
+        val newId =
+            UUID.randomUUID()
+                .toString()
+
+        preferences
+            .edit()
+            .putString(
+                INSTALLATION_ID_KEY,
+                newId
+            )
+            .apply()
+
+        return newId
+    }
+
+    companion object {
+
+        private const val INSTALLATION_PREFERENCES_NAME =
+            "oto_hazard_identity"
+
+        private const val INSTALLATION_ID_KEY =
+            "installation_id"
     }
 }
