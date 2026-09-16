@@ -1,6 +1,4 @@
 package com.cos229239.team02.oto.ui.screens.home
-
-
 import android.Manifest
 import android.content.pm.PackageManager
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -30,11 +28,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -43,8 +36,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.cos229239.team02.oto.R
-import com.cos229239.team02.oto.data.location.AndroidLocationRepository
 import com.cos229239.team02.oto.ui.theme.OtoExplorerGreen
 import com.cos229239.team02.oto.ui.theme.OtoExplorerGreenContainer
 import com.cos229239.team02.oto.ui.theme.OtoHomeCrisisAction
@@ -58,7 +51,6 @@ import com.cos229239.team02.oto.ui.theme.OtoHomePreparednessActionText
 import com.cos229239.team02.oto.ui.theme.OtoHomePreparednessCardDark
 import com.cos229239.team02.oto.ui.theme.OtoHomePreparednessCardLight
 import com.cos229239.team02.oto.ui.theme.OtoSpacing
-import kotlinx.coroutines.launch
 
 
 @Composable
@@ -68,7 +60,35 @@ fun HomeScreen(
     onOfflineToolsClick: () -> Unit
 ) {
     val context = LocalContext.current
-    val scope = rememberCoroutineScope()
+
+    //Use HomeViewModel to manage Home location state and data access.
+    val homeViewModel: HomeViewModel =
+        viewModel()
+
+    //Read the current location state from the ViewModel.
+    val locationState =
+        homeViewModel.locationState
+
+    //Convert the location state into the message shown on Home.
+    val locationText =
+        when (val state = locationState) {
+
+            HomeLocationState.NotRequested ->
+                "Location not requested"
+
+            HomeLocationState.Loading ->
+                "Getting location..."
+
+            is HomeLocationState.Available ->
+                "Latitude: ${state.latitude}\n" +
+                        "Longitude: ${state.longitude}"
+
+            HomeLocationState.PermissionDenied ->
+                "Location permission denied"
+
+            HomeLocationState.Unavailable ->
+                "Location unavailable"
+        }
 
     //Use calmer branding colors when the phone is in dark mode.
     val darkTheme = isSystemInDarkTheme()
@@ -109,28 +129,6 @@ fun HomeScreen(
             OtoHomeCrisisCardLight
         }
 
-    val locationRepository = remember(context) {
-        AndroidLocationRepository(context.applicationContext)
-    }
-
-    var locationText by remember {
-        mutableStateOf("Location not requested")
-    }
-
-    fun loadLocation() {
-        scope.launch {
-            locationText = "Getting location..."
-
-            val location = locationRepository.getCurrentLocation()
-
-            locationText = if (location != null) {
-                "Latitude: ${location.latitude}\nLongitude: ${location.longitude}"
-            } else {
-                "Location unavailable"
-            }
-        }
-    }
-
     val locationPermissionLauncher =
         rememberLauncherForActivityResult(
             contract = ActivityResultContracts.RequestMultiplePermissions()
@@ -143,9 +141,9 @@ fun HomeScreen(
                 permissions[Manifest.permission.ACCESS_COARSE_LOCATION] == true
 
             if (fineGranted || coarseGranted) {
-                loadLocation()
+                homeViewModel.refreshLocation()
             } else {
-                locationText = "Location permission denied"
+                homeViewModel.locationPermissionDenied()
             }
         }
 
@@ -265,7 +263,7 @@ fun HomeScreen(
                         ) == PackageManager.PERMISSION_GRANTED
 
                     if (fineGranted || coarseGranted) {
-                        loadLocation()
+                        homeViewModel.refreshLocation()
                     } else {
                         locationPermissionLauncher.launch(
                             arrayOf(
