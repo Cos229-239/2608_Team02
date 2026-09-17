@@ -72,7 +72,9 @@ class AreaSafetyView (
         _uiState.value = AreaSafetyUIState(
             areaName = areaName,
             hasLocation = selectedLocation != null,
+            selectedLocation = selectedLocation,
             selectedParkCode = selectedParkCode,
+            autoParkSelect = _uiState.value.autoParkSelect,
             filterSelected = _uiState.value.filterSelected
         )
 
@@ -82,6 +84,34 @@ class AreaSafetyView (
 
     }
     fun selectParkCode(parkCode: String?){
+        _uiState.update {
+            it.copy(autoParkSelect = false)
+        }
+        setArea(
+            location = selectedLocation,
+            areaName = _uiState.value.areaName,
+            parkCode = parkCode
+        )
+    }
+
+    fun useNearestPark() {
+        _uiState.update {
+            it.copy(autoParkSelect = true)
+        }
+    }
+    //Ignore an auto result if user changed more or location.
+    fun applyNearestPark(
+        parkCode: String,
+        location: OtoLocation
+    ){
+        if (!_uiState.value.autoParkSelect) return
+
+        if (
+            selectedLocation?.latitude != location.latitude ||
+            selectedLocation?.longitude != location.longitude
+        ){
+            return
+        }
         setArea(
             location = selectedLocation,
             areaName = _uiState.value.areaName,
@@ -112,6 +142,7 @@ class AreaSafetyView (
                 notifications = emptyList(),
                 weatherNotifications = emptyList(),
                 forecast = null,
+                airQuality = null,
                 resourceResult = null,
                 sources = emptyList(),
                 checkedAtMillis = null,
@@ -142,6 +173,7 @@ class AreaSafetyView (
 
                         },
                         forecast = result.forecast,
+                        airQuality = result.airQuality,
                         resourceResult = result.resourceResult,
                         sources = result.sources,
                         checkedAtMillis = result.checkedAtMillis

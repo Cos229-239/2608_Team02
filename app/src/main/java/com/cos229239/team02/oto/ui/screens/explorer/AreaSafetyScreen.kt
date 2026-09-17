@@ -45,8 +45,8 @@ import com.cos229239.team02.oto.data.safety.SafetyLevel
 import com.cos229239.team02.oto.data.safety.SafetyNotification
 import com.cos229239.team02.oto.data.safety.createSafetyHttpClient
 import com.cos229239.team02.oto.ui.components.OtoTopAppBar //Use OTO's shared Material 3 top app bar.
-import com.cos229239.team02.oto.ui.features.WeatherForecastCard
 import androidx.compose.foundation.layout.PaddingValues
+import com.cos229239.team02.oto.data.location.OtoLocation
 
 //Connects ViewModel's state and actions to the Area Safety screen.
 @Composable
@@ -77,7 +77,11 @@ fun AreaSafetyRoute( onBackClick: () -> Unit,
             NpsParkPicker(
                 client = parkClient,
                 selectedParkCode = uiState.selectedParkCode,
-                onParkSelected = safetyView::selectParkCode
+                location = uiState.selectedLocation,
+                autoSelection = uiState.autoParkSelect,
+                onParkSelected = safetyView::selectParkCode,
+                onNearestParkSelect = safetyView::applyNearestPark,
+                onUseNearestPark = safetyView::useNearestPark
             )
         }
     )
@@ -148,12 +152,7 @@ fun AreaSafetyScreen(
                 parkCodeContent()
             }
 
-            item {
-                WeatherForecastCard(
-                    uiState = uiState,
-                    onRefresh = onRefresh
-                )
-            }
+
 
             if (uiState.hasUnavailableSources) {
                 item {

@@ -56,8 +56,11 @@ import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
 import java.util.Locale
 import androidx.compose.material3.TextButton
+import com.cos229239.team02.oto.data.safety.AreaSafetyData
 import com.cos229239.team02.oto.data.safety.SafetySourceState
 import com.cos229239.team02.oto.ui.features.AreaSafetyUIState
+import com.cos229239.team02.oto.ui.features.AreaSafetyViewFactory
+import com.cos229239.team02.oto.ui.features.weatherIcon
 import com.cos229239.team02.oto.ui.theme.OtoCrisisRed
 import com.cos229239.team02.oto.ui.theme.OtoExplorerGreenDark
 
@@ -1622,9 +1625,6 @@ private fun SafetyOverviewCard(
                 modifier = Modifier.fillMaxWidth()
             )
 
-            TextButton(onClick = onWeatherClick) {
-                Text("View Weather Report >")
-            }
             Text(
                 text = "Park Notices: $parkSummary",
                 modifier = Modifier.fillMaxWidth()
@@ -1634,9 +1634,13 @@ private fun SafetyOverviewCard(
                 Text(text = "Selected park code: $code")
             }
 
-            TextButton(onClick = onAreaSafetyClick) {
+            Button (onClick = onAreaSafetyClick) {
                 Text("View Area Safety / Select Park >")
             }
+
+
+
+
             if (uiState.hasUnavailableSources) {
                 Text(
                     text = "Some sources are unavailable. " +
@@ -1655,6 +1659,7 @@ private fun SafetyOverviewCard(
              */
 
 
+
                     /*
                      * -------------------------------------------------
                      * WEATHER
@@ -1667,18 +1672,24 @@ private fun SafetyOverviewCard(
                             "WEATHER",
 
                         icon =
-                            "☀️",
+                            weatherIcon(
+                                code =
+                                    uiState.forecast?.weatherCode,
+                                    isDay = uiState.forecast?.isDay
+                            ),
 
-                        mainValue =
-                            "—",
+                        mainValue = uiState.forecast?.let {
+                            "${it.temp}°${it.tempUnit}"
+                        } ?: "_",
 
-                        description =
-                            "View weather",
+                        description = uiState.forecast?.shortForecast
+                            ?: "View weather",
                         modifier = Modifier
                             .fillMaxWidth()
                             .clickable{
                                 onWeatherClick()
                             }
+                            .padding(16.dp)
                         )
 
 
@@ -1738,10 +1749,17 @@ private fun SafetyOverviewCard(
                             "🍃",
 
                         mainValue =
-                            "—",
+                            uiState.airQuality?.usAqi?.toString() ?:
+                           "_",
 
                         description =
-                            "Not connected",
+                            uiState.airQuality?.category ?: "View air quality",
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable {
+                                onWeatherClick()
+                            }
+                            .padding(16.dp)
 
 
                     )
