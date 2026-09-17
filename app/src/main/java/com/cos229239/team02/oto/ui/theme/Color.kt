@@ -1,7 +1,5 @@
 package com.cos229239.team02.oto.ui.theme
 
-import androidx.compose.material3.NavigationBarItemDefaults
-import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 
 /*
@@ -50,6 +48,29 @@ val OtoWarningContainer = Color(0xFFFFF1D2)
 
 val OtoLocationBlue = Color(0xFF1976D2)
 val OtoLocationBlueContainer = Color(0xFFDCEBFF)
+
+// -----------------------------------------------------------------------------
+// Home Screen
+// -----------------------------------------------------------------------------
+
+//Location and Explorer card colors.
+val OtoHomeForestCardLight = OtoForest800
+val OtoHomeForestCardDark = OtoForest800
+
+//Preparedness card colors.
+val OtoHomePreparednessCardLight = Color(0xFF70424F)
+val OtoHomePreparednessCardDark = Color(0xFF70424F)
+
+val OtoHomePreparednessAction = Color(0xFFD59AAA)
+val OtoHomePreparednessActionText = Color(0xFF4A1824)
+
+//Crisis card colors.
+val OtoHomeCrisisCardLight = Color(0xFFB3261E)
+val OtoHomeCrisisCardDark = Color(0xFFB3261E)
+
+val OtoHomeCrisisAction = Color(0xFFFF8A80)
+val OtoHomeCrisisActionText = Color(0xFF5D0B08)
+
 
 // -----------------------------------------------------------------------------
 // Neutral Surfaces
