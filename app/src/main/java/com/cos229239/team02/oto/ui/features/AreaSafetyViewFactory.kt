@@ -17,23 +17,28 @@ class AreaSafetyViewFactory(
 ) : ViewModelProvider.Factory {
     private val applicationContext =
         context.applicationContext
-    private val areaSafetyRepo: AreaSafetyRepo by lazy {
-        val http = createSafetyHttpClient()
 
+    private val http by lazy {
+        createSafetyHttpClient()
+    }
+
+    private val npsClient by lazy {
+        NpsAlertClient(
+            http = http,
+            apiKey = BuildConfig.NPS_API_KEY
+        )
+    }
+
+private val areaSafetyRepo: AreaSafetyRepo by lazy {
         DefaultAreaSafetyRepo(
             resourceRepository = OverpassResourceRepository(
                 context = applicationContext
             ),
-
             nwsClient = NwsAlertClient(
                 http = http,
                 userAgent = BuildConfig.NWS_USER_AGENT
             ),
-
-            npsClient = NpsAlertClient(
-                http = http,
-                apiKey = BuildConfig.NPS_API_KEY
-            ),
+            npsClient = npsClient,
             forecastClient = OpenMeteoClient(
                 httpClient = http
             )
@@ -50,7 +55,8 @@ class AreaSafetyViewFactory(
 
         @Suppress("UNCHECKED_CAST")
         return AreaSafetyView(
-            repo = areaSafetyRepo
+            repo = areaSafetyRepo,
+            npsAlertClient = npsClient
         ) as T
     }
 }

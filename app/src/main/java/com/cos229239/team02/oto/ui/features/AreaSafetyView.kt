@@ -3,6 +3,7 @@ package com.cos229239.team02.oto.ui.features
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.cos229239.team02.oto.data.location.OtoLocation
+import com.cos229239.team02.oto.data.resource.NpsAlertClient
 import com.cos229239.team02.oto.data.safety.AreaSafetyRepo
 import com.cos229239.team02.oto.data.safety.SafetyNotification
 import com.cos229239.team02.oto.data.safety.SafetyCategory
@@ -14,10 +15,14 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import java.util.Locale
+import android.location.Location
+import com.cos229239.team02.oto.data.safety.NpsParkOption
+
 
 
 class AreaSafetyView (
-    private val repo: AreaSafetyRepo
+    private val repo: AreaSafetyRepo,
+    private val npsAlertClient: NpsAlertClient
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(AreaSafetyUIState())
@@ -29,6 +34,63 @@ class AreaSafetyView (
     private var requestJob: Job? = null
     private var requestVersion: Long = 0
 
+    private var nearestParkJob: Job? = null
+    private var cachedParks: List<NpsParkOption>? = null
+
+    private fun findNearestPark(location: OtoLocation)
+    {
+        nearestParkJob?.cancel()
+
+        nearestParkJob = viewModelScope.launch {
+            try {
+                val parks = cachedParks
+                    ?: npsAlertClient.getParkOptions().also {
+                        cachedParks = it
+                    }
+                val nearest = parks.mapNotNull { park ->
+                    val latitude = park.latitude
+                        ?: return@mapNotNull null
+                    val longitude = park.longitude
+                        ?: return@mapNotNull null
+
+                    if (
+                        !latitude.isFinite() ||
+                        latitude !in -90.0..90.0 ||
+                        !longitude.isFinite() ||
+                        longitude !in -180.0..180.0
+                    ){
+                        return@mapNotNull null
+                    }
+                    val distance = FloatArray(1)
+
+                    Location.distanceBetween(
+                        location.latitude,
+                        location.longitude,
+                        latitude,
+                        longitude,
+                        distance
+                    )
+
+                    park to distance[0]
+                }.minByOrNull { it.second }?.first
+
+                if (nearest != null) {
+                    applyNearestPark(
+                        parkCode = nearest.parkCode,
+                        location = location
+                    )
+                }
+            } catch (error: CancellationException) {
+                throw error
+            } catch (error: Exception) {
+                android.util.Log.e(
+                    "OTO_NEAREST_PARK",
+                    "Unable to select nearest park",
+                    error
+                )
+            }
+        }
+    }
 
 
     fun setArea(
@@ -52,6 +114,9 @@ class AreaSafetyView (
             selectedParkCode == normalizedParkCode
         ) {
             return
+        }
+        if (!sameCoordinates){
+            nearestParkJob?.cancel()
         }
 
         requestVersion++
@@ -82,6 +147,17 @@ class AreaSafetyView (
             loadArea(forceRefresh = false)
         }
 
+        val locationOfPark = selectedLocation
+
+        if (
+            !sameCoordinates &&
+            locationOfPark != null &&
+            _uiState.value.autoParkSelect
+        ){
+            findNearestPark(locationOfPark)
+        }
+
+
     }
     fun selectParkCode(parkCode: String?){
         _uiState.update {
@@ -97,6 +173,10 @@ class AreaSafetyView (
     fun useNearestPark() {
         _uiState.update {
             it.copy(autoParkSelect = true)
+        }
+
+        selectedLocation?.let { location ->
+            findNearestPark(location)
         }
     }
     //Ignore an auto result if user changed more or location.
@@ -146,7 +226,9 @@ class AreaSafetyView (
                 resourceResult = null,
                 sources = emptyList(),
                 checkedAtMillis = null,
-                errorMessage = null
+                errorMessage = null,
+
+
             )
         }
 
@@ -176,7 +258,8 @@ class AreaSafetyView (
                         airQuality = result.airQuality,
                         resourceResult = result.resourceResult,
                         sources = result.sources,
-                        checkedAtMillis = result.checkedAtMillis
+                        checkedAtMillis = result.checkedAtMillis,
+
                     )
                 }
             } catch (error: CancellationException) {
@@ -193,6 +276,8 @@ class AreaSafetyView (
             }
         }
     }
+
+
 //Updates visible notifications using results already loaded
     fun selectFilter(
         filter: SafetyFilter

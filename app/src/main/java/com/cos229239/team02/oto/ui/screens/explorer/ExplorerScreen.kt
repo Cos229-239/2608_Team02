@@ -1,5 +1,6 @@
 package com.cos229239.team02.oto.ui.screens.explorer
 
+
 import android.Manifest
 import android.content.pm.PackageManager
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -11,6 +12,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -40,6 +42,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
@@ -49,25 +52,18 @@ import com.cos229239.team02.oto.data.location.AndroidLocationRepository
 import com.cos229239.team02.oto.data.location.OtoLocation
 import com.cos229239.team02.oto.data.route.RouteClient
 import com.cos229239.team02.oto.data.route.RouteResult
-import com.cos229239.team02.oto.data.safety.SafetySourceState
 import com.cos229239.team02.oto.ui.components.OtoTopAppBar
 import com.cos229239.team02.oto.ui.components.map.OtoMap
 import com.cos229239.team02.oto.ui.features.AreaSafetyUIState
 import com.cos229239.team02.oto.ui.features.AreaSafetyView
 import com.cos229239.team02.oto.ui.features.PlanTripViewModel
+import com.cos229239.team02.oto.ui.features.weatherIcon
+import com.cos229239.team02.oto.ui.theme.OtoBackground
 import com.cos229239.team02.oto.ui.theme.OtoCrisisRed
+import com.cos229239.team02.oto.ui.theme.OtoExplorerGreen
 import com.cos229239.team02.oto.ui.theme.OtoExplorerGreenDark
-import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
 import java.util.Locale
-import androidx.compose.material3.TextButton
-import com.cos229239.team02.oto.data.safety.AreaSafetyData
-import com.cos229239.team02.oto.data.safety.SafetySourceState
-import com.cos229239.team02.oto.ui.features.AreaSafetyUIState
-import com.cos229239.team02.oto.ui.features.AreaSafetyViewFactory
-import com.cos229239.team02.oto.ui.features.weatherIcon
-import com.cos229239.team02.oto.ui.theme.OtoCrisisRed
-import com.cos229239.team02.oto.ui.theme.OtoExplorerGreenDark
 
 @Composable
 fun ExplorerScreen(
@@ -84,7 +80,7 @@ fun ExplorerScreen(
      * - FIELD REPORTS dashboard card
      * - Hazard marker popup
      */
-    onFieldReportsClick: () -> Unit = {},
+    onFieldReportsClick: () -> Unit,
 
     onBackClick: () -> Unit,
 
@@ -1376,7 +1372,10 @@ fun ExplorerScreen(
                     onAreaSafetyClick,
 
                 onWeatherClick =
-                    onWeatherClick
+                    onWeatherClick,
+
+                onReportHazardClick =
+                    onReportHazardClick
             )
 
             Spacer(
@@ -1691,7 +1690,8 @@ private fun SafetyOverviewCard(
     uiState: AreaSafetyUIState,
     hazardCount: Int,
     onAreaSafetyClick: () -> Unit,
-    onWeatherClick: () -> Unit
+    onWeatherClick: () -> Unit,
+    onReportHazardClick: () -> Unit
 ) {
 
     val mediumGreen =
@@ -1699,35 +1699,20 @@ private fun SafetyOverviewCard(
             0xFF0B5D1E
         )
 
-    val dividerColor =
-        Color(
-            0xFFE1E5E1
-        )
+
 
     /*
      * ---------------------------------------------------------
      * SOURCE STATUS
      * ---------------------------------------------------------
      */
+    val forecast = uiState.forecast
 
-    val nwsStatus =
-        uiState.sources
-            .firstOrNull {
-                it.source == "NWS"
-            }
 
     val npsStatus = uiState.sources.firstOrNull{
         it.source == "NPS"
     }
 
-    val weatherSummary = when {
-        uiState.isLoading -> "Loading..."
-        !uiState.hasLocation -> "Select a location"
-                uiState.errorMessage != null -> "Unavailable"
-        nwsStatus?.state == SafetySourceState.SUCCESS ->
-            "${uiState.weatherNotifications.size} weather alerts"
-        else -> nwsStatus?.message ?: "Not loaded"
-    }
 
     val parkSummary = when{
         uiState.selectedParkCode == null -> "Select a park"
@@ -1769,14 +1754,12 @@ private fun SafetyOverviewCard(
                 Arrangement.spacedBy(
                     10.dp
                 )
-        ) {}
-
-
+        ) {
             /*
              * -------------------------------------------------
              * HEADER
              * -------------------------------------------------
-             */
+         */
 
             Row(
                 modifier =
@@ -1805,7 +1788,7 @@ private fun SafetyOverviewCard(
 
                 Text(
                     text =
-                        "View Area Safety ›",
+                        "CURRENT AREA",
 
                     modifier =
                         Modifier.clickable {
@@ -1862,7 +1845,7 @@ private fun SafetyOverviewCard(
 
                 CircularProgressIndicator(
                     color =
-                        mediumGreen
+                        OtoExplorerGreen
                 )
             }
 
@@ -1872,10 +1855,10 @@ private fun SafetyOverviewCard(
              * -------------------------------------------------
              */
 
-            Text(
-                text = "Weather: $weatherSummary",
-                modifier = Modifier.fillMaxWidth()
-            )
+//            Text(
+//                text = "Weather: $",
+//                modifier = Modifier.fillMaxWidth()
+//            )
 
             Text(
                 text = "Park Notices: $parkSummary",
@@ -1886,7 +1869,7 @@ private fun SafetyOverviewCard(
                 Text(text = "Selected park code: $code")
             }
 
-            Button (onClick = onAreaSafetyClick) {
+            Button(onClick = onAreaSafetyClick) {
                 Text("View Area Safety / Select Park >")
             }
 
@@ -1901,53 +1884,61 @@ private fun SafetyOverviewCard(
                 )
             }
         }
-    }
 
 
-            /*
+        /*
              * -------------------------------------------------
              * SUMMARY CONTENT
              * -------------------------------------------------
              */
 
 
-
-                    /*
+        /*
                      * -------------------------------------------------
                      * WEATHER
                      * -------------------------------------------------
-                     *
+                    *
                      * Weather now has its own click action.
                      */
-                    SafetyOverviewItem(
-                        title =
-                            "WEATHER",
+        Column(
+            modifier = Modifier.fillMaxWidth(),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalAlignment = Alignment.Top
 
-                        icon =
-                            weatherIcon(
-                                code =
-                                    uiState.forecast?.weatherCode,
-                                    isDay = uiState.forecast?.isDay
-                            ),
+            ) {
+                SafetyOverviewItem(
+                    title =
+                        "WEATHER",
 
-                        mainValue = uiState.forecast?.let {
-                            "${it.temp}°${it.tempUnit}"
-                        } ?: "_",
+                    icon =
+                        weatherIcon(
+                            code =
+                                forecast?.weatherCode,
+                            isDay = uiState.forecast?.isDay
+                        ),
 
-                        description = uiState.forecast?.shortForecast
-                            ?: "View weather",
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable{
-                                onWeatherClick()
-                            }
-                            .padding(16.dp)
-                        )
+                    mainValue = forecast?.let {
+                        "${it.temp}°${it.tempUnit}"
+                    } ?: "_",
 
-                SafetyOverviewDivider(
-                    color =
-                        dividerColor
+                    description = uiState.forecast?.shortForecast
+                        ?: "View weather",
+                    modifier = Modifier
+                        .weight(1f)
+                        .clickable
+                            (onClick = onWeatherClick)
+
+
                 )
+//
+//                SafetyOverviewDivider(
+//                    color =
+//                        dividerColor
+//                )
 
                 /*
                  * Our locally submitted community hazards.
@@ -1979,15 +1970,24 @@ private fun SafetyOverviewCard(
                         },
 
                     modifier =
-                        Modifier.weight(
-                            1f
-                        )
+                        Modifier
+                            .weight(1f)
+                            .clickable(
+                                onClick = onReportHazardClick
+                            )
                 )
 
-                SafetyOverviewDivider(
-                    color =
-                        dividerColor
-                )
+//                SafetyOverviewDivider(
+//                    color =
+//                        dividerColor
+//                )
+            }
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalAlignment = Alignment.Top
+            ) {
 
                 SafetyOverviewItem(
                     title =
@@ -2016,15 +2016,16 @@ private fun SafetyOverviewCard(
                             .weight(
                                 1f
                             )
-                            .clickable {
-                                onAreaSafetyClick()
-                            }
-                )
+                            .clickable(
+                                onClick = onAreaSafetyClick
+                            )
 
-                SafetyOverviewDivider(
-                    color =
-                        dividerColor
                 )
+//Didn't use dividers for the purpose of alignment issues
+//                SafetyOverviewDivider(
+//                    color =
+//                        dividerColor
+//                )
 
                 SafetyOverviewItem(
                     title =
@@ -2033,19 +2034,25 @@ private fun SafetyOverviewCard(
                     icon =
                         "🍃",
 
-                        mainValue =
-                            uiState.airQuality?.usAqi?.toString() ?:
-                           "_",
+                    mainValue =
+                        uiState.airQuality?.usAqi?.toString() ?: "_",
 
-                        description =
-                            uiState.airQuality?.category ?: "View air quality",
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable {
-                                onWeatherClick()
-                            }
-                            .padding(16.dp)
+                    description =
+                        uiState.airQuality?.category
+                            ?: "View air quality",
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxHeight()
+                        .clickable(
+                            onClick = onWeatherClick
 
+                        )
+
+                )
+            }
+
+        }
+    }
 
             /*
              * -------------------------------------------------
@@ -2071,7 +2078,13 @@ private fun SafetyOverviewCard(
                         FontWeight.Bold
                 )
             }
-}
+
+        }
+
+
+
+
+
 
             /*
              * -------------------------------------------------
@@ -2095,108 +2108,86 @@ private fun SafetyOverviewItem(
     description: String,
     modifier: Modifier = Modifier
 ) {
-
-    val darkGreen =
-        Color(
-            0xFF063D24
+    val textColor = OtoBackground
+    Card(
+        modifier = modifier.height(200.dp),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = OtoExplorerGreenDark
+        ),
+        elevation = CardDefaults.cardElevation(
+            defaultElevation = 0.dp
         )
-
-    Column(
-        modifier =
-            modifier
-                .padding(
-                    horizontal =
-                        4.dp
-                ),
-
-        horizontalAlignment =
-            Alignment.CenterHorizontally
     ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(12.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(
+                space = 10.dp,
+                alignment = Alignment.CenterVertically
+            )
+            ) {
 
-        Text(
-            text =
-                title,
 
-            color =
-                darkGreen,
 
-            fontSize =
-                9.sp,
+            Text(
+                text =
+                    icon,
 
-            fontWeight =
-                FontWeight.Bold,
+                fontSize =
+                    30.sp,
 
-            textAlign =
-                TextAlign.Center
-        )
-
-        Spacer(
-            modifier =
-                Modifier.height(
-                    8.dp
                 )
-        )
 
-        Text(
-            text =
-                icon,
 
-            fontSize =
-                27.sp,
 
-            textAlign =
-                TextAlign.Center
-        )
+            Text(
+                text =
+                    title,
 
-        Spacer(
-            modifier =
-                Modifier.height(
-                    5.dp
-                )
-        )
+                color =
+                    textColor,
 
-        Text(
-            text =
-                mainValue,
+                fontSize =
+                    12.sp,
 
-            color =
-                darkGreen,
+                fontWeight =
+                    FontWeight.Bold,
 
-            fontSize =
-                20.sp,
+                textAlign =
+                    TextAlign.Center
+            )
 
-            fontWeight =
-                FontWeight.Bold,
 
-            textAlign =
-                TextAlign.Center
-        )
+            Text(
+                text =
+                    mainValue,
 
-        Spacer(
-            modifier =
-                Modifier.height(
-                    3.dp
-                )
-        )
+                color =
+                    textColor,
 
-        Text(
-            text =
-                description,
+                fontSize =
+                    26.sp,
 
-            color =
-                Color(
-                    0xFF707070
-                ),
+                fontWeight =
+                    FontWeight.Bold,
 
-            fontSize =
-                8.sp,
+                textAlign =
+                    TextAlign.Center
+            )
+            Text(
+                text = description,
+                color = textColor,
+                fontSize = 12.sp,
+                textAlign = TextAlign.Center,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis
 
-            lineHeight =
-                10.sp,
+            )
 
-            textAlign =
-                TextAlign.Center
-        )
+        }
     }
 }
 

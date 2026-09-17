@@ -1,6 +1,5 @@
 package com.cos229239.team02.oto.ui.screens.explorer
 
-import android.R
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -253,7 +252,10 @@ fun WeatherReportScreen(
                         ),
 
                     horizontalAlignment =
-                        Alignment.CenterHorizontally
+                        Alignment.CenterHorizontally,
+
+
+
                 ) {
 
                     Text(

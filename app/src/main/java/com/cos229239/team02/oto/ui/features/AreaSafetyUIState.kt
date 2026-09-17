@@ -1,16 +1,14 @@
 package com.cos229239.team02.oto.ui.features
 
+
 import com.cos229239.team02.oto.data.location.OtoLocation
 import com.cos229239.team02.oto.data.resource.AirQualityData
 import com.cos229239.team02.oto.data.resource.ResourceResult
 import com.cos229239.team02.oto.data.resource.WeatherForecast
+import com.cos229239.team02.oto.data.safety.SafetyFilter
+import com.cos229239.team02.oto.data.safety.SafetyNotification
 import com.cos229239.team02.oto.data.safety.SafetySourceState
 import com.cos229239.team02.oto.data.safety.SafetySourceStatus
-import com.cos229239.team02.oto.data.safety.SafetyNotification
-
-
-import com.cos229239.team02.oto.data.safety.SafetyFilter
-import okhttp3.internal.http2.ErrorCode
 
 
 data class AreaSafetyUIState(
@@ -30,7 +28,7 @@ data class AreaSafetyUIState(
     //override option for park selection if planning trip
     val selectedLocation: OtoLocation?  = null,
     //Automatic Park Selection variable
-    val autoParkSelect: Boolean = true
+    val autoParkSelect: Boolean = true,
 
 
 ){
