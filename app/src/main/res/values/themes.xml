@@ -1,5 +1,31 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
 
-    <style name="Theme.OTO" parent="android:Theme.Material.Light.NoActionBar" />
+    <!--Normal OTO app theme after startup.-->
+    <style
+        name="Theme.OTO"
+        parent="android:Theme.Material.Light.NoActionBar" />
+
+    <!--OTO branded system splash screen.-->
+    <style
+        name="Theme.OTO.Starting"
+        parent="Theme.SplashScreen">
+
+        <!--Use the OTO forest color across the splash.-->
+        <item name="windowSplashScreenBackground">
+            @color/oto_splash_background
+        </item>
+
+        <!--Use the splash-specific crop of the official OTO logo.-->
+        <item name="windowSplashScreenAnimatedIcon">
+            @drawable/oto_splash_logo
+        </item>
+
+        <!--Hand off to the normal app theme after startup.-->
+        <item name="postSplashScreenTheme">
+            @style/Theme.OTO
+        </item>
+
+    </style>
+
 </resources>
