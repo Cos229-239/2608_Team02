@@ -24,7 +24,6 @@ import androidx.compose.material.icons.filled.Explore
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Map
 import androidx.compose.material.icons.filled.Warning
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -96,13 +95,6 @@ fun HomeScreen(
     val homeBrandColor =
         if (darkTheme) {
             OtoExplorerGreenContainer
-        } else {
-            MaterialTheme.colorScheme.primary
-        }
-
-    val homeAccentColor =
-        if (darkTheme) {
-            OtoExplorerGreen
         } else {
             MaterialTheme.colorScheme.primary
         }
@@ -201,9 +193,7 @@ fun HomeScreen(
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 //Show the OTO mountain mark above the app name.
-                OtoMountainMark(
-                    tint = homeAccentColor
-                )
+                OtoMountainMark()
 
                 Spacer(
                     modifier = Modifier.height(
@@ -426,21 +416,20 @@ fun HomeScreen(
     }
 }
 
-//Show the OTO mountain logo.
-@Composable
-private fun OtoMountainMark(
-    tint: Color
-) {
 
-    Icon(
+//Show the official OTO mountain and forest logo.
+@Composable
+private fun OtoMountainMark() {
+
+    Image(
         painter = painterResource(
-            id = R.drawable.ic_oto_mountain
+            id = R.drawable.oto_home_logo
         ),
         contentDescription = null,
-        tint = tint,
         modifier = Modifier.size(
-            width = 116.dp,
-            height = 56.dp
-        )
+            width = 190.dp,
+            height = 140.dp
+        ),
+        contentScale = ContentScale.Fit
     )
 }
