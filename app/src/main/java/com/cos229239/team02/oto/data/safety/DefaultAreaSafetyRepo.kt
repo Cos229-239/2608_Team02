@@ -11,6 +11,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.supervisorScope
 import kotlinx.coroutines.withContext
+import android.util.Log
 
 //Collects NPS and NWS updates and converts to app safety notifications after removing dummy repo
 class DefaultAreaSafetyRepo(
@@ -39,6 +40,11 @@ class DefaultAreaSafetyRepo(
                 forecastClient.getForecast(location)
             }
         }
+        val airQualityRequest = async {
+            captureSafetyRequest {
+                forecastClient.getAirQuality(location)
+            }
+        }
 
 val parkRequest = async {
         if (parkCode.isNullOrBlank()) {
@@ -65,12 +71,29 @@ val parkRequest = async {
         val parkResult = parkRequest.await()
         val nearbyResult = resourceRequest.await()
         val forecastResult = forecastRequest.await()
+        val airQualityResult = airQualityRequest.await()
 
 
         val sources = listOf(
             alertStatus(
                 source = "NWS",
                 result = weatherResult
+            ),
+            airQualityResult.fold(
+                onSuccess = {
+                    SafetySourceStatus(
+                        source = "Open-Meteo Air Quality",
+                        state = SafetySourceState.SUCCESS,
+                        message = "Air-quality estimate loaded."
+                    )
+                },
+                onFailure = { error->
+                    SafetySourceStatus(
+                        source = "Open-Meteo Air Quality",
+                        state = SafetySourceState.FAILED,
+                        message = safetyErrorMessage(error)
+                    )
+                }
             ),
 
             forecastResult.fold(
@@ -82,6 +105,13 @@ val parkRequest = async {
                     )
                 },
                 onFailure = { error ->
+                    Log.e(
+                        "OTO_FORECAST",
+                        "Forecast failed: ${error.javaClass.name}: ${error.message};" +
+                        "cause=${error.cause?.javaClass?.name}: ${error.cause?.message}",
+                        error
+
+                    )
                     SafetySourceStatus(
                         source = "Open-Meteo",
                         state = SafetySourceState.FAILED,
@@ -117,7 +147,8 @@ val parkRequest = async {
             notifications = notifications,
             resourceResult = nearbyResult.getOrNull(),
             sources = sources,
-            forecast = forecastResult.getOrNull()
+            forecast = forecastResult.getOrNull(),
+            airQuality = airQualityResult.getOrNull()
               )
             }
 

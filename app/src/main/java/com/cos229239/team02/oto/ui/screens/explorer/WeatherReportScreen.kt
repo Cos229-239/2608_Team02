@@ -15,6 +15,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -27,7 +29,9 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.cos229239.team02.oto.data.safety.SafetySourceState
 import com.cos229239.team02.oto.ui.features.AreaSafetyView
+import com.cos229239.team02.oto.ui.features.weatherIcon
 
 /**
  * Weather details screen for Explorer.
@@ -41,20 +45,19 @@ fun WeatherReportScreen(
     safetyView: AreaSafetyView
 ) {
     val uiState by safetyView.uiState.collectAsStateWithLifecycle()
-    val weatherAlerts = uiState.weatherNotifications
-    val nwsStatus = uiState.sources.firstOrNull{
-        it.source == "NWS"
+    val forecast = uiState.forecast
+    val airQuality = uiState.airQuality
+
+    val forecastStatus = uiState.sources.firstOrNull{
+        it.source == "Open-Meteo"
+    }
+    val airQualityStatus = uiState.sources.firstOrNull{
+        it.source == "Open-Meteo Air Quality"
     }
 
-    val weatherServiceMessage = when {
-        uiState.isLoading -> "Checking NWS alerts... "
-        !uiState.hasLocation ->
-            "Select a trip destination or use Locate Me in Explorer."
-        uiState.errorMessage != null ->
-            uiState.errorMessage.orEmpty()
-        else ->
-            nwsStatus?.message ?: "NWS alerts have not been loaded."
-    }
+   val nwsStatus = uiState.sources.firstOrNull{
+       it.source == "NWS"
+   }
 
     val darkGreen =
         Color(0xFF063D24)
@@ -200,8 +203,9 @@ fun WeatherReportScreen(
             )
 
             Text(
-                text =
-                    "Weather location will come from the active trip or current Explorer location.",
+
+                    text = uiState.areaName,
+
 
                 color =
                     Color(
@@ -248,16 +252,24 @@ fun WeatherReportScreen(
                         ),
 
                     horizontalAlignment =
-                        Alignment.CenterHorizontally
+                        Alignment.CenterHorizontally,
+
+
+
                 ) {
 
                     Text(
                         text =
-                            "☀️",
+                            weatherIcon(
+                                code = forecast?.weatherCode,
+                                isDay = forecast?.isDay
+                            ),
+
 
                         fontSize =
                             52.sp
                     )
+
 
                     Spacer(
                         modifier =
@@ -266,35 +278,49 @@ fun WeatherReportScreen(
                             )
                     )
 
-                    Text(
-                        text =
-                            "—°",
 
-                        color =
-                            darkGreen,
 
-                        fontSize =
-                            44.sp,
+                    when{
+                        uiState.isLoading -> {
+                            CircularProgressIndicator()
+                            Text("Loading forecast...")
+                        }
 
-                        fontWeight =
-                            FontWeight.Bold
-                    )
+                        !uiState.hasLocation -> {
+                            Text(
+                                "Select Trip Destination or Use Locate Me."
+                            )
 
-                    Text(
-                        text =
-                            "Weather not connected",
+                        }
 
-                        color =
-                            Color(
-                                0xFF666666
-                            ),
+                        forecast != null -> {
+                            Text(
+                                text = forecast.periodName,
+                                style = MaterialTheme.typography.titleMedium
+                            )
+                            Text(
+                                text = "${forecast.temp}°${forecast.tempUnit}",
+                                style = MaterialTheme.typography.headlineLarge,
+                                fontWeight = FontWeight.SemiBold
+                            )
 
-                        fontSize =
-                            16.sp,
+                            Text(
+                                text = forecast.shortForecast
+                            )
 
-                        textAlign =
-                            TextAlign.Center
-                    )
+                            Text(
+                                text = "Forecast time: ${forecast.endTime}",
+                                style = MaterialTheme.typography.bodySmall
+                            )
+                        }
+                        else -> {
+                            Text(
+                                text = uiState.errorMessage
+                                    ?: forecastStatus?.message
+                                    ?: "Forecast did not load successfully"
+                            )
+                        }
+                    }
                 }
             }
 
@@ -355,6 +381,15 @@ fun WeatherReportScreen(
                             )
                     )
 
+                    Text(
+                        text = forecast?.detailedForecast ?: "Forecast details unavailable."
+                    )
+
+                    Spacer(
+                        modifier =
+                            Modifier.padding(20.dp)
+                    )
+
                     Row(
                         modifier =
                             Modifier.fillMaxWidth(),
@@ -371,7 +406,9 @@ fun WeatherReportScreen(
                                 "Precipitation",
 
                             value =
-                                "—"
+                                forecast?.precipitationPercent
+                                    ?.let{"$it%"}
+                                    ?:"_"
                         )
 
                         WeatherDetailItem(
@@ -382,7 +419,9 @@ fun WeatherReportScreen(
                                 "Wind",
 
                             value =
-                                "—"
+                                forecast?.let {
+                                    "${it.windDirection} ${it.windSpeed}"
+                                } ?: "—"
                         )
                     }
 
@@ -409,7 +448,9 @@ fun WeatherReportScreen(
                                 "Humidity",
 
                             value =
-                                "—"
+                                forecast?.humidityPercent
+                                    ?.let { "$it%" }
+                                    ?: "—"
                         )
 
                         WeatherDetailItem(
@@ -419,8 +460,11 @@ fun WeatherReportScreen(
                             label =
                                 "Feels Like",
 
-                            value =
-                                "—"
+                            value = forecast?.let { weather ->
+                                weather.feelsLike?.let{  temp -> "$temp°${weather.tempUnit}"
+
+                                }
+                            }  ?: "—"
                         )
                     }
                 }
@@ -432,6 +476,68 @@ fun WeatherReportScreen(
                         16.dp
                     )
             )
+
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(
+                    containerColor = Color.White
+                )
+            ) {
+                Text(
+                    text = "AIR QUALITY ESTIMATE",
+                    fontWeight = FontWeight.Bold
+                )
+                Text(text = uiState.areaName)
+
+                when {
+                      uiState.isLoading -> {
+                          CircularProgressIndicator()
+                      }
+
+                    !uiState.hasLocation -> {
+                        Text("Click Locate Me for Location")
+                    }
+
+                    airQuality != null -> {
+                        Text(
+                            text = "US AQI: ${airQuality.usAqi ?: "_"}",
+                            style = MaterialTheme.typography.headlineMedium
+                        )
+
+                        Text(text = airQuality.category)
+
+                        Text(
+                            text = "PM2.5" +
+                                    (airQuality.pm25?.let {"$it µg/m³"} ?: "Unavailable")
+                        )
+                        Text(
+                              text = "PM10: " +
+                                      (airQuality.pm10?.let {"$it µg/m³"} ?: "Unavailable")
+
+                          )
+
+                         Text(
+                                text = "Valid time: ${airQuality.validTime}",
+                             style = MaterialTheme.typography.bodySmall
+
+                            )
+                         }
+
+                   else -> {
+                        Text(
+                            text = uiState.errorMessage
+                                ?: airQualityStatus?.message
+                                ?: "Air quality has not loaded"
+
+                        )
+                   }
+                }
+                Text(
+                    text = "Air-quality data: CAMS via Open-Meteo",
+                    style = MaterialTheme.typography.bodySmall
+                )
+            }
 
             /*
              * -------------------------------------------------
@@ -483,18 +589,35 @@ fun WeatherReportScreen(
                             )
                     )
 
-                    Text(
-                        text =
-                            "Live NWS weather warnings will appear here when connected.",
 
-                        color =
-                            Color(
-                                0xFF666666
-                            ),
 
-                        fontSize =
-                            14.sp
-                    )
+                               when {
+                                   uiState.isLoading -> Text("Loading alerts...")
+
+                                   !uiState.hasLocation ->
+                                       Text("Select a location in Explorer.")
+
+                                   uiState.errorMessage != null ->
+                                       Text(uiState.errorMessage.orEmpty())
+
+                                   nwsStatus?.state == SafetySourceState.SUCCESS -> {
+                                       if (uiState.weatherNotifications.isEmpty()) {
+                                           Text("No active NWS alerts returned for this location.")
+                                       } else {
+                                           uiState.weatherNotifications.forEach { alert ->
+                                               Text(
+                                                   text = alert.title,
+                                                   fontWeight = FontWeight.Bold
+                                               )
+                                               Text(text = alert.details)
+                                               Text(text = alert.instruct)
+                                               Spacer(modifier = Modifier.height(12.dp))
+                                           }
+                                       }
+                                   }
+
+                                   else -> Text(nwsStatus?.message ?: "Alerts not loaded.")
+                               }
                 }
             }
 
@@ -555,8 +678,13 @@ fun WeatherReportScreen(
                     )
 
                     Text(
-                        text =
-                            "Waiting for the team's NWS weather client.",
+                        text = when{
+                            uiState.isLoading -> "Loading Forecast..."
+                            !uiState.hasLocation -> "Select a location in Explorer."
+                            uiState.errorMessage != null -> uiState.errorMessage.orEmpty()
+                            else -> forecastStatus?.message ?:"Forecast not loaded"
+                        },
+
 
                         color =
                             mediumGreen,
@@ -564,6 +692,17 @@ fun WeatherReportScreen(
                         fontSize =
                             13.sp
                     )
+                    Text(
+                        text = "Weather data by Open-Meteo.com",
+                        style = MaterialTheme.typography.bodySmall
+                    )
+
+                    TextButton(
+                        onClick = safetyView::refreshNotifications,
+                        enabled = uiState.hasLocation && !uiState.isLoading
+                    ) {
+                         Text("Refresh safety updates")
+                    }
                 }
             }
 

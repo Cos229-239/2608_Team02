@@ -151,7 +151,13 @@ class NpsAlertClient(
                     parks += NpsParkOption(
                         parkCode = item.getString("parkCode"),
                         fullName = item.getString("fullName"),
-                        states = item.optionalText("states").orEmpty()
+                        states = item.optionalText("states").orEmpty(),
+                        latitude = item.optionalText("latitude")
+                            ?.toDoubleOrNull()
+                            ?.takeIf{ it.isFinite() && it in -90.0..90.0 },
+                        longitude = item.optionalText("longitude")
+                            ?.toDoubleOrNull()
+                            ?.takeIf { it.isFinite() && it in -180.0..180.0 }
                     )
                 }
 
