@@ -1,5 +1,6 @@
 package com.cos229239.team02.oto.data.resource
 
+import android.location.Location
 import com.cos229239.team02.oto.data.resource.NpsAlertClient
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -28,6 +29,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.cos229239.team02.oto.data.location.OtoLocation
 import com.cos229239.team02.oto.data.safety.NpsParkOption
 import com.cos229239.team02.oto.data.safety.SafetyHttpException
 import kotlinx.coroutines.CancellationException
@@ -39,7 +41,11 @@ import org.json.JSONException
 fun NpsParkPicker(
     client: NpsAlertClient,
     selectedParkCode: String?,
-    onParkSelected: (String?) -> Unit
+    location: OtoLocation?,
+    autoSelection: Boolean,
+    onParkSelected: (String?) -> Unit,
+    onNearestParkSelect: (String, OtoLocation) -> Unit,
+    onUseNearestPark: () -> Unit
 ){
     var parks by remember {
         mutableStateOf<List<NpsParkOption>>(emptyList())
@@ -113,6 +119,51 @@ fun NpsParkPicker(
     val selectedPark = parks.firstOrNull {
         it.parkCode == selectedParkCode
     }
+    val nearestPark = remember (
+        parks,
+        location?.latitude,
+        location?.longitude
+    ){
+      val target = location
+
+      if (target == null) {
+          null
+      } else {
+          parks.mapNotNull { park ->
+              val latitude = park.latitude
+              val longitude = park.longitude
+
+              if (latitude == null || longitude == null) {
+                  null
+              } else {
+                  val distance = FloatArray(1)
+
+                  Location.distanceBetween(
+                      target.latitude,
+                      target.longitude,
+                      latitude,
+                      longitude,
+                      distance
+                  )
+                  park to distance[0]
+              }
+          }.minByOrNull { it.second }
+      }
+    }
+    LaunchedEffect(
+        nearestPark?.first?.parkCode,
+        location?.latitude,
+        location?.longitude,
+        autoSelection
+    ) {
+        val target = location
+        val park = nearestPark?.first
+
+        if (autoSelection && target != null && park != null)
+        {
+            onNearestParkSelect(park.parkCode, target)
+        }
+    }
 
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -134,8 +185,40 @@ fun NpsParkPicker(
 
             Text(
                 text = "Search for a park and select it." +
-                "OTO fill in its code automatically."
+                " OTO fill its code in automatically."
             )
+            Text(
+                text = if (autoSelection) {
+                    "Automatically selecting the nearest NPS park...."
+                } else {
+                    "Using your manually selected park."
+                }
+            )
+
+            if (location == null) {
+                Text("Select a destination in plan trip or use Locate in the Explorer Screen")
+            }
+
+            nearestPark?.let { (parks, distanceMeters) ->
+                Text(
+                    text = "Nearest: ${parks.fullName}",
+                    fontWeight = FontWeight.SemiBold
+                )
+
+                Text(
+                    text = String.format(
+                        java.util.Locale.US,
+                        "Approx %.1f miles from the park's listed location.",
+                        distanceMeters / 1609.344
+                    ),
+                    style = MaterialTheme.typography.bodySmall
+                )
+            }
+            if (!autoSelection) {
+                TextButton(onClick = onUseNearestPark) {
+                    Text("Use nearest park")
+                }
+            }
 
             OutlinedTextField(
                 value = query,
