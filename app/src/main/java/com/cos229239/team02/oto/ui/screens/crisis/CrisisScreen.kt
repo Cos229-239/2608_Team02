@@ -3,7 +3,6 @@ package com.cos229239.team02.oto.ui.screens.crisis
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -443,12 +442,9 @@ private fun CrisisActionTile(
 ) {
 
     Card(
+        onClick = onClick,
         modifier =
-            modifier
-                .height(150.dp)
-                .clickable {
-                    onClick()
-                },
+            modifier.heightIn(min = 150.dp),
 
         colors =
             CardDefaults.cardColors(
