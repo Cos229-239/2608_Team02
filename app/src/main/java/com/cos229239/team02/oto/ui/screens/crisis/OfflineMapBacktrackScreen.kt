@@ -39,6 +39,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.Lifecycle
@@ -163,7 +164,85 @@ fun OfflineMapBacktrackScreen(
         }
     }
 
-    val isTracking = viewModel.isTracking
+    Scaffold(
+        topBar = {
+
+            //Use OTO's shared Material 3 top app bar.
+            OtoTopAppBar(
+                title = "OFFLINE MAPS & BACKTRACK",
+                onBackClick = onBackClick
+            )
+        }
+    ) { paddingValues ->
+
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(paddingValues),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+
+            // ----- Live Map -----
+            LiveTrackingMapCard(
+                viewModel = viewModel,
+                onLocateMeClick = ::requestLocation,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(start = 16.dp, top = 16.dp, end = 16.dp)
+            )
+
+            // ----- Scrollable Dashboard -----
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxWidth()
+                    .verticalScroll(rememberScrollState())
+                    .padding(start = 16.dp, end = 16.dp, bottom = 16.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+
+                Text(
+                    text = "Track your route and find your way back, even without a signal.",
+                    style = MaterialTheme.typography.bodyMedium
+                )
+
+                // ----- Route Tracking -----
+                RouteTrackingCard(
+                    viewModel = viewModel
+                )
+
+                // ----- Backtrack -----
+                BacktrackCard(
+                    viewModel = viewModel
+                )
+
+                // ----- Offline Maps -----
+                OfflineMapsCard(
+                    viewModel = viewModel
+                )
+            }
+        }
+    }
+}
+
+/*
+ * ---------------------------------------------------------
+ * LIVE MAP
+ * ---------------------------------------------------------
+ *
+ * Reusable live map card showing the user's current location
+ * and the recorded (or reversed) route, with a small status
+ * overlay and Locate Me action.
+ */
+
+@Composable
+fun LiveTrackingMapCard(
+    viewModel: OfflineMapBacktrackViewModel,
+    onLocateMeClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    mapHeight: Dp = 440.dp
+) {
+
     val isBacktracking = viewModel.isBacktracking
     val currentLocation = viewModel.currentLocation
 
@@ -211,319 +290,322 @@ fun OfflineMapBacktrackScreen(
         }
     }
 
-    Scaffold(
-        topBar = {
-            //Use OTO's shared Material 3 top app bar.
-            OtoTopAppBar(
-                title = "OFFLINE MAPS & BACKTRACK",
-                onBackClick = onBackClick
-            )
-        }
-    ) { paddingValues ->
-        Column(
+    Card(
+        modifier = modifier
+    ) {
+        Box(
             modifier = Modifier
-                .fillMaxSize()
-                .padding(paddingValues),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+                .fillMaxWidth()
+                .height(mapHeight)
         ) {
 
-            // ----- Live Map -----
+            OtoMap(
+                modifier = Modifier.fillMaxSize(),
+                latitude = mapLatitude,
+                longitude = mapLongitude,
+                routePoints = mapRoutePoints,
+                followCamera = true,
+                showMyLocationButton = false
+            )
+
             Card(
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(start = 16.dp, top = 16.dp, end = 16.dp)
+                    .align(Alignment.BottomCenter)
+                    .padding(10.dp),
+                colors = CardDefaults.cardColors(
+                    containerColor = Color.White.copy(alpha = 0.92f)
+                ),
+                shape = RoundedCornerShape(12.dp)
             ) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(440.dp)
+
+                Column(
+                    modifier = Modifier.padding(10.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
                 ) {
 
-                    OtoMap(
-                        modifier = Modifier.fillMaxSize(),
-                        latitude = mapLatitude,
-                        longitude = mapLongitude,
-                        routePoints = mapRoutePoints,
-                        followCamera = true,
-                        showMyLocationButton = false
-                    )
+                    val locationText =
+                        currentLocation?.let { location ->
+                            "Lat ${"%.5f".format(Locale.US, location.latitude)}  •  " +
+                                "Lon ${"%.5f".format(Locale.US, location.longitude)}"
+                        } ?: viewModel.locationStatus
 
-                    Card(
-                        modifier = Modifier
-                            .align(Alignment.BottomCenter)
-                            .padding(10.dp),
-                        colors = CardDefaults.cardColors(
-                            containerColor = Color.White.copy(alpha = 0.92f)
-                        ),
-                        shape = RoundedCornerShape(12.dp)
-                    ) {
-
-                        Column(
-                            modifier = Modifier.padding(10.dp),
-                            horizontalAlignment = Alignment.CenterHorizontally
-                        ) {
-
-                            val locationText =
-                                currentLocation?.let { location ->
-                                    "Lat ${"%.5f".format(Locale.US, location.latitude)}  •  " +
-                                        "Lon ${"%.5f".format(Locale.US, location.longitude)}"
-                                } ?: viewModel.locationStatus
-
-                            Text(
-                                text = locationText,
-                                style = MaterialTheme.typography.bodySmall,
-                                textAlign = TextAlign.Center
-                            )
-
-                            if (
-                                isBacktracking &&
-                                viewModel.guideTarget != null
-                            ) {
-                                Text(
-                                    text = viewModel.backtrackGuidance,
-                                    style = MaterialTheme.typography.bodySmall,
-                                    fontWeight = FontWeight.Bold,
-                                    color = OtoLocationBlue,
-                                    textAlign = TextAlign.Center
-                                )
-                            }
-
-                            if (currentLocation == null) {
-                                TextButton(onClick = { requestLocation() }) {
-                                    Text("📍 Locate Me")
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-
-            // ----- Scrollable Dashboard -----
-            Column(
-                modifier = Modifier
-                    .weight(1f)
-                    .fillMaxWidth()
-                    .verticalScroll(rememberScrollState())
-                    .padding(start = 16.dp, end = 16.dp, bottom = 16.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp)
-            ) {
-
-                Text(
-                    text = "Track your route and find your way back, even without a signal.",
-                    style = MaterialTheme.typography.bodyMedium
-                )
-
-                // ----- Route Tracking -----
-                Card(modifier = Modifier.fillMaxWidth()) {
-                Column(modifier = Modifier.padding(16.dp)) {
                     Text(
-                        text = "Route Tracking",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold
+                        text = locationText,
+                        style = MaterialTheme.typography.bodySmall,
+                        textAlign = TextAlign.Center
                     )
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text(
-                        text = viewModel.trackingStatus,
-                        style = MaterialTheme.typography.bodyMedium
-                    )
-                    if (viewModel.previousSessionRouteLoaded) {
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Text(
-                            text = "This route was recorded earlier " +
-                                "and is ready to backtrack.",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = OtoWarningAmber
-                        )
-                        if (!isTracking && !isBacktracking) {
-                            TextButton(
-                                onClick = {
-                                    viewModel.clearPreviousRoute()
-                                }
-                            ) {
-                                Text("🗑 Clear Previous Route")
-                            }
-                        }
-                    }
-                    if (viewModel.saveRouteError != null) {
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Text(
-                            text = viewModel.saveRouteError.orEmpty(),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = OtoCrisisRed
-                        )
-                    }
-                    if (viewModel.routeSummary != null) {
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Text(
-                            text = viewModel.routeSummary.orEmpty(),
-                            style = MaterialTheme.typography.bodySmall,
-                            fontWeight = FontWeight.Bold,
-                            color = OtoSuccess
-                        )
-                    }
+
                     if (
-                        !isTracking &&
-                        !isBacktracking &&
-                        !viewModel.previousSessionRouteLoaded
+                        isBacktracking &&
+                        viewModel.guideTarget != null
                     ) {
-                        Spacer(modifier = Modifier.height(4.dp))
-                        TextButton(
-                            onClick = {
-                                viewModel.loadLastSavedRoute()
-                            }
-                        ) {
-                            Text("📂 Load Last Route")
-                        }
-                    }
-                    Spacer(modifier = Modifier.height(12.dp))
-                    Button(
-                        onClick = {
-                            if (isTracking) {
-                                viewModel.stopTracking()
-                            } else {
-                                viewModel.startTracking()
-                            }
-                        },
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = if (isTracking) {
-                            ButtonDefaults.buttonColors(
-                                containerColor = OtoCrisisRed
-                            )
-                        } else {
-                            ButtonDefaults.buttonColors()
-                        }
-                    ) {
-                        Text(
-                            text = if (isTracking) "Stop Tracking" else "Start Tracking"
-                        )
-                    }
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text(
-                        text = "Route tracking records your path so you can backtrack later.",
-                        style = MaterialTheme.typography.bodySmall
-                    )
-                }
-            }
-
-            // ----- Backtrack -----
-            Card(modifier = Modifier.fillMaxWidth()) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Text(
-                        text = "Backtrack",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text(
-                        text = viewModel.backtrackStatus,
-                        style = MaterialTheme.typography.bodyMedium
-                    )
-                    if (isBacktracking && !viewModel.backtrackGuidance.isNullOrEmpty()
-                        && viewModel.backtrackStatus != "You are back at the start of your route"
-                    ) {
-                        Spacer(modifier = Modifier.height(4.dp))
                         Text(
                             text = viewModel.backtrackGuidance,
-                            style = MaterialTheme.typography.bodyLarge,
-                            fontWeight = FontWeight.Bold,
-                            color = OtoSuccess
-                        )
-                    }
-                    Spacer(modifier = Modifier.height(12.dp))
-                    Button(
-                        onClick = {
-                            if (isBacktracking) {
-                                viewModel.stopBacktrack()
-                            } else {
-                                viewModel.startBacktrack()
-                            }
-                        },
-                        modifier = Modifier.fillMaxWidth(),
-                        enabled = viewModel.routePoints.size >= 2,
-                        colors = if (isBacktracking) {
-                            ButtonDefaults.buttonColors(
-                                containerColor = OtoCrisisRed
-                            )
-                        } else {
-                            ButtonDefaults.buttonColors()
-                        }
-                    ) {
-                        Text(
-                            text = if (isBacktracking) "Stop Backtrack" else "Start Backtrack"
-                        )
-                    }
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text(
-                        text = "Backtrack guides you back along the route you came from.",
-                        style = MaterialTheme.typography.bodySmall
-                    )
-                }
-            }
-
-            // ----- Offline Maps -----
-            Card(modifier = Modifier.fillMaxWidth()) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Text(
-                        text = "Offline Maps",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text(
-                        text = "Download maps before you head out so they work without a signal.",
-                        style = MaterialTheme.typography.bodyMedium
-                    )
-
-                    if (viewModel.downloadError != null) {
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Text(
-                            text = viewModel.downloadError.orEmpty(),
                             style = MaterialTheme.typography.bodySmall,
-                            color = OtoCrisisRed
+                            fontWeight = FontWeight.Bold,
+                            color = OtoLocationBlue,
+                            textAlign = TextAlign.Center
                         )
                     }
 
                     if (currentLocation == null) {
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Text(
-                            text = "Use Locate Me above to enable downloads " +
-                                "for your area.",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = OtoWarningAmber
-                        )
-                    }
-
-                    Spacer(modifier = Modifier.height(12.dp))
-
-                    OfflineMapBacktrackViewModel.DEFAULT_REGION_OPTIONS.forEach { option ->
-                        val pack =
-                            viewModel.offlinePacks.firstOrNull {
-                                viewModel.regionNameFor(it) == option.name
-                            }
-
-                        OfflineRegionRow(
-                            option = option,
-                            pack = pack,
-                            hasLocation = currentLocation != null,
-                            estimatedTiles =
-                                currentLocation?.let { location ->
-                                    OfflineMapBacktrackViewModel.estimatedTilesFor(
-                                        option = option,
-                                        latitude = location.latitude
-                                    )
-                                },
-                            onDownload = {
-                                viewModel.downloadRegion(option)
-                            },
-                            onDelete = {
-                                pack?.let(viewModel::deleteRegion)
-                            }
-                        )
-
-                        Spacer(modifier = Modifier.height(8.dp))
+                        TextButton(onClick = onLocateMeClick) {
+                            Text("📍 Locate Me")
+                        }
                     }
                 }
             }
+        }
+    }
+}
+
+/*
+ * ---------------------------------------------------------
+ * ROUTE TRACKING
+ * ---------------------------------------------------------
+ */
+
+@Composable
+fun RouteTrackingCard(
+    viewModel: OfflineMapBacktrackViewModel
+) {
+
+    val isTracking = viewModel.isTracking
+    val isBacktracking = viewModel.isBacktracking
+
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Text(
+                text = "Route Tracking",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                text = viewModel.trackingStatus,
+                style = MaterialTheme.typography.bodyMedium
+            )
+            if (viewModel.previousSessionRouteLoaded) {
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = "This route was recorded earlier " +
+                        "and is ready to backtrack.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = OtoWarningAmber
+                )
+                if (!isTracking && !isBacktracking) {
+                    TextButton(
+                        onClick = {
+                            viewModel.clearPreviousRoute()
+                        }
+                    ) {
+                        Text("🗑 Clear Previous Route")
+                    }
+                }
+            }
+            if (viewModel.saveRouteError != null) {
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = viewModel.saveRouteError.orEmpty(),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = OtoCrisisRed
+                )
+            }
+            if (viewModel.routeSummary != null) {
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = viewModel.routeSummary.orEmpty(),
+                    style = MaterialTheme.typography.bodySmall,
+                    fontWeight = FontWeight.Bold,
+                    color = OtoSuccess
+                )
+            }
+            if (
+                !isTracking &&
+                !isBacktracking &&
+                !viewModel.previousSessionRouteLoaded
+            ) {
+                Spacer(modifier = Modifier.height(4.dp))
+                TextButton(
+                    onClick = {
+                        viewModel.loadLastSavedRoute()
+                    }
+                ) {
+                    Text("📂 Load Last Route")
+                }
+            }
+            Spacer(modifier = Modifier.height(12.dp))
+            Button(
+                onClick = {
+                    if (isTracking) {
+                        viewModel.stopTracking()
+                    } else {
+                        viewModel.startTracking()
+                    }
+                },
+                modifier = Modifier.fillMaxWidth(),
+                colors = if (isTracking) {
+                    ButtonDefaults.buttonColors(
+                        containerColor = OtoCrisisRed
+                    )
+                } else {
+                    ButtonDefaults.buttonColors()
+                }
+            ) {
+                Text(
+                    text = if (isTracking) "Stop Tracking" else "Start Tracking"
+                )
+            }
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                text = "Route tracking records your path so you can backtrack later.",
+                style = MaterialTheme.typography.bodySmall
+            )
+        }
+    }
+}
+
+/*
+ * ---------------------------------------------------------
+ * BACKTRACK
+ * ---------------------------------------------------------
+ */
+
+@Composable
+fun BacktrackCard(
+    viewModel: OfflineMapBacktrackViewModel
+) {
+
+    val isBacktracking = viewModel.isBacktracking
+
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Text(
+                text = "Backtrack",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                text = viewModel.backtrackStatus,
+                style = MaterialTheme.typography.bodyMedium
+            )
+            if (isBacktracking && !viewModel.backtrackGuidance.isNullOrEmpty()
+                && viewModel.backtrackStatus != "You are back at the start of your route"
+            ) {
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = viewModel.backtrackGuidance,
+                    style = MaterialTheme.typography.bodyLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = OtoSuccess
+                )
+            }
+            Spacer(modifier = Modifier.height(12.dp))
+            Button(
+                onClick = {
+                    if (isBacktracking) {
+                        viewModel.stopBacktrack()
+                    } else {
+                        viewModel.startBacktrack()
+                    }
+                },
+                modifier = Modifier.fillMaxWidth(),
+                enabled = viewModel.routePoints.size >= 2,
+                colors = if (isBacktracking) {
+                    ButtonDefaults.buttonColors(
+                        containerColor = OtoCrisisRed
+                    )
+                } else {
+                    ButtonDefaults.buttonColors()
+                }
+            ) {
+                Text(
+                    text = if (isBacktracking) "Stop Backtrack" else "Start Backtrack"
+                )
+            }
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                text = "Backtrack guides you back along the route you came from.",
+                style = MaterialTheme.typography.bodySmall
+            )
+        }
+    }
+}
+
+/*
+ * ---------------------------------------------------------
+ * OFFLINE MAPS
+ * ---------------------------------------------------------
+ */
+
+@Composable
+fun OfflineMapsCard(
+    viewModel: OfflineMapBacktrackViewModel
+) {
+
+    val currentLocation = viewModel.currentLocation
+
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Text(
+                text = "Offline Maps",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                text = "Download maps before you head out so they work without a signal.",
+                style = MaterialTheme.typography.bodyMedium
+            )
+
+            if (viewModel.downloadError != null) {
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = viewModel.downloadError.orEmpty(),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = OtoCrisisRed
+                )
+            }
+
+            if (currentLocation == null) {
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = "Use Locate Me above to enable downloads " +
+                        "for your area.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = OtoWarningAmber
+                )
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            OfflineMapBacktrackViewModel.DEFAULT_REGION_OPTIONS.forEach { option ->
+                val pack =
+                    viewModel.offlinePacks.firstOrNull {
+                        viewModel.regionNameFor(it) == option.name
+                    }
+
+                OfflineRegionRow(
+                    option = option,
+                    pack = pack,
+                    hasLocation = currentLocation != null,
+                    estimatedTiles =
+                        currentLocation?.let { location ->
+                            OfflineMapBacktrackViewModel.estimatedTilesFor(
+                                option = option,
+                                latitude = location.latitude
+                            )
+                        },
+                    onDownload = {
+                        viewModel.downloadRegion(option)
+                    },
+                    onDelete = {
+                        pack?.let(viewModel::deleteRegion)
+                    }
+                )
+
+                Spacer(modifier = Modifier.height(8.dp))
             }
         }
     }

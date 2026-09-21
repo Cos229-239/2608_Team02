@@ -1,5 +1,6 @@
 package com.cos229239.team02.oto.data.safety
 
+import com.cos229239.team02.oto.data.resource.AirQualityData
 import com.cos229239.team02.oto.data.resource.ResourceResult
 import com.cos229239.team02.oto.data.resource.WeatherForecast
 import org.maplibre.compose.expressions.value.DpValue
@@ -71,7 +72,8 @@ data class AreaSafetyData(
 
     val sources: List<SafetySourceStatus> = emptyList(),
     val checkedAtMillis: Long = System.currentTimeMillis(),
-    val forecast: WeatherForecast? = null
+    val forecast: WeatherForecast? = null,
+    val airQuality: AirQualityData? = null
 
 )
 

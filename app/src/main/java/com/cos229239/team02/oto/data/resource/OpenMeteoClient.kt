@@ -10,6 +10,7 @@ import okhttp3.Request
 import java.io.IOException
 import java.time.Instant
 import kotlin.math.roundToInt
+import com.cos229239.team02.oto.data.resource.WeatherForecast
 
 class OpenMeteoClient(
     private val httpClient: OkHttpClient
@@ -29,7 +30,10 @@ class OpenMeteoClient(
 
         val hourlyVariables = listOf(
             "temperature_2m",
+            "relative_humidity_2m",
+            "apparent_temperature",
             "weather_code",
+            "is_day",
             "precipitation_probability",
             "wind_speed_10m",
             "wind_direction_10m"
@@ -57,6 +61,7 @@ class OpenMeteoClient(
             .addQueryParameter("forecast_days", "2")
             .build()
 
+
         val request = Request.Builder()
             .url(url)
             .header("Accept", "application/json")
@@ -69,7 +74,16 @@ class OpenMeteoClient(
         val index = (0 until times.length()).firstOrNull{
             times.getLong(it) >= now
         } ?: throw IOException("No upcoming forecast hour returned.")
+        fun optionalNumber(name: String): Double? {
+            val values = hourly.optJSONArray(name) ?: return null
 
+            if(index >= values.length() || values.isNull(index))
+            {
+                return null
+            }
+            return values.optDouble(index)
+                .takeIf { it.isFinite() }
+        }
         fun requiredNumber(name: String): Double{
             val values = hourly.getJSONArray(name)
             if (values.isNull(index)) {
@@ -120,7 +134,75 @@ class OpenMeteoClient(
             windDirection = compassDirection(direction),
             precipitationPercent = probability,
             startTime = Instant.ofEpochSecond(validTime - 3600).toString(),
-            endTime = Instant.ofEpochSecond(validTime).toString()
+            endTime = Instant.ofEpochSecond(validTime).toString(),
+            humidityPercent = optionalNumber("relative_humidity_2m")
+                ?.roundToInt(),
+            feelsLike = optionalNumber("apparent_temperature")
+                ?.roundToInt(),
+            weatherCode = optionalNumber("weather_code")
+                ?.toInt(),
+            isDay = optionalNumber("is_day")?.let { it == 1.0 }
+        )
+
+    }
+    suspend fun getAirQuality(
+        location: OtoLocation
+    ): AirQualityData = withContext(Dispatchers.IO) {
+        require(
+            location.latitude.isFinite() &&
+            location.latitude in -90.0..90.0 &&
+            location.longitude.isFinite() &&
+            location.longitude in -180.0..180.0
+        ){
+            "Invalid coordinates"
+        }
+        val variables = listOf(
+            "us_aqi",
+            "pm2_5",
+            "pm10"
+        )
+        // Air Quality Api
+        val url = "https://air-quality-api.open-meteo.com/v1/air-quality"
+            .toHttpUrl()
+            .newBuilder()
+            .addQueryParameter("latitude", location.latitude.toString())
+            .addQueryParameter("longitude", location.longitude.toString())
+            .addQueryParameter("current", "us_aqi,pm2_5,pm10")
+            .addQueryParameter("timeformat", "unixtime")
+            .build()
+
+
+        val request = Request.Builder()
+            .url(url)
+            .header("Accept", "application/json")
+            .build()
+
+        val root = httpClient.getSafetyJson(request)
+        val current = root.getJSONObject("current")
+
+        fun optionalValue(name: String): Double? {
+            if (!current.has(name) || current.isNull(name)) {
+                return null
+            }
+
+            return current.optDouble(name)
+                .takeIf { it.isFinite() && it >= 0 }
+        }
+        val aqi = optionalValue("us_aqi")
+        val pm25 = optionalValue("pm2_5")
+        val pm10 = optionalValue("pm10")
+
+        if (aqi == null && pm25 == null && pm10 == null) {
+            throw IOException("Air-quality data unavailable for this location")
+        }
+
+        AirQualityData(
+            usAqi = aqi?.roundToInt(),
+            pm25 = pm25,
+            pm10 = pm10,
+            validTime = Instant.ofEpochSecond(
+                current.getLong("time")
+            ).toString()
         )
 
     }
