@@ -40,7 +40,10 @@ android {
             "String",
             "NPS_API_KEY",
             quotedBuildConfigString(
-                safetyProperties.getProperty("NPS_API_KEY", "")
+                safetyProperties.getProperty("NPS_API_KEY")
+                    ?.trim()
+                    ?.takeIf { it.isNotEmpty() }
+                    ?: "SHARED_TEAM_PROJECT_KEY"
             )
         )
 buildConfigField(
