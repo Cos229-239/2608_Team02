@@ -79,6 +79,14 @@ class AreaSafetyView (
                         parkCode = nearest.parkCode,
                         location = location
                     )
+
+                    _uiState.update { state ->
+                        if (state.selectedParkCode == nearest.parkCode) {
+                            state.copy(selectedParkName = nearest.fullName)
+                        } else {
+                            state
+                        }
+                    }
                 }
             } catch (error: CancellationException) {
                 throw error
