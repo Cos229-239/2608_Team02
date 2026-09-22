@@ -26,8 +26,6 @@ import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.Place
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Warning
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
@@ -41,6 +39,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -50,8 +49,6 @@ import com.cos229239.team02.oto.ui.components.OtoTopAppBar
 import com.cos229239.team02.oto.ui.features.OfflineMapBacktrackViewModel
 import com.cos229239.team02.oto.ui.theme.OtoCrisisRed
 import com.cos229239.team02.oto.ui.theme.OtoCrisisRedContainer
-import com.cos229239.team02.oto.ui.theme.OtoHomeCrisisAction
-import com.cos229239.team02.oto.ui.theme.OtoHomeCrisisActionText
 import com.cos229239.team02.oto.ui.theme.OtoSpacing
 import com.cos229239.team02.oto.ui.theme.OtoTextOnDark
 import com.cos229239.team02.oto.ui.theme.OtoTextPrimary
@@ -62,12 +59,13 @@ import com.cos229239.team02.oto.ui.theme.OtoTextSecondary
  * CRISIS MODE
  * ---------------------------------------------------------
  *
- * Emergency Help is shown as the primary hero card so the
+ * Emergency Help is shown as a compact hero card so the
  * most urgent action is immediately visible.
  *
- * Route tracking and backtracking live directly on this
- * dashboard so location tools are available in one place,
- * without leaving Crisis Mode.
+ * The hero and live tracking map stay pinned above the
+ * scroll so map gestures don't fight the dashboard, and
+ * route tracking, backtracking, and the remaining tools
+ * scroll beneath them.
  *
  * The remaining tools use the same tile layout as the
  * Explorer dashboard (white cards, icon badge, title,
@@ -111,14 +109,21 @@ fun CrisisScreen(
                 Color(0xFFF7F8F6)
             }
 
+        val trackingMapHeight =
+            if (
+                LocalConfiguration.current.screenWidthDp >
+                    LocalConfiguration.current.screenHeightDp
+            ) {
+                200.dp
+            } else {
+                300.dp
+            }
+
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .background(backgroundColor)
                 .padding(paddingValues)
-                .verticalScroll(
-                    rememberScrollState()
-                )
                 .padding(
                     horizontal = OtoSpacing.ScreenHorizontal,
                     vertical = OtoSpacing.ScreenVertical
@@ -130,15 +135,18 @@ fun CrisisScreen(
 
             /*
              * -------------------------------------------------
-             * EMERGENCY HELP HERO
+             * FIXED: EMERGENCY HELP HERO + TRACKING MAP
              * -------------------------------------------------
+             *
+             * The hero and live map stay pinned above the scroll
+             * so pan/zoom gestures on the map never fight the
+             * dashboard's scrolling.
              */
 
             CrisisHeroCard(
                 title = "EMERGENCY HELP",
                 description = "Get help, find critical resources, and access survival tools.",
                 icon = Icons.Filled.Warning,
-                buttonLabel = "OPEN EMERGENCY HELP",
                 onClick = onEmergencyHelpClick
             )
 
@@ -186,90 +194,101 @@ fun CrisisScreen(
                 onLocateMeClick = requestLocation,
                 modifier =
                     Modifier.fillMaxWidth(),
-                mapHeight = 300.dp
+                mapHeight = trackingMapHeight
             )
 
             /*
              * -------------------------------------------------
-             * ROUTE TRACKING + BACKTRACK
+             * SCROLLABLE DASHBOARD
              * -------------------------------------------------
+             *
+             * Route tracking, backtracking, and the crisis tool
+             * tiles scroll beneath the pinned hero and map.
              */
 
-            RouteTrackingCard(
-                viewModel = viewModel
-            )
-
-            BacktrackCard(
-                viewModel = viewModel
-            )
-
-            /*
-             * -------------------------------------------------
-             * CRISIS TOOLS
-             * -------------------------------------------------
-             */
-
-            Text(
-                text = "CRISIS TOOLS",
-
-                fontSize =
-                    11.sp,
-
-                color =
-                    if (isSystemInDarkTheme()) {
-                        OtoTextOnDark
-                    } else {
-                        OtoTextSecondary
-                    },
-
-                fontWeight =
-                    FontWeight.Bold
-            )
-
-            Row(
+            Column(
                 modifier =
-                    Modifier.fillMaxWidth(),
-
-                horizontalArrangement =
+                    Modifier
+                        .weight(1f)
+                        .verticalScroll(
+                            rememberScrollState()
+                        ),
+                verticalArrangement =
                     Arrangement.spacedBy(
                         OtoSpacing.Medium
                     )
             ) {
 
-                CrisisActionTile(
-                    title = "First Aid & Survival",
-                    description = "Emergency and outdoor safety information",
-                    icon = Icons.Filled.Favorite,
-                    modifier = Modifier.weight(1f),
-                    onClick = onFirstAidSurvivalClick
+                RouteTrackingCard(
+                    viewModel = viewModel
                 )
 
-                CrisisActionTile(
-                    title = "Share Status & Location",
-                    description = "Let trusted contacts know where you are",
-                    icon = Icons.Filled.Share,
-                    modifier = Modifier.weight(1f),
-                    onClick = onShareStatusLocationClick
+                BacktrackCard(
+                    viewModel = viewModel
                 )
-            }
 
-            Row(
-                modifier =
-                    Modifier.fillMaxWidth(),
+                Text(
+                    text = "CRISIS TOOLS",
 
-                horizontalArrangement =
-                    Arrangement.spacedBy(
-                        OtoSpacing.Medium
+                    fontSize =
+                        11.sp,
+
+                    color =
+                        if (isSystemInDarkTheme()) {
+                            OtoTextOnDark
+                        } else {
+                            OtoTextSecondary
+                        },
+
+                    fontWeight =
+                        FontWeight.Bold
+                )
+
+                Row(
+                    modifier =
+                        Modifier.fillMaxWidth(),
+
+                    horizontalArrangement =
+                        Arrangement.spacedBy(
+                            OtoSpacing.Medium
+                        )
+                ) {
+
+                    CrisisActionTile(
+                        title = "First Aid & Survival",
+                        description = "Emergency and outdoor safety information",
+                        icon = Icons.Filled.Favorite,
+                        modifier = Modifier.weight(1f),
+                        onClick = onFirstAidSurvivalClick
                     )
-            ) {
 
-                CrisisActionTile(
-                    title = "Nearby Resources",
-                    description = "Critical services in your area",
-                    icon = Icons.Filled.Place,
-                    modifier = Modifier.weight(1f),
-                    onClick = onNearbyResourcesClick
-                )
+                    CrisisActionTile(
+                        title = "Share Status & Location",
+                        description = "Let trusted contacts know where you are",
+                        icon = Icons.Filled.Share,
+                        modifier = Modifier.weight(1f),
+                        onClick = onShareStatusLocationClick
+                    )
+                }
+
+                Row(
+                    modifier =
+                        Modifier.fillMaxWidth(),
+
+                    horizontalArrangement =
+                        Arrangement.spacedBy(
+                            OtoSpacing.Medium
+                        )
+                ) {
+
+                    CrisisActionTile(
+                        title = "Nearby Resources",
+                        description = "Critical services in your area",
+                        icon = Icons.Filled.Place,
+                        modifier = Modifier.weight(1f),
+                        onClick = onNearbyResourcesClick
+                    )
+                }
             }
         }
     }
@@ -281,8 +300,9 @@ fun CrisisScreen(
  * EMERGENCY HELP HERO
  * ---------------------------------------------------------
  *
- * Uses the same full-width colored card layout as the
- * Home screen, with a decorative beacon in the corner.
+ * A compact full-width red emergency action. The whole card
+ * is the button, so it stays one row and leaves room for the
+ * pinned tracking map above the dashboard scroll.
  */
 
 @Composable
@@ -290,13 +310,18 @@ private fun CrisisHeroCard(
     title: String,
     description: String,
     icon: ImageVector,
-    buttonLabel: String,
     onClick: () -> Unit
 ) {
 
     Card(
+        onClick = onClick,
         modifier =
-            Modifier.fillMaxWidth(),
+            Modifier
+                .fillMaxWidth()
+                .heightIn(
+                    min =
+                        OtoSpacing.CrisisTouchTarget
+                ),
 
         shape =
             MaterialTheme.shapes.large,
@@ -335,149 +360,108 @@ private fun CrisisHeroCard(
                             Alignment.TopEnd
                         )
                         .size(
-                            width = 125.dp,
-                            height = 100.dp
+                            width = 88.dp,
+                            height = 64.dp
                         )
             )
 
-            Column(
+            Row(
                 modifier =
                     Modifier.padding(
-                        OtoSpacing.Large
-                    )
+                        OtoSpacing.Medium
+                    ),
+                verticalAlignment =
+                    Alignment.CenterVertically
             ) {
 
-                Row(
-                    verticalAlignment =
-                        Alignment.CenterVertically
+                //Icon badge.
+                Box(
+                    modifier =
+                        Modifier
+                            .size(44.dp)
+                            .background(
+                                color =
+                                    Color.White.copy(
+                                        alpha = 0.14f
+                                    ),
+                                shape = CircleShape
+                            ),
+                    contentAlignment =
+                        Alignment.Center
                 ) {
 
-                    //Icon badge.
-                    Box(
+                    Icon(
+                        imageVector = icon,
+                        contentDescription = null,
+                        tint = Color.White,
                         modifier =
-                            Modifier
-                                .size(56.dp)
-                                .background(
-                                    color =
-                                        Color.White.copy(
-                                            alpha = 0.14f
-                                        ),
-                                    shape = CircleShape
-                                ),
-                        contentAlignment =
-                            Alignment.Center
-                    ) {
-
-                        Icon(
-                            imageVector = icon,
-                            contentDescription = null,
-                            tint = Color.White,
-                            modifier =
-                                Modifier.size(30.dp)
-                        )
-                    }
-
-                    Spacer(
-                        modifier =
-                            Modifier.width(
-                                OtoSpacing.Medium
-                            )
+                            Modifier.size(24.dp)
                     )
-
-                    Column(
-                        modifier =
-                            Modifier.weight(1f)
-                    ) {
-
-                        Text(
-                            text = title,
-                            style =
-                                MaterialTheme
-                                    .typography
-                                    .headlineMedium,
-                            color = Color.White
-                        )
-
-                        Spacer(
-                            modifier =
-                                Modifier.height(
-                                    OtoSpacing.XSmall
-                                )
-                        )
-
-                        Text(
-                            text = description,
-                            style =
-                                MaterialTheme
-                                    .typography
-                                    .bodyMedium,
-                            color =
-                                Color.White.copy(
-                                    alpha = 0.90f
-                                )
-                        )
-                    }
                 }
 
                 Spacer(
                     modifier =
-                        Modifier.height(
-                            OtoSpacing.Standard
+                        Modifier.width(
+                            OtoSpacing.Medium
                         )
                 )
 
-                //Full-width action with arrow.
-                Button(
-                    onClick = onClick,
+                Column(
                     modifier =
-                        Modifier
-                            .fillMaxWidth()
-                            .heightIn(
-                                min =
-                                    OtoSpacing.CrisisTouchTarget
-                            ),
-                    colors =
-                        ButtonDefaults.buttonColors(
-                            containerColor =
-                                OtoHomeCrisisAction,
-                            contentColor =
-                                OtoHomeCrisisActionText
-                        )
+                        Modifier.weight(1f)
                 ) {
 
-                    Row(
-                        verticalAlignment =
-                            Alignment.CenterVertically,
-                        horizontalArrangement =
-                            Arrangement.Center
-                    ) {
+                    Text(
+                        text = title,
+                        style =
+                            MaterialTheme
+                                .typography
+                                .titleMedium,
+                        fontWeight =
+                            FontWeight.Bold,
+                        color = Color.White
+                    )
 
-                        Text(
-                            text = buttonLabel,
-                            style =
-                                MaterialTheme
-                                    .typography
-                                    .labelLarge
-                        )
+                    Spacer(
+                        modifier =
+                            Modifier.height(
+                                OtoSpacing.XSmall
+                            )
+                    )
 
-                        Spacer(
-                            modifier =
-                                Modifier.width(
-                                    OtoSpacing.Small
-                                )
-                        )
-
-                        Icon(
-                            imageVector =
-                                Icons.AutoMirrored
-                                    .Filled
-                                    .KeyboardArrowRight,
-                            contentDescription = null,
-                            modifier =
-                                Modifier.size(24.dp)
-                        )
-                    }
+                    Text(
+                        text = description,
+                        style =
+                            MaterialTheme
+                                .typography
+                                .bodySmall,
+                        color =
+                            Color.White.copy(
+                                alpha = 0.90f
+                            )
+                    )
                 }
+
+                Spacer(
+                    modifier =
+                        Modifier.width(
+                            OtoSpacing.Small
+                        )
+                )
+
+                Icon(
+                    imageVector =
+                        Icons.AutoMirrored
+                            .Filled
+                            .KeyboardArrowRight,
+                    contentDescription = null,
+                    tint =
+                        Color.White.copy(
+                            alpha = 0.90f
+                        ),
+                    modifier =
+                        Modifier.size(24.dp)
+                )
             }
         }
     }
