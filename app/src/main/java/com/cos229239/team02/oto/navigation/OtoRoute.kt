@@ -15,6 +15,18 @@ sealed interface OtoRoute : NavKey {
     @Serializable
     data object Home : OtoRoute
 
+
+    /*
+     * ---------------------------------------------------------
+     * APP PREFERENCES
+     * ---------------------------------------------------------
+     */
+
+    @Serializable
+    data object Preferences : OtoRoute
+
+
+
     /*
      * ---------------------------------------------------------
      * EXPLORER

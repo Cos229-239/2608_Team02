@@ -51,12 +51,19 @@ import com.cos229239.team02.oto.ui.theme.OtoHomePreparednessCardDark
 import com.cos229239.team02.oto.ui.theme.OtoHomePreparednessCardLight
 import com.cos229239.team02.oto.ui.theme.OtoSpacing
 
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+
+
 
 @Composable
 fun HomeScreen(
     onExplorerClick: () -> Unit,
     onCrisisClick: () -> Unit,
-    onOfflineToolsClick: () -> Unit
+    onOfflineToolsClick: () -> Unit,
+    onPreferencesClick: () -> Unit
 ) {
     val context = LocalContext.current
 
@@ -189,35 +196,61 @@ fun HomeScreen(
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
 
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally
+
+            //Show the centered OTO branding with Preferences in the upper-right.
+            Box(
+                modifier = Modifier.fillMaxWidth()
             ) {
-                //Show the OTO mountain mark above the app name.
-                OtoMountainMark()
 
-                Spacer(
-                    modifier = Modifier.height(
-                        OtoSpacing.XSmall
+                Column(
+                    modifier = Modifier.align(
+                        Alignment.Center
+                    ),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+
+                    //Show the OTO mountain mark above the app name.
+                    OtoMountainMark()
+
+                    Spacer(
+                        modifier = Modifier.height(
+                            OtoSpacing.XSmall
+                        )
                     )
-                )
 
-                Text(
-                    text = "OUT IN THE OPEN",
-                    style = MaterialTheme.typography.headlineLarge,
-                    color = homeBrandColor
-                )
-
-                Spacer(
-                    modifier = Modifier.height(
-                        OtoSpacing.Small
+                    Text(
+                        text = "OUT IN THE OPEN",
+                        style = MaterialTheme.typography.headlineLarge,
+                        color = homeBrandColor
                     )
-                )
 
-                Text(
-                    text = "Explore farther. Return safer.",
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = MaterialTheme.colorScheme.onBackground
-                )
+                    Spacer(
+                        modifier = Modifier.height(
+                            OtoSpacing.Small
+                        )
+                    )
+
+                    Text(
+                        text = "Explore farther. Return safer.",
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.onBackground
+                    )
+                }
+
+                //Open app-wide OTO preferences.
+                IconButton(
+                    onClick = onPreferencesClick,
+                    modifier = Modifier.align(
+                        Alignment.TopEnd
+                    )
+                ) {
+
+                    Icon(
+                        imageVector = Icons.Filled.Settings,
+                        contentDescription = "Preferences",
+                        tint = homeBrandColor
+                    )
+                }
             }
 
             Spacer(
