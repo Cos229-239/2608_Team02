@@ -68,6 +68,81 @@ fun OfflineMapBacktrackScreen(
         viewModel()
 ) {
 
+    val requestLocation =
+        rememberOfflineMapBacktrackLocation(
+            viewModel
+        )
+
+    Scaffold(
+        topBar = {
+
+            //Use OTO's shared Material 3 top app bar.
+            OtoTopAppBar(
+                title = "OFFLINE MAPS",
+                onBackClick = onBackClick
+            )
+        }
+    ) { paddingValues ->
+
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(paddingValues),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+
+            // ----- Live Map -----
+            LiveTrackingMapCard(
+                viewModel = viewModel,
+                onLocateMeClick = requestLocation,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(start = 16.dp, top = 16.dp, end = 16.dp)
+            )
+
+            // ----- Scrollable Downloads -----
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxWidth()
+                    .verticalScroll(rememberScrollState())
+                    .padding(start = 16.dp, end = 16.dp, bottom = 16.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+
+                Text(
+                    text = "Download maps before you head out so they work without a signal.",
+                    style = MaterialTheme.typography.bodyMedium
+                )
+
+                // ----- Offline Maps -----
+                OfflineMapsCard(
+                    viewModel = viewModel
+                )
+            }
+        }
+    }
+}
+
+/*
+ * ---------------------------------------------------------
+ * SHARED LOCATION & TRACKING LIFECYCLE
+ * ---------------------------------------------------------
+ *
+ * Provides the location permission flow, an initial "locate
+ * if already granted" request, and the save-a-checkpoint-on-
+ * background behavior used by both the Crisis hub and the
+ * Offline Maps screen.
+ *
+ * Returns a requestLocation action for the map's Locate Me
+ * button.
+ */
+
+@Composable
+fun rememberOfflineMapBacktrackLocation(
+    viewModel: OfflineMapBacktrackViewModel
+): () -> Unit {
+
     val context = LocalContext.current
 
     // -------------------------------------------------------------
@@ -96,7 +171,7 @@ fun OfflineMapBacktrackScreen(
         }
 
     /**
-     * Begins tracking/tracking location the first time the screen opens
+     * Begins receiving location the first time the screen opens
      * if permission was already granted elsewhere in the app.
      */
     LaunchedEffect(Unit) {
@@ -115,32 +190,6 @@ fun OfflineMapBacktrackScreen(
 
         if (fineGranted || coarseGranted) {
             viewModel.refreshCurrentLocation()
-        }
-    }
-
-    fun requestLocation() {
-
-        val fineGranted =
-            ContextCompat.checkSelfPermission(
-                context,
-                Manifest.permission.ACCESS_FINE_LOCATION
-            ) == PackageManager.PERMISSION_GRANTED
-
-        val coarseGranted =
-            ContextCompat.checkSelfPermission(
-                context,
-                Manifest.permission.ACCESS_COARSE_LOCATION
-            ) == PackageManager.PERMISSION_GRANTED
-
-        if (fineGranted || coarseGranted) {
-            viewModel.refreshCurrentLocation()
-        } else {
-            locationPermissionLauncher.launch(
-                arrayOf(
-                    Manifest.permission.ACCESS_FINE_LOCATION,
-                    Manifest.permission.ACCESS_COARSE_LOCATION
-                )
-            )
         }
     }
 
@@ -164,63 +213,28 @@ fun OfflineMapBacktrackScreen(
         }
     }
 
-    Scaffold(
-        topBar = {
+    return {
+        val fineGranted =
+            ContextCompat.checkSelfPermission(
+                context,
+                Manifest.permission.ACCESS_FINE_LOCATION
+            ) == PackageManager.PERMISSION_GRANTED
 
-            //Use OTO's shared Material 3 top app bar.
-            OtoTopAppBar(
-                title = "OFFLINE MAPS & BACKTRACK",
-                onBackClick = onBackClick
+        val coarseGranted =
+            ContextCompat.checkSelfPermission(
+                context,
+                Manifest.permission.ACCESS_COARSE_LOCATION
+            ) == PackageManager.PERMISSION_GRANTED
+
+        if (fineGranted || coarseGranted) {
+            viewModel.refreshCurrentLocation()
+        } else {
+            locationPermissionLauncher.launch(
+                arrayOf(
+                    Manifest.permission.ACCESS_FINE_LOCATION,
+                    Manifest.permission.ACCESS_COARSE_LOCATION
+                )
             )
-        }
-    ) { paddingValues ->
-
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(paddingValues),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-
-            // ----- Live Map -----
-            LiveTrackingMapCard(
-                viewModel = viewModel,
-                onLocateMeClick = ::requestLocation,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(start = 16.dp, top = 16.dp, end = 16.dp)
-            )
-
-            // ----- Scrollable Dashboard -----
-            Column(
-                modifier = Modifier
-                    .weight(1f)
-                    .fillMaxWidth()
-                    .verticalScroll(rememberScrollState())
-                    .padding(start = 16.dp, end = 16.dp, bottom = 16.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp)
-            ) {
-
-                Text(
-                    text = "Track your route and find your way back, even without a signal.",
-                    style = MaterialTheme.typography.bodyMedium
-                )
-
-                // ----- Route Tracking -----
-                RouteTrackingCard(
-                    viewModel = viewModel
-                )
-
-                // ----- Backtrack -----
-                BacktrackCard(
-                    viewModel = viewModel
-                )
-
-                // ----- Offline Maps -----
-                OfflineMapsCard(
-                    viewModel = viewModel
-                )
-            }
         }
     }
 }

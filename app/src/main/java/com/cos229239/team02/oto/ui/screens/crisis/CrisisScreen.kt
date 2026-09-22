@@ -23,7 +23,6 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Favorite
-import androidx.compose.material.icons.filled.Map
 import androidx.compose.material.icons.filled.Place
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Warning
@@ -46,7 +45,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.cos229239.team02.oto.ui.components.OtoTopAppBar
+import com.cos229239.team02.oto.ui.features.OfflineMapBacktrackViewModel
 import com.cos229239.team02.oto.ui.theme.OtoCrisisRed
 import com.cos229239.team02.oto.ui.theme.OtoCrisisRedContainer
 import com.cos229239.team02.oto.ui.theme.OtoHomeCrisisAction
@@ -64,6 +65,10 @@ import com.cos229239.team02.oto.ui.theme.OtoTextSecondary
  * Emergency Help is shown as the primary hero card so the
  * most urgent action is immediately visible.
  *
+ * Route tracking and backtracking live directly on this
+ * dashboard so location tools are available in one place,
+ * without leaving Crisis Mode.
+ *
  * The remaining tools use the same tile layout as the
  * Explorer dashboard (white cards, icon badge, title,
  * description) with the Crisis red color identity.
@@ -75,9 +80,15 @@ fun CrisisScreen(
     onFirstAidSurvivalClick: () -> Unit,
     onShareStatusLocationClick: () -> Unit,
     onNearbyResourcesClick: () -> Unit,
-    onOfflineMapBacktrackClick: () -> Unit,
-    onBackClick: () -> Unit
+    onBackClick: () -> Unit,
+    viewModel: OfflineMapBacktrackViewModel =
+        viewModel()
 ) {
+
+    val requestLocation =
+        rememberOfflineMapBacktrackLocation(
+            viewModel
+        )
 
     Scaffold(
         topBar = {
@@ -129,6 +140,67 @@ fun CrisisScreen(
                 icon = Icons.Filled.Warning,
                 buttonLabel = "OPEN EMERGENCY HELP",
                 onClick = onEmergencyHelpClick
+            )
+
+            /*
+             * -------------------------------------------------
+             * TRACK & NAVIGATION
+             * -------------------------------------------------
+             */
+
+            Text(
+                text = "TRACK & NAVIGATION",
+
+                fontSize =
+                    11.sp,
+
+                color =
+                    if (isSystemInDarkTheme()) {
+                        OtoTextOnDark
+                    } else {
+                        OtoTextSecondary
+                    },
+
+                fontWeight =
+                    FontWeight.Bold
+            )
+
+            Text(
+                text = "Track your route and find your way back, even without a signal.",
+
+                style =
+                    MaterialTheme
+                        .typography
+                        .bodyMedium,
+
+                color =
+                    if (isSystemInDarkTheme()) {
+                        OtoTextOnDark
+                    } else {
+                        OtoTextSecondary
+                    }
+            )
+
+            LiveTrackingMapCard(
+                viewModel = viewModel,
+                onLocateMeClick = requestLocation,
+                modifier =
+                    Modifier.fillMaxWidth(),
+                mapHeight = 300.dp
+            )
+
+            /*
+             * -------------------------------------------------
+             * ROUTE TRACKING + BACKTRACK
+             * -------------------------------------------------
+             */
+
+            RouteTrackingCard(
+                viewModel = viewModel
+            )
+
+            BacktrackCard(
+                viewModel = viewModel
             )
 
             /*
@@ -197,14 +269,6 @@ fun CrisisScreen(
                     icon = Icons.Filled.Place,
                     modifier = Modifier.weight(1f),
                     onClick = onNearbyResourcesClick
-                )
-
-                CrisisActionTile(
-                    title = "Offline Maps & Backtrack",
-                    description = "Track your route without a signal",
-                    icon = Icons.Filled.Map,
-                    modifier = Modifier.weight(1f),
-                    onClick = onOfflineMapBacktrackClick
                 )
             }
         }
