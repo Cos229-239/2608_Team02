@@ -24,6 +24,10 @@ import com.cos229239.team02.oto.ui.screens.explorer.PlanTripScreen
 import com.cos229239.team02.oto.ui.screens.explorer.ReportHazardScreen
 import com.cos229239.team02.oto.ui.screens.explorer.WeatherReportScreen
 import com.cos229239.team02.oto.ui.screens.home.HomeScreen
+import com.cos229239.team02.oto.ui.preferences.AppPreferencesViewModel
+import com.cos229239.team02.oto.ui.screens.preferences.PreferencesScreen
+
+
 
 @Composable
 fun OtoNavigation() {
@@ -44,6 +48,18 @@ fun OtoNavigation() {
 
     val planTripViewModel:
             PlanTripViewModel =
+        viewModel()
+
+    /*
+    * ---------------------------------------------------------
+    * SHARED APP PREFERENCES VIEW MODEL
+    * ---------------------------------------------------------
+    *
+    * Holds app-wide preferences such as distance units.
+    */
+
+    val appPreferencesViewModel:
+            AppPreferencesViewModel =
         viewModel()
 
     /*
@@ -174,6 +190,24 @@ fun OtoNavigation() {
                             backStack.add(
                                 OtoRoute.OfflineMapBacktrack
                             )
+                        }
+                    )
+                }
+
+                /*
+                * =================================================
+                * APP PREFERENCES
+                * =================================================
+                */
+
+                entry<OtoRoute.Preferences> {
+
+                    PreferencesScreen(
+                        appPreferencesViewModel =
+                            appPreferencesViewModel,
+
+                        onBackClick = {
+                            backStack.removeLastOrNull()
                         }
                     )
                 }
