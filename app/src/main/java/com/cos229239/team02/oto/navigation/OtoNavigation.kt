@@ -190,6 +190,13 @@ fun OtoNavigation() {
                             backStack.add(
                                 OtoRoute.OfflineMapBacktrack
                             )
+                        },
+
+                        onPreferencesClick = {
+
+                            backStack.add(
+                                OtoRoute.Preferences
+                            )
                         }
                     )
                 }
