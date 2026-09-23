@@ -9,10 +9,12 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -67,6 +69,9 @@ import com.cos229239.team02.oto.ui.theme.OtoTextSecondary
  * route tracking, backtracking, and the remaining tools
  * scroll beneath them.
  *
+ * On short landscape screens (phones in landscape) the map
+ * and dashboard split side by side so both stay reachable.
+ *
  * The remaining tools use the same tile layout as the
  * Explorer dashboard (white cards, icon badge, title,
  * description) with the Crisis red color identity.
@@ -109,39 +114,213 @@ fun CrisisScreen(
                 Color(0xFFF7F8F6)
             }
 
+        val configuration =
+            LocalConfiguration.current
+
+        val isLandscape =
+            configuration.screenWidthDp >
+                configuration.screenHeightDp
+
+        // Short landscape screens (phones in landscape) cannot fit
+        // the pinned hero + map and a usable dashboard stacked, so
+        // they use the side-by-side pane layout instead.
+        val shortLandscape =
+            isLandscape &&
+                configuration.screenHeightDp < 520
+
         val trackingMapHeight =
-            if (
-                LocalConfiguration.current.screenWidthDp >
-                    LocalConfiguration.current.screenHeightDp
-            ) {
+            if (isLandscape) {
                 200.dp
             } else {
                 300.dp
             }
 
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(backgroundColor)
-                .padding(paddingValues)
-                .padding(
-                    horizontal = OtoSpacing.ScreenHorizontal,
-                    vertical = OtoSpacing.ScreenVertical
-                ),
-            verticalArrangement = Arrangement.spacedBy(
-                OtoSpacing.Medium
+        if (shortLandscape) {
+
+            CrisisLandscapePane(
+                paddingValues = paddingValues,
+                backgroundColor = backgroundColor,
+                viewModel = viewModel,
+                requestLocation = requestLocation,
+                onEmergencyHelpClick = onEmergencyHelpClick,
+                onFirstAidSurvivalClick = onFirstAidSurvivalClick,
+                onShareStatusLocationClick = onShareStatusLocationClick,
+                onNearbyResourcesClick = onNearbyResourcesClick
             )
+
+        } else {
+
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(backgroundColor)
+                    .padding(paddingValues)
+                    .padding(
+                        horizontal = OtoSpacing.ScreenHorizontal,
+                        vertical = OtoSpacing.ScreenVertical
+                    ),
+                verticalArrangement = Arrangement.spacedBy(
+                    OtoSpacing.Medium
+                )
+            ) {
+
+                /*
+                 * -------------------------------------------------
+                 * FIXED: EMERGENCY HELP HERO + TRACKING MAP
+                 * -------------------------------------------------
+                 *
+                 * The hero and live map stay pinned above the scroll
+                 * so pan/zoom gestures on the map never fight the
+                 * dashboard's scrolling.
+                 */
+
+                CrisisHeroCard(
+                    title = "EMERGENCY HELP",
+                    description = "Get help, find critical resources, and access survival tools.",
+                    icon = Icons.Filled.Warning,
+                    onClick = onEmergencyHelpClick
+                )
+
+                SectionHeader(text = "TRACK & NAVIGATION")
+
+                Text(
+                    text = "Track your route and find your way back, even without a signal.",
+
+                    style =
+                        MaterialTheme
+                            .typography
+                            .bodyMedium,
+
+                    color =
+                        if (isSystemInDarkTheme()) {
+                            OtoTextOnDark
+                        } else {
+                            OtoTextSecondary
+                        }
+                )
+
+                LiveTrackingMapCard(
+                    viewModel = viewModel,
+                    onLocateMeClick = requestLocation,
+                    modifier =
+                        Modifier.fillMaxWidth(),
+                    mapHeight = trackingMapHeight
+                )
+
+                /*
+                 * -------------------------------------------------
+                 * SCROLLABLE DASHBOARD
+                 * -------------------------------------------------
+                 *
+                 * Route tracking, backtracking, and the crisis tool
+                 * tiles scroll beneath the pinned hero and map.
+                 */
+
+                Column(
+                    modifier =
+                        Modifier
+                            .weight(1f)
+                            .verticalScroll(
+                                rememberScrollState()
+                            ),
+                    verticalArrangement =
+                        Arrangement.spacedBy(
+                            OtoSpacing.Medium
+                        )
+                ) {
+
+                    TrackingCards(
+                        viewModel = viewModel
+                    )
+
+                    CrisisToolsSection(
+                        onFirstAidSurvivalClick = onFirstAidSurvivalClick,
+                        onShareStatusLocationClick = onShareStatusLocationClick,
+                        onNearbyResourcesClick = onNearbyResourcesClick
+                    )
+                }
+            }
+        }
+    }
+}
+
+
+/*
+ * ---------------------------------------------------------
+ * LANDSCAPE PANE
+ * ---------------------------------------------------------
+ *
+ * Used on short landscape screens (phones in landscape) where
+ * the stacked layout leaves no room for the scrollable
+ * dashboard.
+ *
+ * The live tracking map is pinned full height on the left,
+ * out of any scroll so map gestures never fight it, and the
+ * emergency hero and whole dashboard sit in the right half.
+ */
+
+@Composable
+private fun CrisisLandscapePane(
+    paddingValues: PaddingValues,
+    backgroundColor: Color,
+    viewModel: OfflineMapBacktrackViewModel,
+    requestLocation: () -> Unit,
+    onEmergencyHelpClick: () -> Unit,
+    onFirstAidSurvivalClick: () -> Unit,
+    onShareStatusLocationClick: () -> Unit,
+    onNearbyResourcesClick: () -> Unit
+) {
+
+    Row(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(backgroundColor)
+            .padding(paddingValues)
+            .padding(
+                horizontal = OtoSpacing.ScreenHorizontal,
+                vertical = OtoSpacing.ScreenVertical
+            ),
+        horizontalArrangement = Arrangement.spacedBy(
+            OtoSpacing.Medium
+        )
+    ) {
+
+        //Left = live tracking map pinned full height.
+        Column(
+            modifier =
+                Modifier
+                    .weight(1f)
+                    .fillMaxHeight(),
+            verticalArrangement =
+                Arrangement.spacedBy(
+                    OtoSpacing.Medium
+                )
         ) {
 
-            /*
-             * -------------------------------------------------
-             * FIXED: EMERGENCY HELP HERO + TRACKING MAP
-             * -------------------------------------------------
-             *
-             * The hero and live map stay pinned above the scroll
-             * so pan/zoom gestures on the map never fight the
-             * dashboard's scrolling.
-             */
+            SectionHeader(text = "TRACK & NAVIGATION")
+
+            LiveTrackingMapCard(
+                viewModel = viewModel,
+                onLocateMeClick = requestLocation,
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .weight(1f),
+                matchParentHeight = true
+            )
+        }
+
+        //Right = emergency hero pinned above the scrollable dashboard.
+        Column(
+            modifier =
+                Modifier
+                    .weight(1f)
+                    .fillMaxHeight(),
+            verticalArrangement =
+                Arrangement.spacedBy(
+                    OtoSpacing.Medium
+                )
+        ) {
 
             CrisisHeroCard(
                 title = "EMERGENCY HELP",
@@ -149,62 +328,6 @@ fun CrisisScreen(
                 icon = Icons.Filled.Warning,
                 onClick = onEmergencyHelpClick
             )
-
-            /*
-             * -------------------------------------------------
-             * TRACK & NAVIGATION
-             * -------------------------------------------------
-             */
-
-            Text(
-                text = "TRACK & NAVIGATION",
-
-                fontSize =
-                    11.sp,
-
-                color =
-                    if (isSystemInDarkTheme()) {
-                        OtoTextOnDark
-                    } else {
-                        OtoTextSecondary
-                    },
-
-                fontWeight =
-                    FontWeight.Bold
-            )
-
-            Text(
-                text = "Track your route and find your way back, even without a signal.",
-
-                style =
-                    MaterialTheme
-                        .typography
-                        .bodyMedium,
-
-                color =
-                    if (isSystemInDarkTheme()) {
-                        OtoTextOnDark
-                    } else {
-                        OtoTextSecondary
-                    }
-            )
-
-            LiveTrackingMapCard(
-                viewModel = viewModel,
-                onLocateMeClick = requestLocation,
-                modifier =
-                    Modifier.fillMaxWidth(),
-                mapHeight = trackingMapHeight
-            )
-
-            /*
-             * -------------------------------------------------
-             * SCROLLABLE DASHBOARD
-             * -------------------------------------------------
-             *
-             * Route tracking, backtracking, and the crisis tool
-             * tiles scroll beneath the pinned hero and map.
-             */
 
             Column(
                 modifier =
@@ -219,79 +342,132 @@ fun CrisisScreen(
                     )
             ) {
 
-                RouteTrackingCard(
+                TrackingCards(
                     viewModel = viewModel
                 )
 
-                BacktrackCard(
-                    viewModel = viewModel
+                CrisisToolsSection(
+                    onFirstAidSurvivalClick = onFirstAidSurvivalClick,
+                    onShareStatusLocationClick = onShareStatusLocationClick,
+                    onNearbyResourcesClick = onNearbyResourcesClick
                 )
-
-                Text(
-                    text = "CRISIS TOOLS",
-
-                    fontSize =
-                        11.sp,
-
-                    color =
-                        if (isSystemInDarkTheme()) {
-                            OtoTextOnDark
-                        } else {
-                            OtoTextSecondary
-                        },
-
-                    fontWeight =
-                        FontWeight.Bold
-                )
-
-                Row(
-                    modifier =
-                        Modifier.fillMaxWidth(),
-
-                    horizontalArrangement =
-                        Arrangement.spacedBy(
-                            OtoSpacing.Medium
-                        )
-                ) {
-
-                    CrisisActionTile(
-                        title = "First Aid & Survival",
-                        description = "Emergency and outdoor safety information",
-                        icon = Icons.Filled.Favorite,
-                        modifier = Modifier.weight(1f),
-                        onClick = onFirstAidSurvivalClick
-                    )
-
-                    CrisisActionTile(
-                        title = "Share Status & Location",
-                        description = "Let trusted contacts know where you are",
-                        icon = Icons.Filled.Share,
-                        modifier = Modifier.weight(1f),
-                        onClick = onShareStatusLocationClick
-                    )
-                }
-
-                Row(
-                    modifier =
-                        Modifier.fillMaxWidth(),
-
-                    horizontalArrangement =
-                        Arrangement.spacedBy(
-                            OtoSpacing.Medium
-                        )
-                ) {
-
-                    CrisisActionTile(
-                        title = "Nearby Resources",
-                        description = "Critical services in your area",
-                        icon = Icons.Filled.Place,
-                        modifier = Modifier.weight(1f),
-                        onClick = onNearbyResourcesClick
-                    )
-                }
             }
         }
     }
+}
+
+/*
+ * ---------------------------------------------------------
+ * TRACKING CARDS
+ * ---------------------------------------------------------
+ *
+ * The route tracking and backtrack cards, emitted as siblings
+ * so the parent's spaced-by arrangement applies between them.
+ */
+
+@Composable
+private fun TrackingCards(
+    viewModel: OfflineMapBacktrackViewModel
+) {
+
+    RouteTrackingCard(
+        viewModel = viewModel
+    )
+
+    BacktrackCard(
+        viewModel = viewModel
+    )
+}
+
+/*
+ * ---------------------------------------------------------
+ * CRISIS TOOLS SECTION
+ * ---------------------------------------------------------
+ */
+
+@Composable
+private fun CrisisToolsSection(
+    onFirstAidSurvivalClick: () -> Unit,
+    onShareStatusLocationClick: () -> Unit,
+    onNearbyResourcesClick: () -> Unit
+) {
+
+    SectionHeader(text = "CRISIS TOOLS")
+
+    Row(
+        modifier =
+            Modifier.fillMaxWidth(),
+
+        horizontalArrangement =
+            Arrangement.spacedBy(
+                OtoSpacing.Medium
+            )
+    ) {
+
+        CrisisActionTile(
+            title = "First Aid & Survival",
+            description = "Emergency and outdoor safety information",
+            icon = Icons.Filled.Favorite,
+            modifier = Modifier.weight(1f),
+            onClick = onFirstAidSurvivalClick
+        )
+
+        CrisisActionTile(
+            title = "Share Status & Location",
+            description = "Let trusted contacts know where you are",
+            icon = Icons.Filled.Share,
+            modifier = Modifier.weight(1f),
+            onClick = onShareStatusLocationClick
+        )
+    }
+
+    Row(
+        modifier =
+            Modifier.fillMaxWidth(),
+
+        horizontalArrangement =
+            Arrangement.spacedBy(
+                OtoSpacing.Medium
+            )
+    ) {
+
+        CrisisActionTile(
+            title = "Nearby Resources",
+            description = "Critical services in your area",
+            icon = Icons.Filled.Place,
+            modifier = Modifier.weight(1f),
+            onClick = onNearbyResourcesClick
+        )
+    }
+}
+
+/*
+ * ---------------------------------------------------------
+ * SECTION HEADER
+ * ---------------------------------------------------------
+ */
+
+@Composable
+private fun SectionHeader(
+    text: String
+) {
+
+    Text(
+        text = text,
+
+        fontSize =
+            11.sp,
+
+        color =
+            if (isSystemInDarkTheme()) {
+                OtoTextOnDark
+            } else {
+                OtoTextSecondary
+            },
+
+        fontWeight =
+            FontWeight.Bold
+    )
 }
 
 

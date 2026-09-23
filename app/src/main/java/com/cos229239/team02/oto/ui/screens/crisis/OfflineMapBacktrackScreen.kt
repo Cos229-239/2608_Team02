@@ -5,22 +5,34 @@ import android.content.pm.PackageManager
 import android.os.SystemClock
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Fullscreen
+import androidx.compose.material.icons.filled.FullscreenExit
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -36,11 +48,14 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
@@ -84,44 +99,123 @@ fun OfflineMapBacktrackScreen(
         }
     ) { paddingValues ->
 
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(paddingValues),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
+        val configuration =
+            LocalConfiguration.current
 
-            // ----- Live Map -----
-            LiveTrackingMapCard(
-                viewModel = viewModel,
-                onLocateMeClick = requestLocation,
+        val isLandscape =
+            configuration.screenWidthDp >
+                configuration.screenHeightDp
+
+        // Short landscape screens can't fit the tall map and the
+        // downloads stacked, so they split the map and downloads
+        // side by side instead.
+        val shortLandscape =
+            isLandscape &&
+                configuration.screenHeightDp < 520
+
+        if (shortLandscape) {
+
+            Row(
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(start = 16.dp, top = 16.dp, end = 16.dp)
-            )
+                    .fillMaxSize()
+                    .padding(paddingValues),
+                horizontalArrangement =
+                    Arrangement.spacedBy(16.dp)
+            ) {
 
-            // ----- Scrollable Downloads -----
+                // ----- Live Map (left) -----
+                LiveTrackingMapCard(
+                    viewModel = viewModel,
+                    onLocateMeClick = requestLocation,
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxHeight()
+                        .padding(start = 16.dp, top = 16.dp, bottom = 16.dp),
+                    matchParentHeight = true
+                )
+
+                // ----- Scrollable Downloads (right) -----
+                Column(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxHeight()
+                        .verticalScroll(
+                            rememberScrollState()
+                        )
+                        .padding(end = 16.dp, top = 16.dp, bottom = 16.dp),
+                    verticalArrangement =
+                        Arrangement.spacedBy(16.dp)
+                ) {
+
+                    OfflineDownloadsContent(
+                        viewModel = viewModel
+                    )
+                }
+            }
+
+        } else {
+
             Column(
                 modifier = Modifier
-                    .weight(1f)
-                    .fillMaxWidth()
-                    .verticalScroll(rememberScrollState())
-                    .padding(start = 16.dp, end = 16.dp, bottom = 16.dp),
+                    .fillMaxSize()
+                    .padding(paddingValues),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
 
-                Text(
-                    text = "Download maps before you head out so they work without a signal.",
-                    style = MaterialTheme.typography.bodyMedium
+                // ----- Live Map -----
+                LiveTrackingMapCard(
+                    viewModel = viewModel,
+                    onLocateMeClick = requestLocation,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(start = 16.dp, top = 16.dp, end = 16.dp)
                 )
 
-                // ----- Offline Maps -----
-                OfflineMapsCard(
-                    viewModel = viewModel
-                )
+                // ----- Scrollable Downloads -----
+                Column(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxWidth()
+                        .verticalScroll(
+                            rememberScrollState()
+                        )
+                        .padding(start = 16.dp, end = 16.dp, bottom = 16.dp),
+                    verticalArrangement =
+                        Arrangement.spacedBy(16.dp)
+                ) {
+
+                    OfflineDownloadsContent(
+                        viewModel = viewModel
+                    )
+                }
             }
         }
     }
+}
+
+/*
+ * ---------------------------------------------------------
+ * OFFLINE MAPS CONTENT
+ * ---------------------------------------------------------
+ *
+ * The intro line and the downloadable map regions, shared by
+ * the stacked and side-by-side layouts.
+ */
+
+@Composable
+private fun OfflineDownloadsContent(
+    viewModel: OfflineMapBacktrackViewModel
+) {
+
+    Text(
+        text = "Download maps before you head out so they work without a signal.",
+        style = MaterialTheme.typography.bodyMedium
+    )
+
+    // ----- Offline Maps -----
+    OfflineMapsCard(
+        viewModel = viewModel
+    )
 }
 
 /*
@@ -254,8 +348,14 @@ fun LiveTrackingMapCard(
     viewModel: OfflineMapBacktrackViewModel,
     onLocateMeClick: () -> Unit,
     modifier: Modifier = Modifier,
-    mapHeight: Dp = 440.dp
+    mapHeight: Dp = 440.dp,
+    matchParentHeight: Boolean = false,
+    showFullscreenButton: Boolean = true
 ) {
+
+    var mapFullscreen by remember {
+        mutableStateOf(false)
+    }
 
     val isBacktracking = viewModel.isBacktracking
     val currentLocation = viewModel.currentLocation
@@ -308,9 +408,15 @@ fun LiveTrackingMapCard(
         modifier = modifier
     ) {
         Box(
-            modifier = Modifier
+            modifier = modifier
                 .fillMaxWidth()
-                .height(mapHeight)
+                .then(
+                    if (matchParentHeight) {
+                        Modifier.fillMaxHeight()
+                    } else {
+                        Modifier.height(mapHeight)
+                    }
+                )
         ) {
 
             OtoMap(
@@ -367,6 +473,97 @@ fun LiveTrackingMapCard(
                             Text("📍 Locate Me")
                         }
                     }
+                }
+            }
+
+            if (showFullscreenButton) {
+
+                Button(
+                    onClick = {
+                        mapFullscreen = true
+                    },
+                    modifier = Modifier
+                        .align(Alignment.TopStart)
+                        .padding(10.dp)
+                        .size(42.dp),
+                    shape = CircleShape,
+                    colors =
+                        ButtonDefaults.buttonColors(
+                            containerColor = Color.White,
+                            contentColor = Color(0xFF063D24)
+                        ),
+                    contentPadding =
+                        PaddingValues(0.dp)
+                ) {
+
+                    Icon(
+                        imageVector =
+                            Icons.Filled.Fullscreen,
+                        contentDescription = "Expand map",
+                        modifier =
+                            Modifier.size(22.dp)
+                    )
+                }
+            }
+        }
+    }
+
+    if (mapFullscreen) {
+
+        Dialog(
+            onDismissRequest = {
+                mapFullscreen = false
+            },
+            properties =
+                DialogProperties(
+                    decorFitsSystemWindows = false,
+                    usePlatformDefaultWidth = false
+                )
+        ) {
+
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color(0xFF111A14))
+                    .windowInsetsPadding(
+                        WindowInsets.safeDrawing
+                    )
+            ) {
+
+                LiveTrackingMapCard(
+                    viewModel = viewModel,
+                    onLocateMeClick = onLocateMeClick,
+                    modifier =
+                        Modifier.fillMaxSize(),
+                    matchParentHeight = true,
+                    showFullscreenButton = false
+                )
+
+                Button(
+                    onClick = {
+                        mapFullscreen = false
+                    },
+                    modifier = Modifier
+                        .align(Alignment.TopStart)
+                        .padding(10.dp)
+                        .size(42.dp),
+                    shape = CircleShape,
+                    colors =
+                        ButtonDefaults.buttonColors(
+                            containerColor = Color.White,
+                            contentColor = Color(0xFF063D24)
+                        ),
+                    contentPadding =
+                        PaddingValues(0.dp)
+                ) {
+
+                    Icon(
+                        imageVector =
+                            Icons.Filled.FullscreenExit,
+                        contentDescription = "Collapse map",
+                        modifier =
+                            Modifier.size(22.dp)
+                    )
                 }
             }
         }
