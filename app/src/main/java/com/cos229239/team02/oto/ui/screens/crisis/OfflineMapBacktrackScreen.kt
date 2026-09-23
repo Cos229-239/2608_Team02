@@ -3,24 +3,34 @@ package com.cos229239.team02.oto.ui.screens.crisis
 import android.Manifest
 import android.content.pm.PackageManager
 import android.os.SystemClock
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Fullscreen
+import androidx.compose.material.icons.filled.FullscreenExit
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -36,6 +46,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -46,6 +57,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.cos229239.team02.oto.data.location.OtoLocation
 import com.cos229239.team02.oto.data.route.RoutePoint
 import com.cos229239.team02.oto.data.route.toOtoLocation
 import com.cos229239.team02.oto.ui.components.OtoTopAppBar
@@ -67,6 +79,160 @@ fun OfflineMapBacktrackScreen(
     viewModel: OfflineMapBacktrackViewModel =
         viewModel()
 ) {
+
+    val requestLocation =
+        rememberOfflineMapBacktrackLocation(
+            viewModel
+        )
+
+    Scaffold(
+        topBar = {
+
+            //Use OTO's shared Material 3 top app bar.
+            OtoTopAppBar(
+                title = "OFFLINE MAPS",
+                onBackClick = onBackClick
+            )
+        }
+    ) { paddingValues ->
+
+        val configuration =
+            LocalConfiguration.current
+
+        val isLandscape =
+            configuration.screenWidthDp >
+                configuration.screenHeightDp
+
+        // Short landscape screens can't fit the tall map and the
+        // downloads stacked, so they split the map and downloads
+        // side by side instead.
+        val shortLandscape =
+            isLandscape &&
+                configuration.screenHeightDp < 520
+
+        if (shortLandscape) {
+
+            Row(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(paddingValues),
+                horizontalArrangement =
+                    Arrangement.spacedBy(16.dp)
+            ) {
+
+                // ----- Live Map (left) -----
+                LiveTrackingMapCard(
+                    viewModel = viewModel,
+                    onLocateMeClick = requestLocation,
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxHeight()
+                        .padding(start = 16.dp, top = 16.dp, bottom = 16.dp),
+                    matchParentHeight = true
+                )
+
+                // ----- Scrollable Downloads (right) -----
+                Column(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxHeight()
+                        .verticalScroll(
+                            rememberScrollState()
+                        )
+                        .padding(end = 16.dp, top = 16.dp, bottom = 16.dp),
+                    verticalArrangement =
+                        Arrangement.spacedBy(16.dp)
+                ) {
+
+                    OfflineDownloadsContent(
+                        viewModel = viewModel
+                    )
+                }
+            }
+
+        } else {
+
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(paddingValues),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+
+                // ----- Live Map -----
+                LiveTrackingMapCard(
+                    viewModel = viewModel,
+                    onLocateMeClick = requestLocation,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(start = 16.dp, top = 16.dp, end = 16.dp)
+                )
+
+                // ----- Scrollable Downloads -----
+                Column(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxWidth()
+                        .verticalScroll(
+                            rememberScrollState()
+                        )
+                        .padding(start = 16.dp, end = 16.dp, bottom = 16.dp),
+                    verticalArrangement =
+                        Arrangement.spacedBy(16.dp)
+                ) {
+
+                    OfflineDownloadsContent(
+                        viewModel = viewModel
+                    )
+                }
+            }
+        }
+    }
+}
+
+/*
+ * ---------------------------------------------------------
+ * OFFLINE MAPS CONTENT
+ * ---------------------------------------------------------
+ *
+ * The intro line and the downloadable map regions, shared by
+ * the stacked and side-by-side layouts.
+ */
+
+@Composable
+private fun OfflineDownloadsContent(
+    viewModel: OfflineMapBacktrackViewModel
+) {
+
+    Text(
+        text = "Download maps before you head out so they work without a signal.",
+        style = MaterialTheme.typography.bodyMedium
+    )
+
+    // ----- Offline Maps -----
+    OfflineMapsCard(
+        viewModel = viewModel
+    )
+}
+
+/*
+ * ---------------------------------------------------------
+ * SHARED LOCATION & TRACKING LIFECYCLE
+ * ---------------------------------------------------------
+ *
+ * Provides the location permission flow, an initial "locate
+ * if already granted" request, and the save-a-checkpoint-on-
+ * background behavior used by both the Crisis hub and the
+ * Offline Maps screen.
+ *
+ * Returns a requestLocation action for the map's Locate Me
+ * button.
+ */
+
+@Composable
+fun rememberOfflineMapBacktrackLocation(
+    viewModel: OfflineMapBacktrackViewModel
+): () -> Unit {
 
     val context = LocalContext.current
 
@@ -96,7 +262,7 @@ fun OfflineMapBacktrackScreen(
         }
 
     /**
-     * Begins tracking/tracking location the first time the screen opens
+     * Begins receiving location the first time the screen opens
      * if permission was already granted elsewhere in the app.
      */
     LaunchedEffect(Unit) {
@@ -115,32 +281,6 @@ fun OfflineMapBacktrackScreen(
 
         if (fineGranted || coarseGranted) {
             viewModel.refreshCurrentLocation()
-        }
-    }
-
-    fun requestLocation() {
-
-        val fineGranted =
-            ContextCompat.checkSelfPermission(
-                context,
-                Manifest.permission.ACCESS_FINE_LOCATION
-            ) == PackageManager.PERMISSION_GRANTED
-
-        val coarseGranted =
-            ContextCompat.checkSelfPermission(
-                context,
-                Manifest.permission.ACCESS_COARSE_LOCATION
-            ) == PackageManager.PERMISSION_GRANTED
-
-        if (fineGranted || coarseGranted) {
-            viewModel.refreshCurrentLocation()
-        } else {
-            locationPermissionLauncher.launch(
-                arrayOf(
-                    Manifest.permission.ACCESS_FINE_LOCATION,
-                    Manifest.permission.ACCESS_COARSE_LOCATION
-                )
-            )
         }
     }
 
@@ -164,63 +304,28 @@ fun OfflineMapBacktrackScreen(
         }
     }
 
-    Scaffold(
-        topBar = {
+    return {
+        val fineGranted =
+            ContextCompat.checkSelfPermission(
+                context,
+                Manifest.permission.ACCESS_FINE_LOCATION
+            ) == PackageManager.PERMISSION_GRANTED
 
-            //Use OTO's shared Material 3 top app bar.
-            OtoTopAppBar(
-                title = "OFFLINE MAPS & BACKTRACK",
-                onBackClick = onBackClick
+        val coarseGranted =
+            ContextCompat.checkSelfPermission(
+                context,
+                Manifest.permission.ACCESS_COARSE_LOCATION
+            ) == PackageManager.PERMISSION_GRANTED
+
+        if (fineGranted || coarseGranted) {
+            viewModel.refreshCurrentLocation()
+        } else {
+            locationPermissionLauncher.launch(
+                arrayOf(
+                    Manifest.permission.ACCESS_FINE_LOCATION,
+                    Manifest.permission.ACCESS_COARSE_LOCATION
+                )
             )
-        }
-    ) { paddingValues ->
-
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(paddingValues),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-
-            // ----- Live Map -----
-            LiveTrackingMapCard(
-                viewModel = viewModel,
-                onLocateMeClick = ::requestLocation,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(start = 16.dp, top = 16.dp, end = 16.dp)
-            )
-
-            // ----- Scrollable Dashboard -----
-            Column(
-                modifier = Modifier
-                    .weight(1f)
-                    .fillMaxWidth()
-                    .verticalScroll(rememberScrollState())
-                    .padding(start = 16.dp, end = 16.dp, bottom = 16.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp)
-            ) {
-
-                Text(
-                    text = "Track your route and find your way back, even without a signal.",
-                    style = MaterialTheme.typography.bodyMedium
-                )
-
-                // ----- Route Tracking -----
-                RouteTrackingCard(
-                    viewModel = viewModel
-                )
-
-                // ----- Backtrack -----
-                BacktrackCard(
-                    viewModel = viewModel
-                )
-
-                // ----- Offline Maps -----
-                OfflineMapsCard(
-                    viewModel = viewModel
-                )
-            }
         }
     }
 }
@@ -230,9 +335,12 @@ fun OfflineMapBacktrackScreen(
  * LIVE MAP
  * ---------------------------------------------------------
  *
- * Reusable live map card showing the user's current location
- * and the recorded (or reversed) route, with a small status
- * overlay and Locate Me action.
+ * Reusable live map showing the user's current location and the
+ * recorded (or reversed) route, with a small status overlay and
+ * Locate Me action. The card owns a single map instance and a
+ * single fullscreen state: the map body swaps between the inline
+ * card and a full screen overlay instead of composing a second
+ * map underneath a dialog.
  */
 
 @Composable
@@ -240,8 +348,14 @@ fun LiveTrackingMapCard(
     viewModel: OfflineMapBacktrackViewModel,
     onLocateMeClick: () -> Unit,
     modifier: Modifier = Modifier,
-    mapHeight: Dp = 440.dp
+    mapHeight: Dp = 440.dp,
+    matchParentHeight: Boolean = false,
+    showFullscreenButton: Boolean = true
 ) {
+
+    var mapFullscreen by remember {
+        mutableStateOf(false)
+    }
 
     val isBacktracking = viewModel.isBacktracking
     val currentLocation = viewModel.currentLocation
@@ -263,7 +377,8 @@ fun LiveTrackingMapCard(
         }
 
     // The map is fed a throttled copy of the location so rapid GPS
-    // fixes do not force a camera move on every single update.
+    // fixes do not force a camera move on every single update. The
+    // camera state lives here so it survives the fullscreen swap.
     var mapLatitude by remember {
         mutableStateOf(currentLocation?.latitude)
     }
@@ -290,70 +405,185 @@ fun LiveTrackingMapCard(
         }
     }
 
-    Card(
-        modifier = modifier
-    ) {
+    // Collapse the fullscreen map with Android Back instead of
+    // leaving the screen.
+    BackHandler(enabled = mapFullscreen) {
+        mapFullscreen = false
+    }
+
+    if (mapFullscreen && showFullscreenButton) {
+
+        // ----- Fullscreen map (the same single map instance) -----
         Box(
             modifier = Modifier
-                .fillMaxWidth()
-                .height(mapHeight)
+                .fillMaxSize()
+                .background(Color(0xFF111A14))
         ) {
 
-            OtoMap(
-                modifier = Modifier.fillMaxSize(),
-                latitude = mapLatitude,
-                longitude = mapLongitude,
-                routePoints = mapRoutePoints,
-                followCamera = true,
-                showMyLocationButton = false
+            TrackingMapBody(
+                viewModel = viewModel,
+                onLocateMeClick = onLocateMeClick,
+                mapLatitude = mapLatitude,
+                mapLongitude = mapLongitude,
+                mapRoutePoints = mapRoutePoints,
+                isFullscreen = true,
+                showFullscreenButton = showFullscreenButton,
+                onToggleFullscreen = {
+                    mapFullscreen = false
+                },
+                modifier = Modifier.fillMaxSize()
             )
+        }
 
-            Card(
+    } else {
+
+        // ----- Inline map card -----
+        Card(
+            modifier = modifier
+        ) {
+
+            TrackingMapBody(
+                viewModel = viewModel,
+                onLocateMeClick = onLocateMeClick,
+                mapLatitude = mapLatitude,
+                mapLongitude = mapLongitude,
+                mapRoutePoints = mapRoutePoints,
+                isFullscreen = false,
+                showFullscreenButton = showFullscreenButton,
+                onToggleFullscreen = {
+                    mapFullscreen = true
+                },
                 modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .padding(10.dp),
-                colors = CardDefaults.cardColors(
-                    containerColor = Color.White.copy(alpha = 0.92f)
-                ),
-                shape = RoundedCornerShape(12.dp)
+                    .fillMaxWidth()
+                    .then(
+                        if (matchParentHeight) {
+                            Modifier.fillMaxHeight()
+                        } else {
+                            Modifier.height(mapHeight)
+                        }
+                    )
+            )
+        }
+    }
+}
+
+/*
+ * The map content itself: the OtoMap, the location/status overlay,
+ * and the expand/collapse control. Rendered exactly once per map
+ * card regardless of fullscreen state.
+ */
+
+@Composable
+private fun TrackingMapBody(
+    viewModel: OfflineMapBacktrackViewModel,
+    onLocateMeClick: () -> Unit,
+    mapLatitude: Double?,
+    mapLongitude: Double?,
+    mapRoutePoints: List<OtoLocation>,
+    isFullscreen: Boolean,
+    showFullscreenButton: Boolean,
+    onToggleFullscreen: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+
+    val isBacktracking = viewModel.isBacktracking
+    val currentLocation = viewModel.currentLocation
+
+    Box(
+        modifier = modifier
+    ) {
+
+        OtoMap(
+            modifier = Modifier.fillMaxSize(),
+            latitude = mapLatitude,
+            longitude = mapLongitude,
+            routePoints = mapRoutePoints,
+            followCamera = true,
+            showMyLocationButton = false
+        )
+
+        Card(
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .padding(10.dp),
+            colors = CardDefaults.cardColors(
+                containerColor = Color.White.copy(alpha = 0.92f)
+            ),
+            shape = RoundedCornerShape(12.dp)
+        ) {
+
+            Column(
+                modifier = Modifier.padding(10.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
             ) {
 
-                Column(
-                    modifier = Modifier.padding(10.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally
+                val locationText =
+                    currentLocation?.let { location ->
+                        "Lat ${"%.5f".format(Locale.US, location.latitude)}  •  " +
+                            "Lon ${"%.5f".format(Locale.US, location.longitude)}"
+                    } ?: viewModel.locationStatus
+
+                Text(
+                    text = locationText,
+                    style = MaterialTheme.typography.bodySmall,
+                    textAlign = TextAlign.Center
+                )
+
+                if (
+                    isBacktracking &&
+                    viewModel.guideTarget != null
                 ) {
-
-                    val locationText =
-                        currentLocation?.let { location ->
-                            "Lat ${"%.5f".format(Locale.US, location.latitude)}  •  " +
-                                "Lon ${"%.5f".format(Locale.US, location.longitude)}"
-                        } ?: viewModel.locationStatus
-
                     Text(
-                        text = locationText,
+                        text = viewModel.backtrackGuidance,
                         style = MaterialTheme.typography.bodySmall,
+                        fontWeight = FontWeight.Bold,
+                        color = OtoLocationBlue,
                         textAlign = TextAlign.Center
                     )
+                }
 
-                    if (
-                        isBacktracking &&
-                        viewModel.guideTarget != null
-                    ) {
-                        Text(
-                            text = viewModel.backtrackGuidance,
-                            style = MaterialTheme.typography.bodySmall,
-                            fontWeight = FontWeight.Bold,
-                            color = OtoLocationBlue,
-                            textAlign = TextAlign.Center
-                        )
-                    }
-
-                    if (currentLocation == null) {
-                        TextButton(onClick = onLocateMeClick) {
-                            Text("📍 Locate Me")
-                        }
+                if (currentLocation == null) {
+                    TextButton(onClick = onLocateMeClick) {
+                        Text("📍 Locate Me")
                     }
                 }
+            }
+        }
+
+        if (showFullscreenButton) {
+
+            Button(
+                onClick = onToggleFullscreen,
+                modifier = Modifier
+                    .align(Alignment.TopStart)
+                    .padding(10.dp)
+                    .size(42.dp),
+                shape = CircleShape,
+                colors =
+                    ButtonDefaults.buttonColors(
+                        containerColor = Color.White,
+                        contentColor = Color(0xFF063D24)
+                    ),
+                contentPadding =
+                    PaddingValues(0.dp)
+            ) {
+
+                Icon(
+                    imageVector =
+                        if (isFullscreen) {
+                            Icons.Filled.FullscreenExit
+                        } else {
+                            Icons.Filled.Fullscreen
+                        },
+                    contentDescription =
+                        if (isFullscreen) {
+                            "Collapse map"
+                        } else {
+                            "Expand map"
+                        },
+                    modifier =
+                        Modifier.size(22.dp)
+                )
             }
         }
     }
