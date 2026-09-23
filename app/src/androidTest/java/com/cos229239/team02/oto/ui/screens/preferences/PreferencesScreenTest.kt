@@ -15,6 +15,8 @@ import com.cos229239.team02.oto.ui.theme.OTOTheme
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
+import com.cos229239.team02.oto.data.preferences.OtoPreferences
+
 
 //Test the OTO Preferences screen UI.
 class PreferencesScreenTest {
@@ -43,7 +45,7 @@ class PreferencesScreenTest {
 
         context
             .getSharedPreferences(
-                "oto_app_preferences",
+                OtoPreferences.PREFERENCES_NAME,
                 Context.MODE_PRIVATE
             )
             .edit()
