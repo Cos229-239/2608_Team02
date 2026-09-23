@@ -3,6 +3,7 @@ package com.cos229239.team02.oto.ui.screens.crisis
 import android.Manifest
 import android.content.pm.PackageManager
 import android.os.SystemClock
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
@@ -18,9 +19,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.safeDrawing
-import androidx.compose.foundation.layout.windowInsetsPadding
-import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -54,13 +52,12 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.Dialog
-import androidx.compose.ui.window.DialogProperties
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.cos229239.team02.oto.data.location.OtoLocation
 import com.cos229239.team02.oto.data.route.RoutePoint
 import com.cos229239.team02.oto.data.route.toOtoLocation
 import com.cos229239.team02.oto.ui.components.OtoTopAppBar
@@ -338,9 +335,12 @@ fun rememberOfflineMapBacktrackLocation(
  * LIVE MAP
  * ---------------------------------------------------------
  *
- * Reusable live map card showing the user's current location
- * and the recorded (or reversed) route, with a small status
- * overlay and Locate Me action.
+ * Reusable live map showing the user's current location and the
+ * recorded (or reversed) route, with a small status overlay and
+ * Locate Me action. The card owns a single map instance and a
+ * single fullscreen state: the map body swaps between the inline
+ * card and a full screen overlay instead of composing a second
+ * map underneath a dialog.
  */
 
 @Composable
@@ -377,7 +377,8 @@ fun LiveTrackingMapCard(
         }
 
     // The map is fed a throttled copy of the location so rapid GPS
-    // fixes do not force a camera move on every single update.
+    // fixes do not force a camera move on every single update. The
+    // camera state lives here so it survives the fullscreen swap.
     var mapLatitude by remember {
         mutableStateOf(currentLocation?.latitude)
     }
@@ -404,167 +405,185 @@ fun LiveTrackingMapCard(
         }
     }
 
-    Card(
-        modifier = modifier
-    ) {
+    // Collapse the fullscreen map with Android Back instead of
+    // leaving the screen.
+    BackHandler(enabled = mapFullscreen) {
+        mapFullscreen = false
+    }
+
+    if (mapFullscreen && showFullscreenButton) {
+
+        // ----- Fullscreen map (the same single map instance) -----
         Box(
-            modifier = modifier
-                .fillMaxWidth()
-                .then(
-                    if (matchParentHeight) {
-                        Modifier.fillMaxHeight()
-                    } else {
-                        Modifier.height(mapHeight)
-                    }
-                )
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color(0xFF111A14))
         ) {
 
-            OtoMap(
-                modifier = Modifier.fillMaxSize(),
-                latitude = mapLatitude,
-                longitude = mapLongitude,
-                routePoints = mapRoutePoints,
-                followCamera = true,
-                showMyLocationButton = false
+            TrackingMapBody(
+                viewModel = viewModel,
+                onLocateMeClick = onLocateMeClick,
+                mapLatitude = mapLatitude,
+                mapLongitude = mapLongitude,
+                mapRoutePoints = mapRoutePoints,
+                isFullscreen = true,
+                showFullscreenButton = showFullscreenButton,
+                onToggleFullscreen = {
+                    mapFullscreen = false
+                },
+                modifier = Modifier.fillMaxSize()
             )
+        }
 
-            Card(
+    } else {
+
+        // ----- Inline map card -----
+        Card(
+            modifier = modifier
+        ) {
+
+            TrackingMapBody(
+                viewModel = viewModel,
+                onLocateMeClick = onLocateMeClick,
+                mapLatitude = mapLatitude,
+                mapLongitude = mapLongitude,
+                mapRoutePoints = mapRoutePoints,
+                isFullscreen = false,
+                showFullscreenButton = showFullscreenButton,
+                onToggleFullscreen = {
+                    mapFullscreen = true
+                },
                 modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .padding(10.dp),
-                colors = CardDefaults.cardColors(
-                    containerColor = Color.White.copy(alpha = 0.92f)
-                ),
-                shape = RoundedCornerShape(12.dp)
+                    .fillMaxWidth()
+                    .then(
+                        if (matchParentHeight) {
+                            Modifier.fillMaxHeight()
+                        } else {
+                            Modifier.height(mapHeight)
+                        }
+                    )
+            )
+        }
+    }
+}
+
+/*
+ * The map content itself: the OtoMap, the location/status overlay,
+ * and the expand/collapse control. Rendered exactly once per map
+ * card regardless of fullscreen state.
+ */
+
+@Composable
+private fun TrackingMapBody(
+    viewModel: OfflineMapBacktrackViewModel,
+    onLocateMeClick: () -> Unit,
+    mapLatitude: Double?,
+    mapLongitude: Double?,
+    mapRoutePoints: List<OtoLocation>,
+    isFullscreen: Boolean,
+    showFullscreenButton: Boolean,
+    onToggleFullscreen: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+
+    val isBacktracking = viewModel.isBacktracking
+    val currentLocation = viewModel.currentLocation
+
+    Box(
+        modifier = modifier
+    ) {
+
+        OtoMap(
+            modifier = Modifier.fillMaxSize(),
+            latitude = mapLatitude,
+            longitude = mapLongitude,
+            routePoints = mapRoutePoints,
+            followCamera = true,
+            showMyLocationButton = false
+        )
+
+        Card(
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .padding(10.dp),
+            colors = CardDefaults.cardColors(
+                containerColor = Color.White.copy(alpha = 0.92f)
+            ),
+            shape = RoundedCornerShape(12.dp)
+        ) {
+
+            Column(
+                modifier = Modifier.padding(10.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
             ) {
 
-                Column(
-                    modifier = Modifier.padding(10.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally
+                val locationText =
+                    currentLocation?.let { location ->
+                        "Lat ${"%.5f".format(Locale.US, location.latitude)}  •  " +
+                            "Lon ${"%.5f".format(Locale.US, location.longitude)}"
+                    } ?: viewModel.locationStatus
+
+                Text(
+                    text = locationText,
+                    style = MaterialTheme.typography.bodySmall,
+                    textAlign = TextAlign.Center
+                )
+
+                if (
+                    isBacktracking &&
+                    viewModel.guideTarget != null
                 ) {
-
-                    val locationText =
-                        currentLocation?.let { location ->
-                            "Lat ${"%.5f".format(Locale.US, location.latitude)}  •  " +
-                                "Lon ${"%.5f".format(Locale.US, location.longitude)}"
-                        } ?: viewModel.locationStatus
-
                     Text(
-                        text = locationText,
+                        text = viewModel.backtrackGuidance,
                         style = MaterialTheme.typography.bodySmall,
+                        fontWeight = FontWeight.Bold,
+                        color = OtoLocationBlue,
                         textAlign = TextAlign.Center
                     )
-
-                    if (
-                        isBacktracking &&
-                        viewModel.guideTarget != null
-                    ) {
-                        Text(
-                            text = viewModel.backtrackGuidance,
-                            style = MaterialTheme.typography.bodySmall,
-                            fontWeight = FontWeight.Bold,
-                            color = OtoLocationBlue,
-                            textAlign = TextAlign.Center
-                        )
-                    }
-
-                    if (currentLocation == null) {
-                        TextButton(onClick = onLocateMeClick) {
-                            Text("📍 Locate Me")
-                        }
-                    }
                 }
-            }
 
-            if (showFullscreenButton) {
-
-                Button(
-                    onClick = {
-                        mapFullscreen = true
-                    },
-                    modifier = Modifier
-                        .align(Alignment.TopStart)
-                        .padding(10.dp)
-                        .size(42.dp),
-                    shape = CircleShape,
-                    colors =
-                        ButtonDefaults.buttonColors(
-                            containerColor = Color.White,
-                            contentColor = Color(0xFF063D24)
-                        ),
-                    contentPadding =
-                        PaddingValues(0.dp)
-                ) {
-
-                    Icon(
-                        imageVector =
-                            Icons.Filled.Fullscreen,
-                        contentDescription = "Expand map",
-                        modifier =
-                            Modifier.size(22.dp)
-                    )
+                if (currentLocation == null) {
+                    TextButton(onClick = onLocateMeClick) {
+                        Text("📍 Locate Me")
+                    }
                 }
             }
         }
-    }
 
-    if (mapFullscreen) {
+        if (showFullscreenButton) {
 
-        Dialog(
-            onDismissRequest = {
-                mapFullscreen = false
-            },
-            properties =
-                DialogProperties(
-                    decorFitsSystemWindows = false,
-                    usePlatformDefaultWidth = false
-                )
-        ) {
-
-            Box(
+            Button(
+                onClick = onToggleFullscreen,
                 modifier = Modifier
-                    .fillMaxSize()
-                    .background(Color(0xFF111A14))
-                    .windowInsetsPadding(
-                        WindowInsets.safeDrawing
-                    )
+                    .align(Alignment.TopStart)
+                    .padding(10.dp)
+                    .size(42.dp),
+                shape = CircleShape,
+                colors =
+                    ButtonDefaults.buttonColors(
+                        containerColor = Color.White,
+                        contentColor = Color(0xFF063D24)
+                    ),
+                contentPadding =
+                    PaddingValues(0.dp)
             ) {
 
-                LiveTrackingMapCard(
-                    viewModel = viewModel,
-                    onLocateMeClick = onLocateMeClick,
+                Icon(
+                    imageVector =
+                        if (isFullscreen) {
+                            Icons.Filled.FullscreenExit
+                        } else {
+                            Icons.Filled.Fullscreen
+                        },
+                    contentDescription =
+                        if (isFullscreen) {
+                            "Collapse map"
+                        } else {
+                            "Expand map"
+                        },
                     modifier =
-                        Modifier.fillMaxSize(),
-                    matchParentHeight = true,
-                    showFullscreenButton = false
+                        Modifier.size(22.dp)
                 )
-
-                Button(
-                    onClick = {
-                        mapFullscreen = false
-                    },
-                    modifier = Modifier
-                        .align(Alignment.TopStart)
-                        .padding(10.dp)
-                        .size(42.dp),
-                    shape = CircleShape,
-                    colors =
-                        ButtonDefaults.buttonColors(
-                            containerColor = Color.White,
-                            contentColor = Color(0xFF063D24)
-                        ),
-                    contentPadding =
-                        PaddingValues(0.dp)
-                ) {
-
-                    Icon(
-                        imageVector =
-                            Icons.Filled.FullscreenExit,
-                        contentDescription = "Collapse map",
-                        modifier =
-                            Modifier.size(22.dp)
-                    )
-                }
             }
         }
     }
