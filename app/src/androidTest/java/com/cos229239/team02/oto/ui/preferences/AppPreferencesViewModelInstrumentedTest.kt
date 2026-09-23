@@ -31,7 +31,7 @@ class AppPreferencesViewModelInstrumentedTest {
 
         context
             .getSharedPreferences(
-                "oto_app_preferences",
+                OtoPreferences.PREFERENCES_NAME,
                 Context.MODE_PRIVATE
             )
             .edit()

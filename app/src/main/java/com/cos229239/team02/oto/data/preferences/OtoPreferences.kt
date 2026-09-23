@@ -54,7 +54,7 @@ class OtoPreferences(
 
     companion object {
 
-        private const val PREFERENCES_NAME =
+        const val PREFERENCES_NAME =
             "oto_app_preferences"
 
         private const val KEY_DISTANCE_UNIT =

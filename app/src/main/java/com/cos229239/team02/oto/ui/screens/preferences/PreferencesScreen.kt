@@ -20,6 +20,7 @@ import com.cos229239.team02.oto.data.preferences.DistanceUnit
 import com.cos229239.team02.oto.ui.components.OtoTopAppBar
 import com.cos229239.team02.oto.ui.preferences.AppPreferencesViewModel
 import com.cos229239.team02.oto.ui.theme.OtoSpacing
+import androidx.compose.ui.platform.testTag
 
 //Display app-wide OTO preferences.
 @Composable
@@ -84,6 +85,7 @@ fun PreferencesScreen(
                     DistanceUnitOption(
                         title = "Miles",
                         description = "Use miles and feet.",
+                        testTag = "distance_unit_miles",
                         selected =
                             appPreferencesViewModel.distanceUnit ==
                                     DistanceUnit.MILES,
@@ -104,6 +106,7 @@ fun PreferencesScreen(
                     DistanceUnitOption(
                         title = "Kilometers",
                         description = "Use kilometers and meters.",
+                        testTag = "distance_unit_kilometers",
                         selected =
                             appPreferencesViewModel.distanceUnit ==
                                     DistanceUnit.KILOMETERS,
@@ -124,6 +127,7 @@ fun PreferencesScreen(
 private fun DistanceUnitOption(
     title: String,
     description: String,
+    testTag: String,
     selected: Boolean,
     onClick: () -> Unit
 ) {
@@ -135,7 +139,10 @@ private fun DistanceUnitOption(
 
         RadioButton(
             selected = selected,
-            onClick = onClick
+            onClick = onClick,
+            modifier = Modifier.testTag(
+                testTag
+            )
         )
 
         Spacer(
