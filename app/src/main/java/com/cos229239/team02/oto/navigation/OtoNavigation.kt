@@ -477,13 +477,6 @@ fun OtoNavigation() {
                             )
                         },
 
-                        onOfflineMapBacktrackClick = {
-
-                            backStack.add(
-                                OtoRoute.OfflineMapBacktrack
-                            )
-                        },
-
                         onBackClick = {
 
                             backStack.removeLastOrNull()
