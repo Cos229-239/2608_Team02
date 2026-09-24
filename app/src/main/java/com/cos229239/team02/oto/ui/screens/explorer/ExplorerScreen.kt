@@ -1707,10 +1707,10 @@ private fun SafetyOverviewCard(
     onReportHazardClick: () -> Unit
 ) {
 
-    val mediumGreen =
-        Color(
-            0xFF0B5D1E
-        )
+//    val mediumGreen =
+//        Color(
+//            0xFF0B5D1E
+//        )
 
 
 
