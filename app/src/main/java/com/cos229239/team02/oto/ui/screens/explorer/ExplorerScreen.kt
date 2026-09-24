@@ -64,6 +64,12 @@ import com.cos229239.team02.oto.ui.theme.OtoExplorerGreen
 import com.cos229239.team02.oto.ui.theme.OtoExplorerGreenDark
 import kotlinx.coroutines.launch
 import java.util.Locale
+import android.location.Geocoder
+import android.os.Build
+import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.layout.heightIn
+import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlin.coroutines.resume
 
 @Composable
 fun ExplorerScreen(
@@ -116,11 +122,9 @@ fun ExplorerScreen(
         Color(
             0xFF0B5D1E
         )
+    val screenBackground = MaterialTheme.colorScheme
 
-    val lightBackground =
-        Color(
-            0xFFF7F8F6
-        )
+    val primaryText = MaterialTheme.colorScheme.onSurface
 
     /*
      * ---------------------------------------------------------
@@ -348,7 +352,10 @@ fun ExplorerScreen(
         if (
             selectedArea != null
         ) {
-
+            val areaName = resolveAreaName(
+          context = context,
+          location = selectedArea
+      )
             safetyView.setArea(
                 location =
                     selectedArea,
@@ -366,7 +373,7 @@ fun ExplorerScreen(
 
                     } else {
 
-                        "Current area"
+                       areaName
                     }
             )
         }
@@ -632,7 +639,7 @@ fun ExplorerScreen(
             Modifier
                 .fillMaxSize()
                 .background(
-                    lightBackground
+                    screenBackground.background
                 )
     ) {
 
@@ -763,10 +770,9 @@ fun ExplorerScreen(
                         CardDefaults
                             .cardColors(
                                 containerColor =
-                                    Color.White.copy(
-                                        alpha =
-                                            0.92f
-                                    )
+                                    MaterialTheme.colorScheme.surface,
+                                contentColor =
+                                    MaterialTheme.colorScheme.onSurface
                             ),
 
                     shape =
@@ -787,7 +793,7 @@ fun ExplorerScreen(
                                 "CURRENT LOCATION",
 
                             color =
-                                darkGreen,
+                                MaterialTheme.colorScheme.onSurfaceVariant,
 
                             fontSize =
                                 11.sp,
@@ -821,7 +827,7 @@ fun ExplorerScreen(
                                             ),
 
                                         color =
-                                            darkGreen,
+                                            MaterialTheme.colorScheme.onSurfaceVariant,
 
                                         style =
                                             MaterialTheme
@@ -865,7 +871,10 @@ fun ExplorerScreen(
                                     ButtonDefaults
                                         .buttonColors(
                                             containerColor =
-                                                mediumGreen
+                                                MaterialTheme.colorScheme.onSurface,
+                                            contentColor =
+                                                MaterialTheme.colorScheme.surface
+
                                         )
                             ) {
 
@@ -940,7 +949,7 @@ fun ExplorerScreen(
                                     "ACTIVE TRIP",
 
                                 color =
-                                    darkGreen,
+                                    MaterialTheme.colorScheme.onSurfaceVariant,
 
                                 fontSize =
                                     12.sp,
@@ -962,7 +971,7 @@ fun ExplorerScreen(
                                         "−",
 
                                     color =
-                                        darkGreen,
+                                        MaterialTheme.colorScheme.onSurface,
 
                                     fontSize =
                                         24.sp,
@@ -1009,7 +1018,7 @@ fun ExplorerScreen(
                                         "Calculating routes...",
 
                                     color =
-                                        darkGreen
+                                        MaterialTheme.colorScheme.primary
                                 )
                             }
 
@@ -1033,7 +1042,7 @@ fun ExplorerScreen(
                                         }",
 
                                     color =
-                                        darkGreen,
+                                        MaterialTheme.colorScheme.onSurface,
 
                                     fontSize =
                                         16.sp,
@@ -1056,7 +1065,7 @@ fun ExplorerScreen(
                                         },
 
                                     color =
-                                        mediumGreen,
+                                        MaterialTheme.colorScheme.onSurface,
 
                                     style =
                                         MaterialTheme
@@ -1090,7 +1099,7 @@ fun ExplorerScreen(
                                     "View Trip ›",
 
                                 color =
-                                    mediumGreen,
+                                    MaterialTheme.colorScheme.surface,
 
                                 fontWeight =
                                     FontWeight.Bold
@@ -1125,10 +1134,9 @@ fun ExplorerScreen(
                         CardDefaults
                             .cardColors(
                                 containerColor =
-                                    Color.White.copy(
-                                        alpha =
-                                            0.95f
-                                    )
+                                    MaterialTheme.colorScheme.surface,
+                                contentColor =
+                                    MaterialTheme.colorScheme.onSurface
                             ),
 
                     shape =
@@ -1163,7 +1171,7 @@ fun ExplorerScreen(
                                     "ACTIVE TRIP",
 
                                 color =
-                                    darkGreen,
+                                    primaryText,
 
                                 fontSize =
                                     10.sp,
@@ -1231,7 +1239,7 @@ fun ExplorerScreen(
                                     "▲",
 
                                 color =
-                                    darkGreen,
+                                    MaterialTheme.colorScheme.onSurface,
 
                                 fontSize =
                                     18.sp
@@ -1341,7 +1349,6 @@ fun ExplorerScreen(
                         Modifier.weight(
                             1f
                         ),
-
                     onClick = {
                         // Future feature.
                     }
@@ -1422,7 +1429,9 @@ fun ExplorerScreen(
                 colors =
                     CardDefaults.cardColors(
                         containerColor =
-                            Color.White
+                            MaterialTheme.colorScheme.surface,
+                        contentColor =
+                            MaterialTheme.colorScheme.onSurface
                     ),
 
                 shape =
@@ -1448,8 +1457,6 @@ fun ExplorerScreen(
                         fontWeight =
                             FontWeight.Bold,
 
-                        color =
-                            darkGreen
                     )
 
                     Spacer(
@@ -1467,11 +1474,6 @@ fun ExplorerScreen(
                     Text(
                         text =
                             "Not checked in",
-
-                        color =
-                            Color(
-                                0xFFE67E22
-                            ),
 
                         fontWeight =
                             FontWeight.Bold
@@ -1495,7 +1497,9 @@ fun ExplorerScreen(
                         colors =
                             ButtonDefaults.buttonColors(
                                 containerColor =
-                                    mediumGreen
+                                    MaterialTheme.colorScheme.onSurface,
+                                contentColor =
+                                    MaterialTheme.colorScheme.surface
                             )
                     ) {
 
@@ -1576,25 +1580,22 @@ private fun ExplorerActionCard(
     onClick: () -> Unit
 ) {
 
-    val darkGreen =
-        Color(
-            0xFF063D24
-        )
+
 
     Card(
         modifier =
             modifier
                 .height(
                     150.dp
-                )
-                .clickable {
-                    onClick()
-                },
+                ),
+                onClick = onClick,
 
         colors =
             CardDefaults.cardColors(
                 containerColor =
-                    Color.White
+                    MaterialTheme.colorScheme.surface,
+                contentColor =
+                    MaterialTheme.colorScheme.onSurface
             ),
 
         shape =
@@ -1608,14 +1609,17 @@ private fun ExplorerActionCard(
                 Modifier
                     .fillMaxSize()
                     .padding(
-                        12.dp
+                        horizontal = 8.dp,
+                        vertical = 10.dp
                     ),
 
             horizontalAlignment =
                 Alignment.CenterHorizontally,
 
             verticalArrangement =
-                Arrangement.Center
+                Arrangement.spacedBy(
+                    6.dp
+                )
         ) {
 
             Text(
@@ -1626,36 +1630,39 @@ private fun ExplorerActionCard(
                     30.sp
             )
 
-            Spacer(
-                modifier =
-                    Modifier.height(
-                        6.dp
-                    )
-            )
+//            Spacer(
+//                modifier =
+//                    Modifier.height(
+//                        6.dp
+//                    )
+//            )
 
             Text(
                 text =
                     title,
 
-                color =
-                    darkGreen,
-
                 fontWeight =
                     FontWeight.Bold,
 
                 fontSize =
-                    14.sp,
+                    13.sp,
 
                 textAlign =
-                    TextAlign.Center
+                    TextAlign.Center,
+
+                maxLines = 2,
+                minLines = 2,
+                modifier = Modifier.fillMaxWidth()
+
+
             )
 
-            Spacer(
-                modifier =
-                    Modifier.height(
-                        4.dp
-                    )
-            )
+//            Spacer(
+//                modifier =
+//                    Modifier.height(
+//                        4.dp
+//                    )
+//            )
 
             Text(
                 text =
@@ -1665,9 +1672,15 @@ private fun ExplorerActionCard(
                     MaterialTheme
                         .typography
                         .bodySmall,
+                fontSize = 12.sp,
+                lineHeight =  14.sp,
 
                 textAlign =
-                    TextAlign.Center
+                    TextAlign.Center,
+                maxLines = 3,
+                minLines = 3,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.fillMaxWidth()
             )
         }
     }
@@ -1694,10 +1707,10 @@ private fun SafetyOverviewCard(
     onReportHazardClick: () -> Unit
 ) {
 
-    val mediumGreen =
-        Color(
-            0xFF0B5D1E
-        )
+//    val mediumGreen =
+//        Color(
+//            0xFF0B5D1E
+//        )
 
 
 
@@ -1734,7 +1747,9 @@ private fun SafetyOverviewCard(
         colors =
             CardDefaults.cardColors(
                 containerColor =
-                    Color.White
+                   MaterialTheme.colorScheme.onSurface,
+                contentColor =
+                    MaterialTheme.colorScheme.surface
             ),
 
         shape =
@@ -1747,6 +1762,7 @@ private fun SafetyOverviewCard(
             modifier =
                 Modifier
                     .fillMaxWidth()
+                    .background(MaterialTheme.colorScheme.tertiary)
                     .padding(
                         16.dp
                     ),
@@ -1774,10 +1790,10 @@ private fun SafetyOverviewCard(
 
                 Text(
                     text =
-                        "🛡️  SAFETY OVERVIEW",
+                        "🦺  SAFETY OVERVIEW",
 
                     color =
-                        OtoExplorerGreenDark,
+                        MaterialTheme.colorScheme.surface,
 
                     fontSize =
                         17.sp,
@@ -1796,7 +1812,7 @@ private fun SafetyOverviewCard(
                         },
 
                     color =
-                        mediumGreen,
+                        MaterialTheme.colorScheme.surface,
 
                     fontSize =
                         13.sp,
@@ -1821,12 +1837,10 @@ private fun SafetyOverviewCard(
                         uiState.areaName,
 
                     color =
-                        Color(
-                            0xFF4A554F
-                        ),
+                        MaterialTheme.colorScheme.surface,
 
                     fontSize =
-                        12.sp,
+                        20.sp,
 
                     fontWeight =
                         FontWeight.Medium
@@ -1862,12 +1876,19 @@ private fun SafetyOverviewCard(
 
             Text(
                 text = "Park Notices: $parkSummary",
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier.fillMaxWidth(),
+                color = MaterialTheme.colorScheme.surface
             )
 
             uiState.selectedParkCode?.let { code ->
-                Text(text = "Selected park code: $code")
+                Text(
+                    text = "Park: ${uiState.selectedParkName ?: code}",
+                    modifier = Modifier.fillMaxWidth(),
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.surface
+                )
             }
+
 
             Button(onClick = onAreaSafetyClick) {
                 Text("View Area Safety / Select Park >")
@@ -1901,8 +1922,11 @@ private fun SafetyOverviewCard(
                      * Weather now has its own click action.
                      */
         Column(
-            modifier = Modifier.fillMaxWidth(),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(MaterialTheme.colorScheme.tertiary)
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -1996,20 +2020,17 @@ private fun SafetyOverviewCard(
                     icon =
                         "⛔",
 
-                    mainValue =
+                    mainValue = uiState.selectedParkCode
+                        ?.uppercase(java.util.Locale.ROOT) ?:
                         "—",
+                    description = when {
+                        !uiState.hasLocation -> "Select a location"
+                        uiState.selectedParkCode == null -> "No park selected"
+                        uiState.isLoading -> "Loading notices..."
+                        uiState.errorMessage != null -> "Unable to load notices"
+                        else -> npsStatus?.message ?: "Notices not loaded"
+                    },
 
-                    description =
-                        if (
-                            uiState.selectedParkCode != null
-                        ) {
-
-                            "View park notices"
-
-                        } else {
-
-                            "Select park"
-                        },
 
                     modifier =
                         Modifier
@@ -2108,12 +2129,13 @@ private fun SafetyOverviewItem(
     description: String,
     modifier: Modifier = Modifier
 ) {
-    val textColor = OtoBackground
+
     Card(
         modifier = modifier.height(200.dp),
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(
-            containerColor = OtoExplorerGreenDark
+            containerColor = MaterialTheme.colorScheme.surface,
+            contentColor = MaterialTheme.colorScheme.onSurface
         ),
         elevation = CardDefaults.cardElevation(
             defaultElevation = 0.dp
@@ -2148,7 +2170,7 @@ private fun SafetyOverviewItem(
                     title,
 
                 color =
-                    textColor,
+                    MaterialTheme.colorScheme.onSurface,
 
                 fontSize =
                     12.sp,
@@ -2166,7 +2188,7 @@ private fun SafetyOverviewItem(
                     mainValue,
 
                 color =
-                    textColor,
+                    MaterialTheme.colorScheme.onSurface,
 
                 fontSize =
                     26.sp,
@@ -2179,7 +2201,7 @@ private fun SafetyOverviewItem(
             )
             Text(
                 text = description,
-                color = textColor,
+                color = MaterialTheme.colorScheme.onSurface,
                 fontSize = 12.sp,
                 textAlign = TextAlign.Center,
                 maxLines = 2,
@@ -2236,10 +2258,10 @@ private fun DashboardWideCard(
     onClick: () -> Unit
 ) {
 
-    val darkGreen =
-        Color(
-            0xFF063D24
-        )
+//    val darkGreen =
+//        Color(
+//            0xFF063D24
+//        )
 
     Card(
         modifier =
@@ -2252,7 +2274,9 @@ private fun DashboardWideCard(
         colors =
             CardDefaults.cardColors(
                 containerColor =
-                    Color.White
+                    MaterialTheme.colorScheme.surface,
+                contentColor =
+                    MaterialTheme.colorScheme.onSurface
             ),
 
         shape =
@@ -2285,7 +2309,7 @@ private fun DashboardWideCard(
                         title,
 
                     color =
-                        darkGreen,
+                         MaterialTheme.colorScheme.onSurface,
 
                     fontWeight =
                         FontWeight.Bold,
@@ -2315,7 +2339,7 @@ private fun DashboardWideCard(
                     28.sp,
 
                 color =
-                    darkGreen
+                    MaterialTheme.colorScheme.onSurface
             )
         }
     }
@@ -2421,6 +2445,68 @@ private fun formatRouteDuration(
         } else {
 
             "$hours hr $minutes min"
+        }
+    }
+}
+// Add resolve functional to real name of area location
+private suspend fun resolveAreaName(
+    context: android.content.Context,
+    location: OtoLocation
+): String {
+    val fallback = String.format(
+        Locale.US,
+        "%.4f, %.4f",
+        location.latitude,
+        location.longitude
+    )
+
+    if (
+        Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU ||
+        !Geocoder.isPresent()
+    ) {
+        return fallback
+    }
+
+    return suspendCancellableCoroutine { continuation ->
+        try {
+            Geocoder(context, Locale.getDefault()).getFromLocation(
+                location.latitude,
+                location.longitude,
+                1,
+                object : Geocoder.GeocodeListener {
+                    override fun onGeocode(
+                        addresses: MutableList<android.location.Address>
+                    ) {
+                        val address = addresses.firstOrNull()
+
+                        val name = address?.let{
+                            listOfNotNull(
+                                it.locality ?: it.subAdminArea,
+                                it.adminArea
+                            )
+
+                                .distinct()
+                                .joinToString (" , ")
+                                .takeIf (String::isNotBlank)
+                        } ?: fallback
+
+                        if (continuation.isActive) {
+                            continuation.resume(name)
+                        }
+
+                    }
+
+                    override fun onError(errorMessage: String?) {
+                       if (continuation.isActive) {
+                           continuation.resume(fallback)
+                       }
+                    }
+                }
+            )
+        } catch (_: Exception) {
+            if (continuation.isActive) {
+                continuation.resume(fallback)
+            }
         }
     }
 }

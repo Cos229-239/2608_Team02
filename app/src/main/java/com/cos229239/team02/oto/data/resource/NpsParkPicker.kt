@@ -174,7 +174,7 @@ fun NpsParkPicker(
         )
     ) {
         Column(
-            modifier = Modifier.padding(18.dp),
+            modifier = Modifier.padding(10.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
             Text(
@@ -189,14 +189,14 @@ fun NpsParkPicker(
             )
             Text(
                 text = if (autoSelection) {
-                    "Automatically selecting the nearest NPS park...."
+                    "Finding the nearest NPS park...."
                 } else {
                     "Using your manually selected park."
                 }
             )
 
             if (location == null) {
-                Text("Select a destination in plan trip or use Locate in the Explorer Screen")
+                Text("Input a park code or use Locate Me in the OTO Explorer Screen")
             }
 
             nearestPark?.let { (parks, distanceMeters) ->
