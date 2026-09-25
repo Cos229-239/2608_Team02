@@ -285,30 +285,18 @@ private fun CrisisLandscapePane(
         )
     ) {
 
-        //Left = live tracking map pinned full height.
-        Column(
+        //Left = live tracking map pinned full height, sitting directly
+        //in the Row so its fullscreen state fills the whole screen
+        //instead of being trapped inside a weighted column.
+        LiveTrackingMapCard(
+            viewModel = viewModel,
+            onLocateMeClick = requestLocation,
             modifier =
                 Modifier
                     .weight(1f)
                     .fillMaxHeight(),
-            verticalArrangement =
-                Arrangement.spacedBy(
-                    OtoSpacing.Medium
-                )
-        ) {
-
-            SectionHeader(text = "TRACK & NAVIGATION")
-
-            LiveTrackingMapCard(
-                viewModel = viewModel,
-                onLocateMeClick = requestLocation,
-                modifier =
-                    Modifier
-                        .fillMaxWidth()
-                        .weight(1f),
-                matchParentHeight = true
-            )
-        }
+            matchParentHeight = true
+        )
 
         //Right = emergency hero pinned above the scrollable dashboard.
         Column(
