@@ -1,6 +1,12 @@
 package com.cos229239.team02.oto.ui.screens.explorer
 
+import android.app.Activity
+import android.content.ActivityNotFoundException
+import android.content.Intent
+import android.provider.ContactsContract
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -13,6 +19,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -21,6 +28,7 @@ import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.DateRangePicker
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
@@ -35,14 +43,15 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.cos229239.team02.oto.data.location.PlaceSearchClient
 import com.cos229239.team02.oto.data.location.PlaceSuggestion
+import com.cos229239.team02.oto.ui.components.OtoTopAppBar
 import com.cos229239.team02.oto.ui.features.PlanTripViewModel
-import com.cos229239.team02.oto.ui.components.OtoTopAppBar //Use OTO's shared Material 3 top app bar.
 import kotlinx.coroutines.delay
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -61,19 +70,45 @@ fun PlanTripScreen(
         onBackClick()
     }
 
-    val darkGreen = Color(0xFF0B5D1E)
-    val dangerRed = Color(0xFFB3261E)
+    val context = LocalContext.current
+
+    val darkGreen =
+        androidx.compose.ui.graphics.Color(
+            0xFF0B5D1E
+        )
+
+    val dangerRed =
+        MaterialTheme.colorScheme.error
+
+    val screenBackground =
+        MaterialTheme.colorScheme.background
+
+    val primaryText =
+        MaterialTheme.colorScheme.onBackground
+
+    val secondaryText =
+        MaterialTheme.colorScheme.onSurfaceVariant
+
+    val unselectedButtonColor =
+        MaterialTheme.colorScheme.surfaceVariant
+
+    val unselectedButtonTextColor =
+        MaterialTheme.colorScheme.onSurfaceVariant
 
     val placeSearchClient = remember {
         PlaceSearchClient()
     }
 
     var startingSuggestions by remember {
-        mutableStateOf<List<PlaceSuggestion>>(emptyList())
+        mutableStateOf<List<PlaceSuggestion>>(
+            emptyList()
+        )
     }
 
     var destinationSuggestions by remember {
-        mutableStateOf<List<PlaceSuggestion>>(emptyList())
+        mutableStateOf<List<PlaceSuggestion>>(
+            emptyList()
+        )
     }
 
     var pendingStartingPoint by remember {
@@ -86,6 +121,170 @@ fun PlanTripScreen(
 
     var showCalendar by remember {
         mutableStateOf(false)
+    }
+
+    /*
+     * Controls the Add / Edit Trusted Contact dialog.
+     */
+    var showTrustedContactDialog by remember {
+        mutableStateOf(false)
+    }
+
+    /*
+     * Temporary Trusted Contact values.
+     *
+     * These are copied into the ViewModel when
+     * the user presses Save Contact.
+     */
+    var trustedContactNameInput by remember {
+        mutableStateOf("")
+    }
+
+    var trustedContactPhoneInput by remember {
+        mutableStateOf("")
+    }
+
+    /*
+     * Displays an error if the device cannot open
+     * the Android contact picker.
+     */
+    var contactPickerError by remember {
+        mutableStateOf<String?>(null)
+    }
+
+    /*
+     * Opens Android's contact picker.
+     *
+     * We request a specific phone-number contact
+     * instead of reading the user's entire address book.
+     */
+    val contactPickerLauncher =
+        rememberLauncherForActivityResult(
+            contract =
+                ActivityResultContracts
+                    .StartActivityForResult()
+        ) { result ->
+
+            if (
+                result.resultCode ==
+                Activity.RESULT_OK
+            ) {
+
+                val contactUri =
+                    result.data?.data
+
+                if (contactUri != null) {
+
+                    val projection =
+                        arrayOf(
+                            ContactsContract
+                                .CommonDataKinds
+                                .Phone
+                                .DISPLAY_NAME,
+
+                            ContactsContract
+                                .CommonDataKinds
+                                .Phone
+                                .NUMBER
+                        )
+
+                    context.contentResolver
+                        .query(
+                            contactUri,
+                            projection,
+                            null,
+                            null,
+                            null
+                        )
+                        ?.use { cursor ->
+
+                            if (
+                                cursor.moveToFirst()
+                            ) {
+
+                                val nameIndex =
+                                    cursor.getColumnIndex(
+                                        ContactsContract
+                                            .CommonDataKinds
+                                            .Phone
+                                            .DISPLAY_NAME
+                                    )
+
+                                val phoneIndex =
+                                    cursor.getColumnIndex(
+                                        ContactsContract
+                                            .CommonDataKinds
+                                            .Phone
+                                            .NUMBER
+                                    )
+
+                                if (
+                                    nameIndex >= 0
+                                ) {
+                                    trustedContactNameInput =
+                                        cursor.getString(
+                                            nameIndex
+                                        )
+                                            .orEmpty()
+                                }
+
+                                if (
+                                    phoneIndex >= 0
+                                ) {
+                                    trustedContactPhoneInput =
+                                        cursor.getString(
+                                            phoneIndex
+                                        )
+                                            .orEmpty()
+                                }
+
+                                contactPickerError =
+                                    null
+                            }
+                        }
+                }
+            }
+        }
+
+    /*
+     * Opens the Android contact picker.
+     */
+    fun openContactPicker() {
+
+        try {
+
+            contactPickerError =
+                null
+
+            val contactIntent =
+                Intent(
+                    Intent.ACTION_PICK,
+                    ContactsContract
+                        .CommonDataKinds
+                        .Phone
+                        .CONTENT_URI
+                )
+
+            contactPickerLauncher
+                .launch(
+                    contactIntent
+                )
+
+        } catch (
+            exception:
+            ActivityNotFoundException
+        ) {
+
+            contactPickerError =
+                "Contacts are not available on this device."
+
+        } catch (
+            exception: Exception
+        ) {
+
+            contactPickerError =
+                "Unable to open contacts."
+        }
     }
 
     // Controls the confirmation box before deleting a saved trip.
@@ -118,6 +317,7 @@ fun PlanTripScreen(
             tripViewModel.startingPoint.length < 3 ||
             tripViewModel.verifiedStartingPoint != null
         ) {
+
             startingSuggestions =
                 emptyList()
 
@@ -130,7 +330,6 @@ fun PlanTripScreen(
             placeSearchClient.search(
                 tripViewModel.startingPoint
             )
-
     }
 
     /*
@@ -144,6 +343,7 @@ fun PlanTripScreen(
             tripViewModel.destination.length < 3 ||
             tripViewModel.verifiedDestination != null
         ) {
+
             destinationSuggestions =
                 emptyList()
 
@@ -161,7 +361,9 @@ fun PlanTripScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(darkGreen)
+            .background(
+                darkGreen
+            )
     ) {
 
         Column(
@@ -171,26 +373,28 @@ fun PlanTripScreen(
         ) {
 
             /*
-            * Header
-            */
-
-            //Use OTO's shared Material 3 top app bar.
+             * Header
+             */
             OtoTopAppBar(
-                title = "PLAN YOUR TRIP",
-                onBackClick = onBackClick
-            )
+                title =
+                    "PLAN YOUR TRIP",
 
+                onBackClick =
+                    onBackClick
+            )
 
             Column(
                 modifier = Modifier
                     .fillMaxSize()
                     .background(
-                        Color.White
+                        screenBackground
                     )
                     .verticalScroll(
                         rememberScrollState()
                     )
-                    .padding(20.dp)
+                    .padding(
+                        20.dp
+                    )
             ) {
 
                 /*
@@ -208,13 +412,18 @@ fun PlanTripScreen(
 
                     Button(
                         onClick = {
+
                             tripViewModel
                                 .updateRoundTrip(
                                     true
                                 )
                         },
+
                         modifier =
-                            Modifier.weight(1f),
+                            Modifier.weight(
+                                1f
+                            ),
+
                         colors =
                             ButtonDefaults
                                 .buttonColors(
@@ -225,7 +434,17 @@ fun PlanTripScreen(
                                         ) {
                                             darkGreen
                                         } else {
-                                            Color.LightGray
+                                            unselectedButtonColor
+                                        },
+
+                                    contentColor =
+                                        if (
+                                            tripViewModel
+                                                .isRoundTrip
+                                        ) {
+                                            androidx.compose.ui.graphics.Color.White
+                                        } else {
+                                            unselectedButtonTextColor
                                         }
                                 )
                     ) {
@@ -237,13 +456,18 @@ fun PlanTripScreen(
 
                     Button(
                         onClick = {
+
                             tripViewModel
                                 .updateRoundTrip(
                                     false
                                 )
                         },
+
                         modifier =
-                            Modifier.weight(1f),
+                            Modifier.weight(
+                                1f
+                            ),
+
                         colors =
                             ButtonDefaults
                                 .buttonColors(
@@ -254,7 +478,17 @@ fun PlanTripScreen(
                                         ) {
                                             darkGreen
                                         } else {
-                                            Color.LightGray
+                                            unselectedButtonColor
+                                        },
+
+                                    contentColor =
+                                        if (
+                                            !tripViewModel
+                                                .isRoundTrip
+                                        ) {
+                                            androidx.compose.ui.graphics.Color.White
+                                        } else {
+                                            unselectedButtonTextColor
                                         }
                                 )
                     ) {
@@ -276,7 +510,11 @@ fun PlanTripScreen(
                  * Starting Point
                  */
                 Text(
-                    "STARTING POINT"
+                    text =
+                        "STARTING POINT",
+
+                    color =
+                        primaryText
                 )
 
                 LocationAutocompleteField(
@@ -284,6 +522,7 @@ fun PlanTripScreen(
                         tripViewModel.startingPoint,
 
                     onValueChange = {
+
                         tripViewModel
                             .updateStartingPoint(
                                 it
@@ -294,6 +533,7 @@ fun PlanTripScreen(
                         startingSuggestions,
 
                     onSuggestionClick = {
+
                         pendingStartingPoint =
                             it
                     },
@@ -310,6 +550,7 @@ fun PlanTripScreen(
                     Text(
                         text =
                             "✓ Location verified",
+
                         color =
                             darkGreen
                     )
@@ -326,7 +567,11 @@ fun PlanTripScreen(
                  * Destination
                  */
                 Text(
-                    "DESTINATION"
+                    text =
+                        "DESTINATION",
+
+                    color =
+                        primaryText
                 )
 
                 LocationAutocompleteField(
@@ -334,6 +579,7 @@ fun PlanTripScreen(
                         tripViewModel.destination,
 
                     onValueChange = {
+
                         tripViewModel
                             .updateDestination(
                                 it
@@ -344,6 +590,7 @@ fun PlanTripScreen(
                         destinationSuggestions,
 
                     onSuggestionClick = {
+
                         pendingDestination =
                             it
                     },
@@ -360,6 +607,7 @@ fun PlanTripScreen(
                     Text(
                         text =
                             "✓ Location verified",
+
                         color =
                             darkGreen
                     )
@@ -384,11 +632,15 @@ fun PlanTripScreen(
                             "TRIP DATES"
                         } else {
                             "TRIP DATE"
-                        }
+                        },
+
+                    color =
+                        primaryText
                 )
 
                 OutlinedButton(
                     onClick = {
+
                         showCalendar =
                             true
                     },
@@ -453,6 +705,7 @@ fun PlanTripScreen(
                         Text(
                             text =
                                 "📅",
+
                             fontSize =
                                 20.sp
                         )
@@ -462,7 +715,178 @@ fun PlanTripScreen(
                 Spacer(
                     modifier =
                         Modifier.height(
-                            14.dp
+                            20.dp
+                        )
+                )
+
+                /*
+                 * Trusted Contact
+                 *
+                 * The contact is optional.
+                 * A trip can still be saved without one.
+                 */
+                Text(
+                    text =
+                        "TRUSTED CONTACT",
+
+                    color =
+                        primaryText
+                )
+
+                Spacer(
+                    modifier =
+                        Modifier.height(
+                            6.dp
+                        )
+                )
+
+                if (
+                    tripViewModel
+                        .trustedContactName
+                        .isBlank() &&
+                    tripViewModel
+                        .trustedContactPhone
+                        .isBlank()
+                ) {
+
+                    Text(
+                        text =
+                            "No trusted contact added.",
+
+                        color =
+                            secondaryText
+                    )
+
+                    Spacer(
+                        modifier =
+                            Modifier.height(
+                                8.dp
+                            )
+                    )
+
+                    OutlinedButton(
+                        onClick = {
+
+                            trustedContactNameInput =
+                                ""
+
+                            trustedContactPhoneInput =
+                                ""
+
+                            contactPickerError =
+                                null
+
+                            showTrustedContactDialog =
+                                true
+                        },
+
+                        modifier =
+                            Modifier.fillMaxWidth()
+                    ) {
+
+                        Text(
+                            "ADD TRUSTED CONTACT"
+                        )
+                    }
+
+                } else {
+
+                    Text(
+                        text =
+                            tripViewModel
+                                .trustedContactName,
+
+                        color =
+                            primaryText
+                    )
+
+                    Text(
+                        text =
+                            tripViewModel
+                                .trustedContactPhone,
+
+                        color =
+                            secondaryText
+                    )
+
+                    Spacer(
+                        modifier =
+                            Modifier.height(
+                                8.dp
+                            )
+                    )
+
+                    Row(
+                        modifier =
+                            Modifier.fillMaxWidth(),
+
+                        horizontalArrangement =
+                            Arrangement.spacedBy(
+                                8.dp
+                            )
+                    ) {
+
+                        OutlinedButton(
+                            onClick = {
+
+                                trustedContactNameInput =
+                                    tripViewModel
+                                        .trustedContactName
+
+                                trustedContactPhoneInput =
+                                    tripViewModel
+                                        .trustedContactPhone
+
+                                contactPickerError =
+                                    null
+
+                                showTrustedContactDialog =
+                                    true
+                            },
+
+                            modifier =
+                                Modifier.weight(
+                                    1f
+                                )
+                        ) {
+
+                            Text(
+                                text =
+                                    "EDIT",
+
+                                color =
+                                    darkGreen
+                            )
+                        }
+
+                        OutlinedButton(
+                            onClick = {
+
+                                tripViewModel
+                                    .clearTrustedContact()
+                            },
+
+                            modifier =
+                                Modifier.weight(
+                                    1f
+                                )
+                        ) {
+
+                            Text(
+                                text =
+                                    "REMOVE",
+
+                                color =
+                                    dangerRed
+                            )
+                        }
+                    }
+                }
+
+                Spacer(
+                    modifier =
+                        Modifier.height(
+                            20.dp
                         )
                 )
 
@@ -470,7 +894,11 @@ fun PlanTripScreen(
                  * Notes
                  */
                 Text(
-                    "NOTES"
+                    text =
+                        "NOTES",
+
+                    color =
+                        primaryText
                 )
 
                 OutlinedTextField(
@@ -478,6 +906,7 @@ fun PlanTripScreen(
                         tripViewModel.notes,
 
                     onValueChange = {
+
                         tripViewModel
                             .updateNotes(
                                 it
@@ -492,12 +921,18 @@ fun PlanTripScreen(
 
                     textStyle =
                         TextStyle(
-                            color = Color.Black
+                            color =
+                                primaryText
                         ),
 
                     placeholder = {
+
                         Text(
-                            "Add notes about your trip"
+                            text =
+                                "Add notes about your trip",
+
+                            color =
+                                secondaryText
                         )
                     }
                 )
@@ -516,8 +951,9 @@ fun PlanTripScreen(
                         Text(
                             text =
                                 error,
+
                             color =
-                                MaterialErrorColor
+                                dangerRed
                         )
                     }
 
@@ -579,7 +1015,10 @@ fun PlanTripScreen(
                         ButtonDefaults
                             .buttonColors(
                                 containerColor =
-                                    darkGreen
+                                    darkGreen,
+
+                                contentColor =
+                                    androidx.compose.ui.graphics.Color.White
                             )
                 ) {
 
@@ -612,6 +1051,7 @@ fun PlanTripScreen(
 
                     TextButton(
                         onClick = {
+
                             showClearTripDialog =
                                 true
                         },
@@ -668,6 +1108,7 @@ fun PlanTripScreen(
                 },
 
                 onCancel = {
+
                     pendingStartingPoint =
                         null
                 }
@@ -702,11 +1143,251 @@ fun PlanTripScreen(
                 },
 
                 onCancel = {
+
                     pendingDestination =
                         null
                 }
             )
         }
+
+    /*
+     * Add / Edit Trusted Contact dialog.
+     */
+    if (
+        showTrustedContactDialog
+    ) {
+
+        AlertDialog(
+            onDismissRequest = {
+
+                showTrustedContactDialog =
+                    false
+            },
+
+            title = {
+
+                Text(
+                    text =
+                        if (
+                            tripViewModel
+                                .trustedContactName
+                                .isBlank()
+                        ) {
+                            "Add Trusted Contact"
+                        } else {
+                            "Edit Trusted Contact"
+                        }
+                )
+            },
+
+            text = {
+
+                Column {
+
+                    Text(
+                        text =
+                            "This contact will receive your trip check-ins.",
+
+                        color =
+                            MaterialTheme
+                                .colorScheme
+                                .onSurface
+                    )
+
+                    Spacer(
+                        modifier =
+                            Modifier.height(
+                                12.dp
+                            )
+                    )
+
+                    /*
+                     * Allows the user to select someone
+                     * already saved in their phone.
+                     */
+                    OutlinedButton(
+                        onClick = {
+                            openContactPicker()
+                        },
+
+                        modifier =
+                            Modifier.fillMaxWidth()
+                    ) {
+
+                        Text(
+                            "CHOOSE FROM CONTACTS"
+                        )
+                    }
+
+                    Text(
+                        text =
+                            "or",
+
+                        modifier =
+                            Modifier
+                                .align(
+                                    Alignment.CenterHorizontally
+                                )
+                                .padding(
+                                    vertical =
+                                        8.dp
+                                ),
+
+                        color =
+                            MaterialTheme
+                                .colorScheme
+                                .onSurfaceVariant
+                    )
+
+                    OutlinedTextField(
+                        value =
+                            trustedContactNameInput,
+
+                        onValueChange = {
+
+                            trustedContactNameInput =
+                                it
+                        },
+
+                        modifier =
+                            Modifier.fillMaxWidth(),
+
+                        label = {
+
+                            Text(
+                                "Name"
+                            )
+                        },
+
+                        placeholder = {
+
+                            Text(
+                                "Trusted contact name"
+                            )
+                        },
+
+                        singleLine =
+                            true
+                    )
+
+                    Spacer(
+                        modifier =
+                            Modifier.height(
+                                10.dp
+                            )
+                    )
+
+                    OutlinedTextField(
+                        value =
+                            trustedContactPhoneInput,
+
+                        onValueChange = {
+
+                            trustedContactPhoneInput =
+                                it
+                        },
+
+                        modifier =
+                            Modifier.fillMaxWidth(),
+
+                        label = {
+
+                            Text(
+                                "Phone Number"
+                            )
+                        },
+
+                        placeholder = {
+
+                            Text(
+                                "Phone number"
+                            )
+                        },
+
+                        keyboardOptions =
+                            KeyboardOptions(
+                                keyboardType =
+                                    KeyboardType.Phone
+                            ),
+
+                        singleLine =
+                            true
+                    )
+
+                    contactPickerError
+                        ?.let { error ->
+
+                            Spacer(
+                                modifier =
+                                    Modifier.height(
+                                        8.dp
+                                    )
+                            )
+
+                            Text(
+                                text =
+                                    error,
+
+                                color =
+                                    MaterialTheme
+                                        .colorScheme
+                                        .error
+                            )
+                        }
+                }
+            },
+
+            confirmButton = {
+
+                TextButton(
+                    onClick = {
+
+                        tripViewModel
+                            .updateTrustedContactName(
+                                trustedContactNameInput
+                                    .trim()
+                            )
+
+                        tripViewModel
+                            .updateTrustedContactPhone(
+                                trustedContactPhoneInput
+                                    .trim()
+                            )
+
+                        showTrustedContactDialog =
+                            false
+                    },
+
+                    enabled =
+                        trustedContactNameInput
+                            .isNotBlank() &&
+                                trustedContactPhoneInput
+                                    .isNotBlank()
+                ) {
+
+                    Text(
+                        "Save Contact"
+                    )
+                }
+            },
+
+            dismissButton = {
+
+                TextButton(
+                    onClick = {
+
+                        showTrustedContactDialog =
+                            false
+                    }
+                ) {
+
+                    Text(
+                        "Cancel"
+                    )
+                }
+            }
+        )
+    }
 
     /*
      * Calendar
@@ -720,6 +1401,7 @@ fun PlanTripScreen(
 
             DatePickerDialog(
                 onDismissRequest = {
+
                     showCalendar =
                         false
                 },
@@ -728,6 +1410,7 @@ fun PlanTripScreen(
 
                     TextButton(
                         onClick = {
+
                             showCalendar =
                                 false
                         }
@@ -743,6 +1426,7 @@ fun PlanTripScreen(
 
                     TextButton(
                         onClick = {
+
                             showCalendar =
                                 false
                         }
@@ -770,6 +1454,7 @@ fun PlanTripScreen(
 
             DatePickerDialog(
                 onDismissRequest = {
+
                     showCalendar =
                         false
                 },
@@ -778,6 +1463,7 @@ fun PlanTripScreen(
 
                     TextButton(
                         onClick = {
+
                             showCalendar =
                                 false
                         }
@@ -793,6 +1479,7 @@ fun PlanTripScreen(
 
                     TextButton(
                         onClick = {
+
                             showCalendar =
                                 false
                         }
@@ -822,17 +1509,20 @@ fun PlanTripScreen(
 
         AlertDialog(
             onDismissRequest = {
+
                 showClearTripDialog =
                     false
             },
 
             title = {
+
                 Text(
                     "Clear Saved Trip?"
                 )
             },
 
             text = {
+
                 Text(
                     "This will permanently delete the saved trip and clear all Plan Trip information."
                 )
@@ -867,6 +1557,7 @@ fun PlanTripScreen(
 
                 TextButton(
                     onClick = {
+
                         showClearTripDialog =
                             false
                     }
@@ -880,6 +1571,7 @@ fun PlanTripScreen(
         )
     }
 }
+
 
 @Composable
 private fun LocationAutocompleteField(
@@ -905,12 +1597,22 @@ private fun LocationAutocompleteField(
 
             textStyle =
                 TextStyle(
-                    color = Color.Black
+                    color =
+                        MaterialTheme
+                            .colorScheme
+                            .onBackground
                 ),
 
             placeholder = {
+
                 Text(
-                    placeholder
+                    text =
+                        placeholder,
+
+                    color =
+                        MaterialTheme
+                            .colorScheme
+                            .onSurfaceVariant
                 )
             }
         )
@@ -922,6 +1624,11 @@ private fun LocationAutocompleteField(
                 Text(
                     text =
                         suggestion.name,
+
+                    color =
+                        MaterialTheme
+                            .colorScheme
+                            .onBackground,
 
                     modifier = Modifier
                         .fillMaxWidth()
@@ -939,6 +1646,7 @@ private fun LocationAutocompleteField(
     }
 }
 
+
 @Composable
 private fun LocationVerificationDialog(
     title: String,
@@ -952,12 +1660,14 @@ private fun LocationVerificationDialog(
             onCancel,
 
         title = {
+
             Text(
                 title
             )
         },
 
         text = {
+
             Column {
 
                 Text(
@@ -1006,6 +1716,7 @@ private fun LocationVerificationDialog(
     )
 }
 
+
 private fun formatDate(
     dateMillis: Long?
 ): String {
@@ -1029,6 +1740,7 @@ private fun formatDate(
     )
 }
 
+
 private fun formatDateRange(
     startMillis: Long?,
     endMillis: Long?
@@ -1043,6 +1755,7 @@ private fun formatDateRange(
     if (
         endMillis == null
     ) {
+
         return formatDate(
             startMillis
         )
@@ -1050,6 +1763,3 @@ private fun formatDateRange(
 
     return "${formatDate(startMillis)} - ${formatDate(endMillis)}"
 }
-
-private val MaterialErrorColor =
-    Color(0xFFB3261E)

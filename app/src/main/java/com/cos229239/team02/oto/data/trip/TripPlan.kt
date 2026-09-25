@@ -17,5 +17,13 @@ data class TripPlan(
     val departureDateMillis: Long,
     val returnDateMillis: Long?,
 
-    val notes: String
+    val notes: String,
+
+    /*
+     * Optional trusted contact for trip check-ins.
+     *
+     * A trip can still be saved without either value.
+     */
+    val trustedContactName: String? = null,
+    val trustedContactPhone: String? = null
 )
