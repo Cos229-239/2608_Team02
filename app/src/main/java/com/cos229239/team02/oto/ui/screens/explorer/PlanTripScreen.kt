@@ -27,6 +27,8 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.material3.rememberDateRangePickerState
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -180,439 +182,217 @@ fun PlanTripScreen(
                 onBackClick = onBackClick
             )
 
-
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(
-                        Color.White
-                    )
-                    .verticalScroll(
-                        rememberScrollState()
-                    )
-                    .padding(20.dp)
+            Surface(
+                modifier = Modifier.fillMaxSize(),
+                color = MaterialTheme.colorScheme.background
             ) {
 
-                /*
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .verticalScroll(
+                            rememberScrollState()
+                        )
+                        .padding(20.dp)
+                ) {
+
+                    /*
                  * Round Trip / One Way
                  */
-                Row(
-                    modifier =
-                        Modifier.fillMaxWidth(),
-
-                    horizontalArrangement =
-                        Arrangement.spacedBy(
-                            8.dp
-                        )
-                ) {
-
-                    Button(
-                        onClick = {
-                            tripViewModel
-                                .updateRoundTrip(
-                                    true
-                                )
-                        },
-                        modifier =
-                            Modifier.weight(1f),
-                        colors =
-                            ButtonDefaults
-                                .buttonColors(
-                                    containerColor =
-                                        if (
-                                            tripViewModel
-                                                .isRoundTrip
-                                        ) {
-                                            darkGreen
-                                        } else {
-                                            Color.LightGray
-                                        }
-                                )
-                    ) {
-
-                        Text(
-                            "Round Trip"
-                        )
-                    }
-
-                    Button(
-                        onClick = {
-                            tripViewModel
-                                .updateRoundTrip(
-                                    false
-                                )
-                        },
-                        modifier =
-                            Modifier.weight(1f),
-                        colors =
-                            ButtonDefaults
-                                .buttonColors(
-                                    containerColor =
-                                        if (
-                                            !tripViewModel
-                                                .isRoundTrip
-                                        ) {
-                                            darkGreen
-                                        } else {
-                                            Color.LightGray
-                                        }
-                                )
-                    ) {
-
-                        Text(
-                            "One Way"
-                        )
-                    }
-                }
-
-                Spacer(
-                    modifier =
-                        Modifier.height(
-                            20.dp
-                        )
-                )
-
-                /*
-                 * Starting Point
-                 */
-                Text(
-                    "STARTING POINT"
-                )
-
-                LocationAutocompleteField(
-                    value =
-                        tripViewModel.startingPoint,
-
-                    onValueChange = {
-                        tripViewModel
-                            .updateStartingPoint(
-                                it
-                            )
-                    },
-
-                    suggestions =
-                        startingSuggestions,
-
-                    onSuggestionClick = {
-                        pendingStartingPoint =
-                            it
-                    },
-
-                    placeholder =
-                        "Enter starting point"
-                )
-
-                if (
-                    tripViewModel
-                        .verifiedStartingPoint != null
-                ) {
-
-                    Text(
-                        text =
-                            "✓ Location verified",
-                        color =
-                            darkGreen
-                    )
-                }
-
-                Spacer(
-                    modifier =
-                        Modifier.height(
-                            14.dp
-                        )
-                )
-
-                /*
-                 * Destination
-                 */
-                Text(
-                    "DESTINATION"
-                )
-
-                LocationAutocompleteField(
-                    value =
-                        tripViewModel.destination,
-
-                    onValueChange = {
-                        tripViewModel
-                            .updateDestination(
-                                it
-                            )
-                    },
-
-                    suggestions =
-                        destinationSuggestions,
-
-                    onSuggestionClick = {
-                        pendingDestination =
-                            it
-                    },
-
-                    placeholder =
-                        "Enter destination"
-                )
-
-                if (
-                    tripViewModel
-                        .verifiedDestination != null
-                ) {
-
-                    Text(
-                        text =
-                            "✓ Location verified",
-                        color =
-                            darkGreen
-                    )
-                }
-
-                Spacer(
-                    modifier =
-                        Modifier.height(
-                            14.dp
-                        )
-                )
-
-                /*
-                 * Dates
-                 */
-                Text(
-                    text =
-                        if (
-                            tripViewModel
-                                .isRoundTrip
-                        ) {
-                            "TRIP DATES"
-                        } else {
-                            "TRIP DATE"
-                        }
-                )
-
-                OutlinedButton(
-                    onClick = {
-                        showCalendar =
-                            true
-                    },
-
-                    modifier =
-                        Modifier.fillMaxWidth()
-                ) {
-
                     Row(
                         modifier =
                             Modifier.fillMaxWidth(),
 
                         horizontalArrangement =
-                            Arrangement.SpaceBetween,
-
-                        verticalAlignment =
-                            Alignment.CenterVertically
+                            Arrangement.spacedBy(
+                                8.dp
+                            )
                     ) {
 
-                        Text(
-                            text =
-                                if (
-                                    tripViewModel
-                                        .isRoundTrip
-                                ) {
-
-                                    val range =
-                                        formatDateRange(
-                                            roundTripDateState
-                                                .selectedStartDateMillis,
-
-                                            roundTripDateState
-                                                .selectedEndDateMillis
-                                        )
-
-                                    if (
-                                        range.isBlank()
-                                    ) {
-                                        "Select departure and return dates"
-                                    } else {
-                                        range
-                                    }
-
-                                } else {
-
-                                    val date =
-                                        formatDate(
-                                            oneWayDateState
-                                                .selectedDateMillis
-                                        )
-
-                                    if (
-                                        date.isBlank()
-                                    ) {
-                                        "Select trip date"
-                                    } else {
-                                        date
-                                    }
-                                }
-                        )
-
-                        Text(
-                            text =
-                                "📅",
-                            fontSize =
-                                20.sp
-                        )
-                    }
-                }
-
-                Spacer(
-                    modifier =
-                        Modifier.height(
-                            14.dp
-                        )
-                )
-
-                /*
-                 * Notes
-                 */
-                Text(
-                    "NOTES"
-                )
-
-                OutlinedTextField(
-                    value =
-                        tripViewModel.notes,
-
-                    onValueChange = {
-                        tripViewModel
-                            .updateNotes(
-                                it
-                            )
-                    },
-
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(
-                            120.dp
-                        ),
-
-                    textStyle =
-                        TextStyle(
-                            color = Color.Black
-                        ),
-
-                    placeholder = {
-                        Text(
-                            "Add notes about your trip"
-                        )
-                    }
-                )
-
-                tripViewModel
-                    .saveError
-                    ?.let { error ->
-
-                        Spacer(
+                        Button(
+                            onClick = {
+                                tripViewModel
+                                    .updateRoundTrip(
+                                        true
+                                    )
+                            },
                             modifier =
-                                Modifier.height(
-                                    10.dp
-                                )
-                        )
-
-                        Text(
-                            text =
-                                error,
-                            color =
-                                MaterialErrorColor
-                        )
-                    }
-
-                Spacer(
-                    modifier =
-                        Modifier.height(
-                            20.dp
-                        )
-                )
-
-                /*
-                 * Save / Update Trip
-                 */
-                Button(
-                    onClick = {
-
-                        if (
-                            tripViewModel
-                                .isRoundTrip
+                                Modifier.weight(1f),
+                            colors =
+                                ButtonDefaults
+                                    .buttonColors(
+                                        containerColor =
+                                            if (
+                                                tripViewModel
+                                                    .isRoundTrip
+                                            ) {
+                                                darkGreen
+                                            } else {
+                                                Color.LightGray
+                                            }
+                                    )
                         ) {
 
-                            tripViewModel
-                                .updateDates(
-                                    departureMillis =
-                                        roundTripDateState
-                                            .selectedStartDateMillis,
-
-                                    returnMillis =
-                                        roundTripDateState
-                                            .selectedEndDateMillis
-                                )
-
-                        } else {
-
-                            tripViewModel
-                                .updateDates(
-                                    departureMillis =
-                                        oneWayDateState
-                                            .selectedDateMillis,
-
-                                    returnMillis =
-                                        null
-                                )
-                        }
-
-                        val saved =
-                            tripViewModel
-                                .saveTrip()
-
-                        if (saved) {
-                            onSaveClick()
-                        }
-                    },
-
-                    modifier =
-                        Modifier.fillMaxWidth(),
-
-                    colors =
-                        ButtonDefaults
-                            .buttonColors(
-                                containerColor =
-                                    darkGreen
+                            Text(
+                                "Round Trip"
                             )
-                ) {
-
-                    Text(
-                        if (
-                            tripViewModel
-                                .savedTrip == null
-                        ) {
-                            "SAVE TRIP"
-                        } else {
-                            "UPDATE TRIP"
                         }
-                    )
-                }
 
-                /*
-                 * Clear Trip only appears when
-                 * a saved trip currently exists.
-                 */
-                if (
-                    tripViewModel.savedTrip != null
-                ) {
+                        Button(
+                            onClick = {
+                                tripViewModel
+                                    .updateRoundTrip(
+                                        false
+                                    )
+                            },
+                            modifier =
+                                Modifier.weight(1f),
+                            colors =
+                                ButtonDefaults
+                                    .buttonColors(
+                                        containerColor =
+                                            if (
+                                                !tripViewModel
+                                                    .isRoundTrip
+                                            ) {
+                                                darkGreen
+                                            } else {
+                                                Color.LightGray
+                                            }
+                                    )
+                        ) {
+
+                            Text(
+                                "One Way"
+                            )
+                        }
+                    }
 
                     Spacer(
                         modifier =
                             Modifier.height(
-                                8.dp
+                                20.dp
                             )
                     )
 
-                    TextButton(
+                    /*
+                 * Starting Point
+                 */
+                    Text(
+                        "STARTING POINT"
+                    )
+
+                    LocationAutocompleteField(
+                        value =
+                            tripViewModel.startingPoint,
+
+                        onValueChange = {
+                            tripViewModel
+                                .updateStartingPoint(
+                                    it
+                                )
+                        },
+
+                        suggestions =
+                            startingSuggestions,
+
+                        onSuggestionClick = {
+                            pendingStartingPoint =
+                                it
+                        },
+
+                        placeholder =
+                            "Enter starting point"
+                    )
+
+                    if (
+                        tripViewModel
+                            .verifiedStartingPoint != null
+                    ) {
+
+                        Text(
+                            text =
+                                "✓ Location verified",
+                            color =
+                                darkGreen
+                        )
+                    }
+
+                    Spacer(
+                        modifier =
+                            Modifier.height(
+                                14.dp
+                            )
+                    )
+
+                    /*
+                 * Destination
+                 */
+                    Text(
+                        "DESTINATION"
+                    )
+
+                    LocationAutocompleteField(
+                        value =
+                            tripViewModel.destination,
+
+                        onValueChange = {
+                            tripViewModel
+                                .updateDestination(
+                                    it
+                                )
+                        },
+
+                        suggestions =
+                            destinationSuggestions,
+
+                        onSuggestionClick = {
+                            pendingDestination =
+                                it
+                        },
+
+                        placeholder =
+                            "Enter destination"
+                    )
+
+                    if (
+                        tripViewModel
+                            .verifiedDestination != null
+                    ) {
+
+                        Text(
+                            text =
+                                "✓ Location verified",
+                            color =
+                                darkGreen
+                        )
+                    }
+
+                    Spacer(
+                        modifier =
+                            Modifier.height(
+                                14.dp
+                            )
+                    )
+
+                    /*
+                 * Dates
+                 */
+                    Text(
+                        text =
+                            if (
+                                tripViewModel
+                                    .isRoundTrip
+                            ) {
+                                "TRIP DATES"
+                            } else {
+                                "TRIP DATE"
+                            }
+                    )
+
+                    OutlinedButton(
                         onClick = {
-                            showClearTripDialog =
+                            showCalendar =
                                 true
                         },
 
@@ -620,26 +400,251 @@ fun PlanTripScreen(
                             Modifier.fillMaxWidth()
                     ) {
 
-                        Text(
-                            text =
-                                "CLEAR TRIP",
+                        Row(
+                            modifier =
+                                Modifier.fillMaxWidth(),
 
-                            color =
-                                dangerRed
+                            horizontalArrangement =
+                                Arrangement.SpaceBetween,
+
+                            verticalAlignment =
+                                Alignment.CenterVertically
+                        ) {
+
+                            Text(
+                                text =
+                                    if (
+                                        tripViewModel
+                                            .isRoundTrip
+                                    ) {
+
+                                        val range =
+                                            formatDateRange(
+                                                roundTripDateState
+                                                    .selectedStartDateMillis,
+
+                                                roundTripDateState
+                                                    .selectedEndDateMillis
+                                            )
+
+                                        if (
+                                            range.isBlank()
+                                        ) {
+                                            "Select departure and return dates"
+                                        } else {
+                                            range
+                                        }
+
+                                    } else {
+
+                                        val date =
+                                            formatDate(
+                                                oneWayDateState
+                                                    .selectedDateMillis
+                                            )
+
+                                        if (
+                                            date.isBlank()
+                                        ) {
+                                            "Select trip date"
+                                        } else {
+                                            date
+                                        }
+                                    }
+                            )
+
+                            Text(
+                                text =
+                                    "📅",
+                                fontSize =
+                                    20.sp
+                            )
+                        }
+                    }
+
+                    Spacer(
+                        modifier =
+                            Modifier.height(
+                                14.dp
+                            )
+                    )
+
+                    /*
+                 * Notes
+                 */
+                    Text(
+                        "NOTES"
+                    )
+
+                    OutlinedTextField(
+                        value =
+                            tripViewModel.notes,
+
+                        onValueChange = {
+                            tripViewModel
+                                .updateNotes(
+                                    it
+                                )
+                        },
+
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(
+                                120.dp
+                            ),
+
+                        textStyle =
+                            TextStyle(
+                                color = MaterialTheme.colorScheme.onSurface
+                            ),
+
+                        placeholder = {
+                            Text(
+                                "Add notes about your trip"
+                            )
+                        }
+                    )
+
+                    tripViewModel
+                        .saveError
+                        ?.let { error ->
+
+                            Spacer(
+                                modifier =
+                                    Modifier.height(
+                                        10.dp
+                                    )
+                            )
+
+                            Text(
+                                text =
+                                    error,
+                                color =
+                                    MaterialErrorColor
+                            )
+                        }
+
+                    Spacer(
+                        modifier =
+                            Modifier.height(
+                                20.dp
+                            )
+                    )
+
+                    /*
+                 * Save / Update Trip
+                 */
+                    Button(
+                        onClick = {
+
+                            if (
+                                tripViewModel
+                                    .isRoundTrip
+                            ) {
+
+                                tripViewModel
+                                    .updateDates(
+                                        departureMillis =
+                                            roundTripDateState
+                                                .selectedStartDateMillis,
+
+                                        returnMillis =
+                                            roundTripDateState
+                                                .selectedEndDateMillis
+                                    )
+
+                            } else {
+
+                                tripViewModel
+                                    .updateDates(
+                                        departureMillis =
+                                            oneWayDateState
+                                                .selectedDateMillis,
+
+                                        returnMillis =
+                                            null
+                                    )
+                            }
+
+                            val saved =
+                                tripViewModel
+                                    .saveTrip()
+
+                            if (saved) {
+                                onSaveClick()
+                            }
+                        },
+
+                        modifier =
+                            Modifier.fillMaxWidth(),
+                        colors =
+                            ButtonDefaults
+                                .buttonColors(
+                                    containerColor =
+                                        darkGreen,
+                                    contentColor =
+                                        Color.White
+                                )
+
+                    ) {
+
+                        Text(
+                            if (
+                                tripViewModel
+                                    .savedTrip == null
+                            ) {
+                                "SAVE TRIP"
+                            } else {
+                                "UPDATE TRIP"
+                            }
                         )
                     }
-                }
 
-                Spacer(
-                    modifier =
-                        Modifier.height(
-                            30.dp
+                    /*
+                 * Clear Trip only appears when
+                 * a saved trip currently exists.
+                 */
+                    if (
+                        tripViewModel.savedTrip != null
+                    ) {
+
+                        Spacer(
+                            modifier =
+                                Modifier.height(
+                                    8.dp
+                                )
                         )
-                )
+
+                        TextButton(
+                            onClick = {
+                                showClearTripDialog =
+                                    true
+                            },
+
+                            modifier =
+                                Modifier.fillMaxWidth()
+                        ) {
+
+                            Text(
+                                text =
+                                    "CLEAR TRIP",
+
+                                color =
+                                    dangerRed
+                            )
+                        }
+                    }
+
+                    Spacer(
+                        modifier =
+                            Modifier.height(
+                                30.dp
+                            )
+                    )
+                }
             }
         }
     }
-
     /*
      * Starting Point verification dialog.
      */
@@ -905,7 +910,7 @@ private fun LocationAutocompleteField(
 
             textStyle =
                 TextStyle(
-                    color = Color.Black
+                    color = MaterialTheme.colorScheme.onSurface
                 ),
 
             placeholder = {
