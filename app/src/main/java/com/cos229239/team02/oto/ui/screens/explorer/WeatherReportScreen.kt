@@ -1,6 +1,7 @@
 package com.cos229239.team02.oto.ui.screens.explorer
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -32,6 +33,10 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.cos229239.team02.oto.data.safety.SafetySourceState
 import com.cos229239.team02.oto.ui.features.AreaSafetyView
 import com.cos229239.team02.oto.ui.features.weatherIcon
+import com.cos229239.team02.oto.ui.theme.OtoExplorerGreenContainer
+import com.cos229239.team02.oto.ui.theme.OtoExplorerGreenDark
+import com.cos229239.team02.oto.ui.theme.OtoSurface
+import com.cos229239.team02.oto.ui.theme.OtoTextOnDark
 
 /**
  * Weather details screen for Explorer.
@@ -65,15 +70,19 @@ fun WeatherReportScreen(
     val mediumGreen =
         Color(0xFF0B5D1E)
 
-    val lightBackground =
-        Color(0xFFF7F8F6)
+    val screenBackground = MaterialTheme.colorScheme
+
+
+    val primaryText = MaterialTheme.colorScheme.onSurface
+    val secondaryText = MaterialTheme.colorScheme.onSurfaceVariant
+
 
     Column(
         modifier =
             Modifier
                 .fillMaxSize()
                 .background(
-                    lightBackground
+                    screenBackground.background
                 )
     ) {
 
@@ -87,9 +96,6 @@ fun WeatherReportScreen(
             modifier =
                 Modifier
                     .fillMaxWidth()
-                    .background(
-                        darkGreen
-                    )
                     .statusBarsPadding()
                     .padding(
                         horizontal =
@@ -132,7 +138,7 @@ fun WeatherReportScreen(
                         "WEATHER REPORT",
 
                     color =
-                        Color.White,
+                       primaryText,
 
                     fontSize =
                         22.sp,
@@ -146,10 +152,7 @@ fun WeatherReportScreen(
                         "Explorer weather conditions",
 
                     color =
-                        Color.White.copy(
-                            alpha =
-                                0.90f
-                        ),
+                        secondaryText,
 
                     fontSize =
                         13.sp
@@ -186,10 +189,10 @@ fun WeatherReportScreen(
                     "CURRENT AREA",
 
                 color =
-                    darkGreen,
+                    primaryText,
 
                 fontSize =
-                    12.sp,
+                    16.sp,
 
                 fontWeight =
                     FontWeight.Bold
@@ -208,12 +211,12 @@ fun WeatherReportScreen(
 
 
                 color =
-                    Color(
-                        0xFF555555
-                    ),
+                    primaryText,
 
                 fontSize =
-                    14.sp
+                    24.sp,
+
+                fontWeight = FontWeight.Bold
             )
 
             Spacer(
@@ -236,7 +239,8 @@ fun WeatherReportScreen(
                 colors =
                     CardDefaults.cardColors(
                         containerColor =
-                            Color.White
+                            MaterialTheme.colorScheme.surface,
+                        contentColor = MaterialTheme.colorScheme.onSurface
                     ),
 
                 shape =
@@ -247,7 +251,9 @@ fun WeatherReportScreen(
 
                 Column(
                     modifier =
-                        Modifier.padding(
+                        Modifier
+                            .fillMaxWidth()
+                            .padding(
                             20.dp
                         ),
 
@@ -344,7 +350,8 @@ fun WeatherReportScreen(
                 colors =
                     CardDefaults.cardColors(
                         containerColor =
-                            Color.White
+                            MaterialTheme.colorScheme.surface,
+                        contentColor = MaterialTheme.colorScheme.onSurface
                     ),
 
                 shape =
@@ -365,7 +372,7 @@ fun WeatherReportScreen(
                             "WEATHER DETAILS",
 
                         color =
-                            darkGreen,
+                           primaryText,
 
                         fontSize =
                             16.sp,
@@ -481,63 +488,76 @@ fun WeatherReportScreen(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(16.dp),
                 colors = CardDefaults.cardColors(
-                    containerColor = Color.White
+                    containerColor =
+                        MaterialTheme.colorScheme.surface,
+                    contentColor = MaterialTheme.colorScheme.onSurface
                 )
             ) {
-                Text(
-                    text = "AIR QUALITY ESTIMATE",
-                    fontWeight = FontWeight.Bold
-                )
-                Text(text = uiState.areaName)
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(18.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Text(
+                        text = "AIR QUALITY ESTIMATE",
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(text = uiState.areaName)
 
-                when {
-                      uiState.isLoading -> {
-                          CircularProgressIndicator()
-                      }
+                    when {
+                        uiState.isLoading -> {
+                            CircularProgressIndicator()
+                        }
 
-                    !uiState.hasLocation -> {
-                        Text("Click Locate Me for Location")
-                    }
+                        !uiState.hasLocation -> {
+                            Text("Click Locate Me for Location")
+                        }
 
-                    airQuality != null -> {
-                        Text(
-                            text = "US AQI: ${airQuality.usAqi ?: "_"}",
-                            style = MaterialTheme.typography.headlineMedium
-                        )
+                        airQuality != null -> {
+                            Text(
+                                text = "US AQI: ${airQuality.usAqi ?: "_"}",
+                                style = MaterialTheme.typography.headlineMedium
+                            )
 
-                        Text(text = airQuality.category)
+                            Text(text = airQuality.category)
 
-                        Text(
-                            text = "PM2.5" +
-                                    (airQuality.pm25?.let {"$it µg/m³"} ?: "Unavailable")
-                        )
-                        Text(
-                              text = "PM10: " +
-                                      (airQuality.pm10?.let {"$it µg/m³"} ?: "Unavailable")
-
-                          )
-
-                         Text(
-                                text = "Valid time: ${airQuality.validTime}",
-                             style = MaterialTheme.typography.bodySmall
+                            Text(
+                                text = "PM2.5" +
+                                        (airQuality.pm25?.let { "$it µg/m³" } ?: "Unavailable")
+                            )
+                            Text(
+                                text = "PM10: " +
+                                        (airQuality.pm10?.let { "$it µg/m³" } ?: "Unavailable")
 
                             )
-                         }
 
-                   else -> {
-                        Text(
-                            text = uiState.errorMessage
-                                ?: airQualityStatus?.message
-                                ?: "Air quality has not loaded"
+                            Text(
+                                text = "Valid time: ${airQuality.validTime}",
+                                style = MaterialTheme.typography.bodySmall
 
-                        )
-                   }
+                            )
+                        }
+
+                        else -> {
+                            Text(
+                                text = uiState.errorMessage
+                                    ?: airQualityStatus?.message
+                                    ?: "Air quality has not loaded"
+
+                            )
+                        }
+                    }
+                    Text(
+                        text = "Air-quality data: CAMS via Open-Meteo",
+                        style = MaterialTheme.typography.bodySmall
+                    )
                 }
-                Text(
-                    text = "Air-quality data: CAMS via Open-Meteo",
-                    style = MaterialTheme.typography.bodySmall
-                )
             }
+            Spacer(
+                modifier =
+                    Modifier.height(16.dp)
+            )
 
             /*
              * -------------------------------------------------
@@ -552,7 +572,8 @@ fun WeatherReportScreen(
                 colors =
                     CardDefaults.cardColors(
                         containerColor =
-                            Color.White
+                            MaterialTheme.colorScheme.surface,
+                        contentColor = MaterialTheme.colorScheme.onSurface
                     ),
 
                 shape =
@@ -573,7 +594,7 @@ fun WeatherReportScreen(
                             "⚠️ WEATHER ALERTS",
 
                         color =
-                            darkGreen,
+                           primaryText,
 
                         fontSize =
                             16.sp,
@@ -641,9 +662,8 @@ fun WeatherReportScreen(
                 colors =
                     CardDefaults.cardColors(
                         containerColor =
-                            Color(
-                                0xFFEFF5F0
-                            )
+                            MaterialTheme.colorScheme.surface,
+                        contentColor = MaterialTheme.colorScheme.onSurface
                     ),
 
                 shape =
@@ -664,7 +684,7 @@ fun WeatherReportScreen(
                             "Weather service",
 
                         color =
-                            darkGreen,
+                            secondaryText,
 
                         fontWeight =
                             FontWeight.Bold
@@ -687,7 +707,7 @@ fun WeatherReportScreen(
 
 
                         color =
-                            mediumGreen,
+                            secondaryText,
 
                         fontSize =
                             13.sp
@@ -763,13 +783,15 @@ private fun WeatherDetailItem(
                 value,
 
             color =
-                darkGreen,
+                MaterialTheme.colorScheme.onSurface,
 
             fontSize =
                 19.sp,
 
             fontWeight =
-                FontWeight.Bold
+                FontWeight.Bold,
+
+            textAlign = TextAlign.Center
         )
 
         Spacer(
@@ -784,9 +806,7 @@ private fun WeatherDetailItem(
                 label,
 
             color =
-                Color(
-                    0xFF666666
-                ),
+                MaterialTheme.colorScheme.onSurfaceVariant,
 
             fontSize =
                 11.sp,

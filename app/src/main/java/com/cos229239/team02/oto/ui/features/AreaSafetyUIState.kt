@@ -29,6 +29,7 @@ data class AreaSafetyUIState(
     val selectedLocation: OtoLocation?  = null,
     //Automatic Park Selection variable
     val autoParkSelect: Boolean = true,
+    val selectedParkName: String? = null,
 
 
 ){
