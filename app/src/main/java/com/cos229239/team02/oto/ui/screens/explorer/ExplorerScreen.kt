@@ -1,12 +1,23 @@
 package com.cos229239.team02.oto.ui.screens.explorer
 
-
 import android.Manifest
+import android.app.Activity
+import android.app.PendingIntent
+import android.content.ActivityNotFoundException
+import android.content.BroadcastReceiver
+import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
 import android.content.pm.PackageManager
+import android.location.Geocoder
+import android.net.Uri
+import android.os.Build
+import android.telephony.SmsManager
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -16,6 +27,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -29,6 +41,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -63,12 +76,10 @@ import com.cos229239.team02.oto.ui.theme.OtoCrisisRed
 import com.cos229239.team02.oto.ui.theme.OtoExplorerGreen
 import com.cos229239.team02.oto.ui.theme.OtoExplorerGreenDark
 import kotlinx.coroutines.launch
-import java.util.Locale
-import android.location.Geocoder
-import android.os.Build
-import androidx.compose.foundation.isSystemInDarkTheme
-import androidx.compose.foundation.layout.heightIn
 import kotlinx.coroutines.suspendCancellableCoroutine
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 import kotlin.coroutines.resume
 
 @Composable
@@ -122,9 +133,12 @@ fun ExplorerScreen(
         Color(
             0xFF0B5D1E
         )
-    val screenBackground = MaterialTheme.colorScheme
 
-    val primaryText = MaterialTheme.colorScheme.onSurface
+    val screenBackground =
+        MaterialTheme.colorScheme
+
+    val primaryText =
+        MaterialTheme.colorScheme.onSurface
 
     /*
      * ---------------------------------------------------------
@@ -141,8 +155,610 @@ fun ExplorerScreen(
         tripViewModel.savedTrip
 
     /*
-     * Active hazard reports.
+     * ---------------------------------------------------------
+     * TRUSTED CONTACT CHECK-IN
+     * ---------------------------------------------------------
+     *
+     * The trusted contact is saved with the trip.
+     *
+     * Check-in time is stored locally on the device.
+     * SMS permission is requested the first time the
+     * user tries to send a check-in message.
      */
+
+    val checkInPreferences =
+        remember(
+            context
+        ) {
+            context.getSharedPreferences(
+                "oto_check_in",
+                Context.MODE_PRIVATE
+            )
+        }
+
+    val trustedContactName =
+        savedTrip
+            ?.trustedContactName
+            .orEmpty()
+
+    val trustedContactPhone =
+        savedTrip
+            ?.trustedContactPhone
+            .orEmpty()
+
+    val hasTrustedContact =
+        trustedContactName.isNotBlank() &&
+                trustedContactPhone.isNotBlank()
+
+    /*
+     * Save the phone number with the check-in time so
+     * an old check-in is not displayed for a different
+     * trusted contact later.
+     */
+    val storedCheckInPhone =
+        checkInPreferences
+            .getString(
+                KEY_LAST_CHECK_IN_PHONE,
+                ""
+            )
+            .orEmpty()
+
+    var lastCheckInTime by remember(
+        trustedContactPhone
+    ) {
+
+        mutableStateOf<Long?>(
+            if (
+                hasTrustedContact &&
+                storedCheckInPhone == trustedContactPhone
+            ) {
+
+                checkInPreferences
+                    .getLong(
+                        KEY_LAST_CHECK_IN_TIME,
+                        0L
+                    )
+                    .takeIf {
+                        it > 0L
+                    }
+
+            } else {
+
+                null
+            }
+        )
+    }
+
+    var checkInMessageError by remember {
+
+        mutableStateOf<String?>(
+            null
+        )
+    }
+
+    var checkInMessageStatus by remember {
+
+        mutableStateOf<String?>(
+            null
+        )
+    }
+
+    var isCheckInSending by remember {
+
+        mutableStateOf(
+            false
+        )
+    }
+
+    val smsSentAction =
+        remember(
+            context
+        ) {
+
+            "${context.packageName}.OTO_SMS_SENT"
+        }
+
+    val smsDeliveredAction =
+        remember(
+            context
+        ) {
+
+            "${context.packageName}.OTO_SMS_DELIVERED"
+        }
+
+    fun recordCheckIn(
+        checkInTime: Long
+    ) {
+
+        if (
+            !hasTrustedContact
+        ) {
+
+            return
+        }
+
+        lastCheckInTime =
+            checkInTime
+
+        checkInPreferences
+            .edit()
+            .putLong(
+                KEY_LAST_CHECK_IN_TIME,
+                checkInTime
+            )
+            .putString(
+                KEY_LAST_CHECK_IN_PHONE,
+                trustedContactPhone
+            )
+            .apply()
+    }
+
+    fun buildCheckInMessage(
+        checkInTime: Long
+    ): String {
+
+        return "OTO check-in: Your traveler checked in ${
+            formatCheckInTime(
+                checkInTime
+            )
+        }."
+    }
+
+    fun openMessagingFallback(
+        checkInTime: Long
+    ) {
+
+        if (
+            !hasTrustedContact
+        ) {
+
+            return
+        }
+
+        val message =
+            buildCheckInMessage(
+                checkInTime
+            )
+
+        try {
+
+            val messageIntent =
+                Intent(
+                    Intent.ACTION_SENDTO
+                ).apply {
+
+                    data =
+                        Uri.fromParts(
+                            "smsto",
+                            trustedContactPhone,
+                            null
+                        )
+
+                    putExtra(
+                        "sms_body",
+                        message
+                    )
+                }
+
+            context.startActivity(
+                messageIntent
+            )
+
+            isCheckInSending =
+                false
+
+            checkInMessageError =
+                null
+
+            checkInMessageStatus =
+                "Message opened in your messaging app. Send it there to complete the check-in."
+
+        } catch (
+            exception: ActivityNotFoundException
+        ) {
+
+            isCheckInSending =
+                false
+
+            checkInMessageStatus =
+                null
+
+            checkInMessageError =
+                "No messaging app is available on this device."
+
+        } catch (
+            exception: Exception
+        ) {
+
+            isCheckInSending =
+                false
+
+            checkInMessageStatus =
+                null
+
+            checkInMessageError =
+                "Unable to open the messaging app."
+        }
+    }
+
+    DisposableEffect(
+        context,
+        trustedContactPhone
+    ) {
+
+        val sentReceiver =
+            object : BroadcastReceiver() {
+
+                override fun onReceive(
+                    receiverContext: Context?,
+                    intent: Intent?
+                ) {
+
+                    val checkInTime =
+                        intent
+                            ?.getLongExtra(
+                                EXTRA_CHECK_IN_TIME,
+                                0L
+                            )
+                            ?: 0L
+
+                    isCheckInSending =
+                        false
+
+                    when (
+                        resultCode
+                    ) {
+
+                        Activity.RESULT_OK -> {
+
+                            if (
+                                checkInTime > 0L
+                            ) {
+
+                                recordCheckIn(
+                                    checkInTime
+                                )
+                            }
+
+                            checkInMessageError =
+                                null
+
+                            checkInMessageStatus =
+                                "SMS sent."
+                        }
+
+                        SmsManager.RESULT_ERROR_NO_SERVICE -> {
+
+                            checkInMessageStatus =
+                                null
+
+                            checkInMessageError =
+                                "SMS could not be sent because there is no mobile service."
+                        }
+
+                        SmsManager.RESULT_ERROR_RADIO_OFF -> {
+
+                            checkInMessageStatus =
+                                null
+
+                            checkInMessageError =
+                                "SMS could not be sent because the mobile radio is turned off."
+                        }
+
+                        SmsManager.RESULT_ERROR_NULL_PDU -> {
+
+                            checkInMessageStatus =
+                                null
+
+                            checkInMessageError =
+                                "SMS could not be created by this device."
+                        }
+
+                        SmsManager.RESULT_ERROR_GENERIC_FAILURE -> {
+
+                            checkInMessageStatus =
+                                null
+
+                            checkInMessageError =
+                                "The SMS failed to send."
+                        }
+
+                        else -> {
+
+                            checkInMessageStatus =
+                                null
+
+                            checkInMessageError =
+                                "The SMS could not be sent."
+                        }
+                    }
+                }
+            }
+
+        val deliveredReceiver =
+            object : BroadcastReceiver() {
+
+                override fun onReceive(
+                    receiverContext: Context?,
+                    intent: Intent?
+                ) {
+
+                    if (
+                        resultCode ==
+                        Activity.RESULT_OK
+                    ) {
+
+                        checkInMessageError =
+                            null
+
+                        checkInMessageStatus =
+                            "SMS delivery confirmed."
+
+                    } else {
+
+                        checkInMessageStatus =
+                            "SMS was sent, but delivery was not confirmed."
+                    }
+                }
+            }
+
+        ContextCompat.registerReceiver(
+            context,
+            sentReceiver,
+            IntentFilter(
+                smsSentAction
+            ),
+            ContextCompat.RECEIVER_NOT_EXPORTED
+        )
+
+        ContextCompat.registerReceiver(
+            context,
+            deliveredReceiver,
+            IntentFilter(
+                smsDeliveredAction
+            ),
+            ContextCompat.RECEIVER_NOT_EXPORTED
+        )
+
+        onDispose {
+
+            try {
+
+                context.unregisterReceiver(
+                    sentReceiver
+                )
+
+            } catch (
+                exception: Exception
+            ) {
+            }
+
+            try {
+
+                context.unregisterReceiver(
+                    deliveredReceiver
+                )
+
+            } catch (
+                exception: Exception
+            ) {
+            }
+        }
+    }
+
+    fun sendCheckInMessage() {
+
+        if (
+            !hasTrustedContact ||
+            isCheckInSending
+        ) {
+
+            return
+        }
+
+        val checkInTime =
+            System.currentTimeMillis()
+
+        val message =
+            buildCheckInMessage(
+                checkInTime
+            )
+
+        try {
+
+            isCheckInSending =
+                true
+
+            checkInMessageError =
+                null
+
+            checkInMessageStatus =
+                "Sending check-in..."
+
+            val sentIntent =
+                Intent(
+                    smsSentAction
+                ).apply {
+
+                    setPackage(
+                        context.packageName
+                    )
+
+                    putExtra(
+                        EXTRA_CHECK_IN_TIME,
+                        checkInTime
+                    )
+                }
+
+            val sentPendingIntent =
+                PendingIntent.getBroadcast(
+                    context,
+                    checkInTime.hashCode(),
+                    sentIntent,
+                    PendingIntent.FLAG_UPDATE_CURRENT or
+                            PendingIntent.FLAG_IMMUTABLE
+                )
+
+            val deliveredIntent =
+                Intent(
+                    smsDeliveredAction
+                ).apply {
+
+                    setPackage(
+                        context.packageName
+                    )
+
+                    putExtra(
+                        EXTRA_CHECK_IN_TIME,
+                        checkInTime
+                    )
+                }
+
+            val deliveredPendingIntent =
+                PendingIntent.getBroadcast(
+                    context,
+                    checkInTime.hashCode() + 1,
+                    deliveredIntent,
+                    PendingIntent.FLAG_UPDATE_CURRENT or
+                            PendingIntent.FLAG_IMMUTABLE
+                )
+
+            @Suppress("DEPRECATION")
+            val smsManager =
+                SmsManager.getDefault()
+
+            smsManager.sendTextMessage(
+                trustedContactPhone,
+                null,
+                message,
+                sentPendingIntent,
+                deliveredPendingIntent
+            )
+
+        } catch (
+            exception: UnsupportedOperationException
+        ) {
+
+            openMessagingFallback(
+                checkInTime
+            )
+
+        } catch (
+            exception: SecurityException
+        ) {
+
+            isCheckInSending =
+                false
+
+            checkInMessageStatus =
+                null
+
+            checkInMessageError =
+                "SMS permission is required to send a check-in."
+
+        } catch (
+            exception: IllegalArgumentException
+        ) {
+
+            isCheckInSending =
+                false
+
+            checkInMessageStatus =
+                null
+
+            checkInMessageError =
+                "The trusted contact phone number is not valid."
+
+        } catch (
+            exception: Exception
+        ) {
+
+            isCheckInSending =
+                false
+
+            checkInMessageStatus =
+                null
+
+            checkInMessageError =
+                "Unable to send the check-in message on this device."
+        }
+    }
+
+    val smsPermissionLauncher =
+        rememberLauncherForActivityResult(
+            contract =
+                ActivityResultContracts
+                    .RequestPermission()
+        ) { granted ->
+
+            if (
+                granted
+            ) {
+
+                sendCheckInMessage()
+
+            } else {
+
+                isCheckInSending =
+                    false
+
+                checkInMessageStatus =
+                    null
+
+                checkInMessageError =
+                    "SMS permission was denied. OTO could not send the check-in."
+            }
+        }
+
+    fun checkIn() {
+
+        if (
+            !hasTrustedContact ||
+            isCheckInSending
+        ) {
+
+            return
+        }
+
+        val supportsDirectSms =
+            context
+                .packageManager
+                .hasSystemFeature(
+                    PackageManager.FEATURE_TELEPHONY_MESSAGING
+                )
+
+        if (
+            !supportsDirectSms
+        ) {
+
+            openMessagingFallback(
+                System.currentTimeMillis()
+            )
+
+            return
+        }
+
+        val smsPermissionGranted =
+            ContextCompat.checkSelfPermission(
+                context,
+                Manifest.permission.SEND_SMS
+            ) ==
+                    PackageManager.PERMISSION_GRANTED
+
+        if (
+            smsPermissionGranted
+        ) {
+
+            sendCheckInMessage()
+
+        } else {
+
+            smsPermissionLauncher.launch(
+                Manifest.permission.SEND_SMS
+            )
+        }
+    }
+
     val activeHazardReports =
         hazardReportViewModel
             .activeHazardReports
@@ -150,51 +766,46 @@ fun ExplorerScreen(
     val activeHazardCount =
         activeHazardReports.size
 
-    /*
-     * ---------------------------------------------------------
-     * ROUTE NAVIGATION
-     * ---------------------------------------------------------
-     */
-
     val routeClient =
         remember {
             RouteClient()
         }
 
     var routes by remember {
+
         mutableStateOf<List<RouteResult>>(
             emptyList()
         )
     }
 
     var selectedRouteIndex by remember {
+
         mutableIntStateOf(
             0
         )
     }
 
     var routeLoading by remember {
+
         mutableStateOf(
             false
         )
     }
 
     var routeError by remember {
+
         mutableStateOf<String?>(
             null
         )
     }
 
     var isTripCardExpanded by remember {
+
         mutableStateOf(
             true
         )
     }
 
-    /*
-     * Retrieve route geometry whenever
-     * the saved trip changes.
-     */
     LaunchedEffect(
         savedTrip?.startingLatitude,
         savedTrip?.startingLongitude,
@@ -271,12 +882,6 @@ fun ExplorerScreen(
             false
     }
 
-    /*
-     * ---------------------------------------------------------
-     * LOCATION
-     * ---------------------------------------------------------
-     */
-
     val locationRepository =
         remember(
             context
@@ -288,23 +893,11 @@ fun ExplorerScreen(
         }
 
     var currentLocation by remember {
+
         mutableStateOf<OtoLocation?>(
             null
         )
     }
-
-    /*
-     * ---------------------------------------------------------
-     * SAFETY AREA SELECTION
-     * ---------------------------------------------------------
-     *
-     * Team update:
-     *
-     * If a trip exists, use the trip destination
-     * for weather and safety information.
-     *
-     * Otherwise use the user's current location.
-     */
 
     val destinationLatitude =
         savedTrip
@@ -352,10 +945,16 @@ fun ExplorerScreen(
         if (
             selectedArea != null
         ) {
-            val areaName = resolveAreaName(
-          context = context,
-          location = selectedArea
-      )
+
+            val areaName =
+                resolveAreaName(
+                    context =
+                        context,
+
+                    location =
+                        selectedArea
+                )
+
             safetyView.setArea(
                 location =
                     selectedArea,
@@ -373,33 +972,35 @@ fun ExplorerScreen(
 
                     } else {
 
-                       areaName
+                        areaName
                     }
             )
         }
     }
 
-
-
     var locationStatus by remember {
+
         mutableStateOf(
             "Location not loaded"
         )
     }
 
     var loadingLocation by remember {
+
         mutableStateOf(
             false
         )
     }
 
     var locationFocusRequest by remember {
+
         mutableIntStateOf(
             0
         )
     }
 
     var focusAfterPermission by remember {
+
         mutableStateOf(
             false
         )
@@ -420,12 +1021,6 @@ fun ExplorerScreen(
                     PackageManager.PERMISSION_GRANTED
         )
     }
-
-    /*
-     * ---------------------------------------------------------
-     * REQUEST FRESH LOCATION
-     * ---------------------------------------------------------
-     */
 
     fun loadCurrentLocation(
         focusOnMap: Boolean = false
@@ -471,12 +1066,6 @@ fun ExplorerScreen(
         }
     }
 
-    /*
-     * ---------------------------------------------------------
-     * LOCATION PERMISSION
-     * ---------------------------------------------------------
-     */
-
     val locationPermissionLauncher =
         rememberLauncherForActivityResult(
             contract =
@@ -513,12 +1102,6 @@ fun ExplorerScreen(
             focusAfterPermission =
                 false
         }
-
-    /*
-     * ---------------------------------------------------------
-     * REQUEST LOCATION
-     * ---------------------------------------------------------
-     */
 
     fun requestLocation(
         focusOnMap: Boolean = false
@@ -565,12 +1148,6 @@ fun ExplorerScreen(
         }
     }
 
-    /*
-     * ---------------------------------------------------------
-     * INITIAL LOCATION
-     * ---------------------------------------------------------
-     */
-
     LaunchedEffect(
         hasLocationPermission
     ) {
@@ -595,12 +1172,6 @@ fun ExplorerScreen(
             }
         }
     }
-
-    /*
-     * ---------------------------------------------------------
-     * CONTINUOUS LOCATION UPDATES
-     * ---------------------------------------------------------
-     */
 
     LaunchedEffect(
         hasLocationPermission
@@ -628,12 +1199,6 @@ fun ExplorerScreen(
             }
     }
 
-    /*
-     * ---------------------------------------------------------
-     * SCREEN
-     * ---------------------------------------------------------
-     */
-
     Column(
         modifier =
             Modifier
@@ -643,12 +1208,6 @@ fun ExplorerScreen(
                 )
     ) {
 
-        /*
-         * -----------------------------------------------------
-         * HEADER
-         * -----------------------------------------------------
-         */
-
         OtoTopAppBar(
             title =
                 "EXPLORER MODE",
@@ -656,12 +1215,6 @@ fun ExplorerScreen(
             onBackClick =
                 onBackClick
         )
-
-        /*
-         * -----------------------------------------------------
-         * MAP
-         * -----------------------------------------------------
-         */
 
         Box(
             modifier =
@@ -706,23 +1259,8 @@ fun ExplorerScreen(
                 selectedRouteIndex =
                     selectedRouteIndex,
 
-                /*
-                 * -------------------------------------------------
-                 * ACTIVE HAZARDS
-                 * -------------------------------------------------
-                 */
-
                 hazardReports =
                     activeHazardReports,
-
-                /*
-                 * -------------------------------------------------
-                 * MAP POPUP -> FIELD REPORTS
-                 * -------------------------------------------------
-                 *
-                 * Save only the reports represented by
-                 * the selected marker before navigating.
-                 */
 
                 onViewHazardReportsClick = { selectedReports ->
 
@@ -746,12 +1284,6 @@ fun ExplorerScreen(
                     locationFocusRequest
             )
 
-            /*
-             * -------------------------------------------------
-             * CURRENT LOCATION CARD
-             * -------------------------------------------------
-             */
-
             if (
                 savedTrip == null
             ) {
@@ -771,6 +1303,7 @@ fun ExplorerScreen(
                             .cardColors(
                                 containerColor =
                                     MaterialTheme.colorScheme.surface,
+
                                 contentColor =
                                     MaterialTheme.colorScheme.onSurface
                             ),
@@ -872,9 +1405,9 @@ fun ExplorerScreen(
                                         .buttonColors(
                                             containerColor =
                                                 MaterialTheme.colorScheme.onSurface,
+
                                             contentColor =
                                                 MaterialTheme.colorScheme.surface
-
                                         )
                             ) {
 
@@ -887,12 +1420,6 @@ fun ExplorerScreen(
                     }
                 }
             }
-
-            /*
-             * -------------------------------------------------
-             * EXPANDED ACTIVE TRIP
-             * -------------------------------------------------
-             */
 
             if (
                 savedTrip != null &&
@@ -1109,12 +1636,6 @@ fun ExplorerScreen(
                 }
             }
 
-            /*
-             * -------------------------------------------------
-             * MINIMIZED ACTIVE TRIP
-             * -------------------------------------------------
-             */
-
             if (
                 savedTrip != null &&
                 !isTripCardExpanded
@@ -1135,6 +1656,7 @@ fun ExplorerScreen(
                             .cardColors(
                                 containerColor =
                                     MaterialTheme.colorScheme.surface,
+
                                 contentColor =
                                     MaterialTheme.colorScheme.onSurface
                             ),
@@ -1250,12 +1772,6 @@ fun ExplorerScreen(
             }
         }
 
-        /*
-         * -----------------------------------------------------
-         * SCROLLABLE DASHBOARD
-         * -----------------------------------------------------
-         */
-
         Column(
             modifier =
                 Modifier
@@ -1270,12 +1786,6 @@ fun ExplorerScreen(
                         16.dp
                     )
         ) {
-
-            /*
-             * -------------------------------------------------
-             * QUICK ACTIONS
-             * -------------------------------------------------
-             */
 
             Row(
                 modifier =
@@ -1331,6 +1841,7 @@ fun ExplorerScreen(
                         ),
 
                     onClick = {
+
                         // Future feature.
                     }
                 )
@@ -1349,7 +1860,9 @@ fun ExplorerScreen(
                         Modifier.weight(
                             1f
                         ),
+
                     onClick = {
+
                         // Future feature.
                     }
                 )
@@ -1361,12 +1874,6 @@ fun ExplorerScreen(
                         16.dp
                     )
             )
-
-            /*
-             * -------------------------------------------------
-             * SAFETY OVERVIEW
-             * -------------------------------------------------
-             */
 
             SafetyOverviewCard(
                 uiState =
@@ -1392,12 +1899,6 @@ fun ExplorerScreen(
                     )
             )
 
-            /*
-             * -------------------------------------------------
-             * REPORT HAZARD / ROUTE CHANGE
-             * -------------------------------------------------
-             */
-
             DashboardWideCard(
                 title =
                     "⚠️  REPORT HAZARD / ROUTE CHANGE",
@@ -1416,12 +1917,6 @@ fun ExplorerScreen(
                     )
             )
 
-            /*
-             * -------------------------------------------------
-             * CHECK-IN
-             * -------------------------------------------------
-             */
-
             Card(
                 modifier =
                     Modifier.fillMaxWidth(),
@@ -1430,6 +1925,7 @@ fun ExplorerScreen(
                     CardDefaults.cardColors(
                         containerColor =
                             MaterialTheme.colorScheme.surface,
+
                         contentColor =
                             MaterialTheme.colorScheme.onSurface
                     ),
@@ -1455,58 +1951,213 @@ fun ExplorerScreen(
                             18.sp,
 
                         fontWeight =
-                            FontWeight.Bold,
-
-                    )
-
-                    Spacer(
-                        modifier =
-                            Modifier.height(
-                                6.dp
-                            )
-                    )
-
-                    Text(
-                        text =
-                            "Trusted Contact"
-                    )
-
-                    Text(
-                        text =
-                            "Not checked in",
-
-                        fontWeight =
                             FontWeight.Bold
                     )
 
                     Spacer(
                         modifier =
                             Modifier.height(
-                                10.dp
+                                8.dp
                             )
                     )
 
-                    Button(
-                        onClick = {
-                            // Future feature.
-                        },
-
-                        modifier =
-                            Modifier.fillMaxWidth(),
-
-                        colors =
-                            ButtonDefaults.buttonColors(
-                                containerColor =
-                                    MaterialTheme.colorScheme.onSurface,
-                                contentColor =
-                                    MaterialTheme.colorScheme.surface
-                            )
+                    if (
+                        !hasTrustedContact
                     ) {
 
                         Text(
                             text =
-                                "CHECK IN"
+                                "No trusted contact added",
+
+                            color =
+                                MaterialTheme.colorScheme.onSurfaceVariant
                         )
+
+                        Spacer(
+                            modifier =
+                                Modifier.height(
+                                    10.dp
+                                )
+                        )
+
+                        Button(
+                            onClick =
+                                onPlanTripClick,
+
+                            modifier =
+                                Modifier.fillMaxWidth(),
+
+                            colors =
+                                ButtonDefaults.buttonColors(
+                                    containerColor =
+                                        MaterialTheme.colorScheme.onSurface,
+
+                                    contentColor =
+                                        MaterialTheme.colorScheme.surface
+                                )
+                        ) {
+
+                            Text(
+                                text =
+                                    "ADD TRUSTED CONTACT"
+                            )
+                        }
+
+                    } else {
+
+                        Text(
+                            text =
+                                trustedContactName,
+
+                            fontWeight =
+                                FontWeight.Bold
+                        )
+
+                        Text(
+                            text =
+                                trustedContactPhone,
+
+                            color =
+                                MaterialTheme.colorScheme.onSurfaceVariant,
+
+                            style =
+                                MaterialTheme.typography.bodySmall
+                        )
+
+                        Spacer(
+                            modifier =
+                                Modifier.height(
+                                    8.dp
+                                )
+                        )
+
+                        if (
+                            lastCheckInTime != null
+                        ) {
+
+                            Text(
+                                text =
+                                    "✓ Checked in ${
+                                        formatCheckInTime(
+                                            lastCheckInTime!!
+                                        )
+                                    }",
+
+                                color =
+                                    MaterialTheme.colorScheme.primary,
+
+                                fontWeight =
+                                    FontWeight.Bold
+                            )
+
+                        } else {
+
+                            Text(
+                                text =
+                                    "Not checked in",
+
+                                color =
+                                    MaterialTheme.colorScheme.onSurfaceVariant,
+
+                                fontWeight =
+                                    FontWeight.Bold
+                            )
+                        }
+
+                        Spacer(
+                            modifier =
+                                Modifier.height(
+                                    12.dp
+                                )
+                        )
+
+                        Button(
+                            onClick = {
+
+                                checkIn()
+                            },
+
+                            enabled =
+                                !isCheckInSending,
+
+                            modifier =
+                                Modifier.fillMaxWidth(),
+
+                            colors =
+                                ButtonDefaults.buttonColors(
+                                    containerColor =
+                                        MaterialTheme.colorScheme.onSurface,
+
+                                    contentColor =
+                                        MaterialTheme.colorScheme.surface
+                                )
+                        ) {
+
+                            Text(
+                                text =
+                                    when {
+
+                                        isCheckInSending -> {
+
+                                            "SENDING..."
+                                        }
+
+                                        lastCheckInTime == null -> {
+
+                                            "CHECK IN"
+                                        }
+
+                                        else -> {
+
+                                            "CHECK IN AGAIN"
+                                        }
+                                    }
+                            )
+                        }
+
+                        checkInMessageStatus
+                            ?.let { status ->
+
+                                Spacer(
+                                    modifier =
+                                        Modifier.height(
+                                            8.dp
+                                        )
+                                )
+
+                                Text(
+                                    text =
+                                        status,
+
+                                    color =
+                                        MaterialTheme.colorScheme.primary,
+
+                                    style =
+                                        MaterialTheme.typography.bodySmall
+                                )
+                            }
+
+                        checkInMessageError
+                            ?.let { error ->
+
+                                Spacer(
+                                    modifier =
+                                        Modifier.height(
+                                            8.dp
+                                        )
+                                )
+
+                                Text(
+                                    text =
+                                        error,
+
+                                    color =
+                                        MaterialTheme.colorScheme.error,
+
+                                    style =
+                                        MaterialTheme.typography.bodySmall
+                                )
+                            }
                     }
                 }
             }
@@ -1517,14 +2168,6 @@ fun ExplorerScreen(
                         12.dp
                     )
             )
-
-            /*
-             * -------------------------------------------------
-             * FIELD REPORTS
-             * -------------------------------------------------
-             *
-             * Dashboard path always shows ALL active reports.
-             */
 
             DashboardWideCard(
                 title =
@@ -1565,12 +2208,6 @@ fun ExplorerScreen(
 }
 
 
-/*
- * -------------------------------------------------------------
- * SMALL EXPLORER ACTION CARD
- * -------------------------------------------------------------
- */
-
 @Composable
 private fun ExplorerActionCard(
     title: String,
@@ -1580,20 +2217,21 @@ private fun ExplorerActionCard(
     onClick: () -> Unit
 ) {
 
-
-
     Card(
         modifier =
             modifier
                 .height(
                     150.dp
                 ),
-                onClick = onClick,
+
+        onClick =
+            onClick,
 
         colors =
             CardDefaults.cardColors(
                 containerColor =
                     MaterialTheme.colorScheme.surface,
+
                 contentColor =
                     MaterialTheme.colorScheme.onSurface
             ),
@@ -1609,8 +2247,11 @@ private fun ExplorerActionCard(
                 Modifier
                     .fillMaxSize()
                     .padding(
-                        horizontal = 8.dp,
-                        vertical = 10.dp
+                        horizontal =
+                            8.dp,
+
+                        vertical =
+                            10.dp
                     ),
 
             horizontalAlignment =
@@ -1630,13 +2271,6 @@ private fun ExplorerActionCard(
                     30.sp
             )
 
-//            Spacer(
-//                modifier =
-//                    Modifier.height(
-//                        6.dp
-//                    )
-//            )
-
             Text(
                 text =
                     title,
@@ -1650,19 +2284,15 @@ private fun ExplorerActionCard(
                 textAlign =
                     TextAlign.Center,
 
-                maxLines = 2,
-                minLines = 2,
-                modifier = Modifier.fillMaxWidth()
+                maxLines =
+                    2,
 
+                minLines =
+                    2,
 
+                modifier =
+                    Modifier.fillMaxWidth()
             )
-
-//            Spacer(
-//                modifier =
-//                    Modifier.height(
-//                        4.dp
-//                    )
-//            )
 
             Text(
                 text =
@@ -1672,31 +2302,32 @@ private fun ExplorerActionCard(
                     MaterialTheme
                         .typography
                         .bodySmall,
-                fontSize = 12.sp,
-                lineHeight =  14.sp,
+
+                fontSize =
+                    12.sp,
+
+                lineHeight =
+                    14.sp,
 
                 textAlign =
                     TextAlign.Center,
-                maxLines = 3,
-                minLines = 3,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.fillMaxWidth()
+
+                maxLines =
+                    3,
+
+                minLines =
+                    3,
+
+                overflow =
+                    TextOverflow.Ellipsis,
+
+                modifier =
+                    Modifier.fillMaxWidth()
             )
         }
     }
 }
 
-
-/*
- * -------------------------------------------------------------
- * SAFETY OVERVIEW
- * -------------------------------------------------------------
- *
- * Combines:
- *
- * - Team's live NWS / NPS safety state
- * - Our local hazard report count
- */
 
 @Composable
 private fun SafetyOverviewCard(
@@ -1707,39 +2338,34 @@ private fun SafetyOverviewCard(
     onReportHazardClick: () -> Unit
 ) {
 
-//    val mediumGreen =
-//        Color(
-//            0xFF0B5D1E
-//        )
+    val forecast =
+        uiState.forecast
 
+    val npsStatus =
+        uiState.sources.firstOrNull {
+            it.source == "NPS"
+        }
 
+    val parkSummary =
+        when {
 
-    /*
-     * ---------------------------------------------------------
-     * SOURCE STATUS
-     * ---------------------------------------------------------
-     */
-    val forecast = uiState.forecast
+            uiState.selectedParkCode == null ->
+                "Select a park"
 
+            uiState.isLoading ->
+                "Loading..."
 
-    val npsStatus = uiState.sources.firstOrNull{
-        it.source == "NPS"
-    }
+            !uiState.hasLocation ->
+                "Location required to load notices"
 
+            uiState.errorMessage != null ->
+                "Unavailable"
 
-    val parkSummary = when{
-        uiState.selectedParkCode == null -> "Select a park"
-        uiState.isLoading -> "Loading..."
-        !uiState.hasLocation -> "Location required to load notices"
-        uiState.errorMessage != null -> "Unavailable"
-        else -> npsStatus?.message ?: "Not Loaded"
-    }
+            else ->
+                npsStatus?.message
+                    ?: "Not Loaded"
+        }
 
-    /*
-     * ---------------------------------------------------------
-     * PARK SUMMARY
-     * ---------------------------------------------------------
-     */
     Card(
         modifier =
             Modifier.fillMaxWidth(),
@@ -1747,7 +2373,8 @@ private fun SafetyOverviewCard(
         colors =
             CardDefaults.cardColors(
                 containerColor =
-                   MaterialTheme.colorScheme.onSurface,
+                    MaterialTheme.colorScheme.onSurface,
+
                 contentColor =
                     MaterialTheme.colorScheme.surface
             ),
@@ -1762,20 +2389,18 @@ private fun SafetyOverviewCard(
             modifier =
                 Modifier
                     .fillMaxWidth()
-                    .background(MaterialTheme.colorScheme.tertiary)
+                    .background(
+                        MaterialTheme.colorScheme.tertiary
+                    )
                     .padding(
                         16.dp
                     ),
+
             verticalArrangement =
                 Arrangement.spacedBy(
                     10.dp
                 )
         ) {
-            /*
-             * -------------------------------------------------
-             * HEADER
-             * -------------------------------------------------
-         */
 
             Row(
                 modifier =
@@ -1822,12 +2447,6 @@ private fun SafetyOverviewCard(
                 )
             }
 
-            /*
-             * -------------------------------------------------
-             * AREA NAME
-             * -------------------------------------------------
-             */
-
             if (
                 uiState.areaName.isNotBlank()
             ) {
@@ -1847,12 +2466,6 @@ private fun SafetyOverviewCard(
                 )
             }
 
-            /*
-             * -------------------------------------------------
-             * LOADING
-             * -------------------------------------------------
-             */
-
             if (
                 uiState.isLoading
             ) {
@@ -1863,77 +2476,94 @@ private fun SafetyOverviewCard(
                 )
             }
 
-            /*
-             * -------------------------------------------------
-             * LIVE SOURCE SUMMARIES
-             * -------------------------------------------------
-             */
-
-//            Text(
-//                text = "Weather: $",
-//                modifier = Modifier.fillMaxWidth()
-//            )
-
             Text(
-                text = "Park Notices: $parkSummary",
-                modifier = Modifier.fillMaxWidth(),
-                color = MaterialTheme.colorScheme.surface
+                text =
+                    "Park Notices: $parkSummary",
+
+                modifier =
+                    Modifier.fillMaxWidth(),
+
+                color =
+                    MaterialTheme.colorScheme.surface
             )
 
-            uiState.selectedParkCode?.let { code ->
+            uiState.selectedParkCode
+                ?.let { code ->
+
+                    Text(
+                        text =
+                            "Park: ${
+                                uiState.selectedParkName
+                                    ?: code
+                            }",
+
+                        modifier =
+                            Modifier.fillMaxWidth(),
+
+                        fontWeight =
+                            FontWeight.SemiBold,
+
+                        color =
+                            MaterialTheme.colorScheme.surface
+                    )
+                }
+
+            Button(
+                onClick =
+                    onAreaSafetyClick
+            ) {
+
                 Text(
-                    text = "Park: ${uiState.selectedParkName ?: code}",
-                    modifier = Modifier.fillMaxWidth(),
-                    fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.surface
+                    text =
+                        "View Area Safety / Select Park >"
                 )
             }
 
+            if (
+                uiState.hasUnavailableSources
+            ) {
 
-            Button(onClick = onAreaSafetyClick) {
-                Text("View Area Safety / Select Park >")
-            }
-
-
-
-
-            if (uiState.hasUnavailableSources) {
                 Text(
-                    text = "Some sources are unavailable. " +
-                            "Results may be incomplete.",
-                    color = OtoCrisisRed
+                    text =
+                        "Some sources are unavailable. " +
+                                "Results may be incomplete.",
+
+                    color =
+                        OtoCrisisRed
                 )
             }
         }
 
-
-        /*
-             * -------------------------------------------------
-             * SUMMARY CONTENT
-             * -------------------------------------------------
-             */
-
-
-        /*
-                     * -------------------------------------------------
-                     * WEATHER
-                     * -------------------------------------------------
-                    *
-                     * Weather now has its own click action.
-                     */
         Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(MaterialTheme.colorScheme.tertiary)
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp)
-        ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                verticalAlignment = Alignment.Top
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .background(
+                        MaterialTheme.colorScheme.tertiary
+                    )
+                    .padding(
+                        16.dp
+                    ),
 
+            verticalArrangement =
+                Arrangement.spacedBy(
+                    10.dp
+                )
+        ) {
+
+            Row(
+                modifier =
+                    Modifier.fillMaxWidth(),
+
+                horizontalArrangement =
+                    Arrangement.spacedBy(
+                        12.dp
+                    ),
+
+                verticalAlignment =
+                    Alignment.Top
             ) {
+
                 SafetyOverviewItem(
                     title =
                         "WEATHER",
@@ -1942,31 +2572,34 @@ private fun SafetyOverviewCard(
                         weatherIcon(
                             code =
                                 forecast?.weatherCode,
-                            isDay = uiState.forecast?.isDay
+
+                            isDay =
+                                uiState.forecast?.isDay
                         ),
 
-                    mainValue = forecast?.let {
-                        "${it.temp}°${it.tempUnit}"
-                    } ?: "_",
+                    mainValue =
+                        forecast
+                            ?.let {
+                                "${it.temp}°${it.tempUnit}"
+                            }
+                            ?: "_",
 
-                    description = uiState.forecast?.shortForecast
-                        ?: "View weather",
-                    modifier = Modifier
-                        .weight(1f)
-                        .clickable
-                            (onClick = onWeatherClick)
+                    description =
+                        uiState.forecast
+                            ?.shortForecast
+                            ?: "View weather",
 
-
+                    modifier =
+                        Modifier
+                            .weight(
+                                1f
+                            )
+                            .clickable(
+                                onClick =
+                                    onWeatherClick
+                            )
                 )
-//
-//                SafetyOverviewDivider(
-//                    color =
-//                        dividerColor
-//                )
 
-                /*
-                 * Our locally submitted community hazards.
-                 */
                 SafetyOverviewItem(
                     title =
                         "HAZARDS",
@@ -1995,22 +2628,27 @@ private fun SafetyOverviewCard(
 
                     modifier =
                         Modifier
-                            .weight(1f)
+                            .weight(
+                                1f
+                            )
                             .clickable(
-                                onClick = onReportHazardClick
+                                onClick =
+                                    onReportHazardClick
                             )
                 )
-
-//                SafetyOverviewDivider(
-//                    color =
-//                        dividerColor
-//                )
             }
 
             Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                verticalAlignment = Alignment.Top
+                modifier =
+                    Modifier.fillMaxWidth(),
+
+                horizontalArrangement =
+                    Arrangement.spacedBy(
+                        12.dp
+                    ),
+
+                verticalAlignment =
+                    Alignment.Top
             ) {
 
                 SafetyOverviewItem(
@@ -2020,17 +2658,32 @@ private fun SafetyOverviewCard(
                     icon =
                         "⛔",
 
-                    mainValue = uiState.selectedParkCode
-                        ?.uppercase(java.util.Locale.ROOT) ?:
-                        "—",
-                    description = when {
-                        !uiState.hasLocation -> "Select a location"
-                        uiState.selectedParkCode == null -> "No park selected"
-                        uiState.isLoading -> "Loading notices..."
-                        uiState.errorMessage != null -> "Unable to load notices"
-                        else -> npsStatus?.message ?: "Notices not loaded"
-                    },
+                    mainValue =
+                        uiState.selectedParkCode
+                            ?.uppercase(
+                                Locale.ROOT
+                            )
+                            ?: "—",
 
+                    description =
+                        when {
+
+                            !uiState.hasLocation ->
+                                "Select a location"
+
+                            uiState.selectedParkCode == null ->
+                                "No park selected"
+
+                            uiState.isLoading ->
+                                "Loading notices..."
+
+                            uiState.errorMessage != null ->
+                                "Unable to load notices"
+
+                            else ->
+                                npsStatus?.message
+                                    ?: "Notices not loaded"
+                        },
 
                     modifier =
                         Modifier
@@ -2038,15 +2691,10 @@ private fun SafetyOverviewCard(
                                 1f
                             )
                             .clickable(
-                                onClick = onAreaSafetyClick
+                                onClick =
+                                    onAreaSafetyClick
                             )
-
                 )
-//Didn't use dividers for the purpose of alignment issues
-//                SafetyOverviewDivider(
-//                    color =
-//                        dividerColor
-//                )
 
                 SafetyOverviewItem(
                     title =
@@ -2056,70 +2704,51 @@ private fun SafetyOverviewCard(
                         "🍃",
 
                     mainValue =
-                        uiState.airQuality?.usAqi?.toString() ?: "_",
+                        uiState.airQuality
+                            ?.usAqi
+                            ?.toString()
+                            ?: "_",
 
                     description =
-                        uiState.airQuality?.category
+                        uiState.airQuality
+                            ?.category
                             ?: "View air quality",
-                    modifier = Modifier
-                        .weight(1f)
-                        .fillMaxHeight()
-                        .clickable(
-                            onClick = onWeatherClick
 
-                        )
-
+                    modifier =
+                        Modifier
+                            .weight(
+                                1f
+                            )
+                            .fillMaxHeight()
+                            .clickable(
+                                onClick =
+                                    onWeatherClick
+                            )
                 )
             }
-
         }
     }
 
-            /*
-             * -------------------------------------------------
-             * SOURCE WARNING
-             * -------------------------------------------------
-             */
+    if (
+        uiState.hasUnavailableSources
+    ) {
 
-            if (
-                uiState.hasUnavailableSources
-            ) {
+        Text(
+            text =
+                "Some safety sources are unavailable. Results may be incomplete.",
 
-                Text(
-                    text =
-                        "Some safety sources are unavailable. Results may be incomplete.",
+            color =
+                OtoCrisisRed,
 
-                    color =
-                        OtoCrisisRed,
+            fontSize =
+                11.sp,
 
-                    fontSize =
-                        11.sp,
+            fontWeight =
+                FontWeight.Bold
+        )
+    }
+}
 
-                    fontWeight =
-                        FontWeight.Bold
-                )
-            }
-
-        }
-
-
-
-
-
-
-            /*
-             * -------------------------------------------------
-             * AREA SAFETY BUTTON
-             * -------------------------------------------------
-             */
-
-
-
-/*
- * -------------------------------------------------------------
- * SAFETY OVERVIEW ITEM
- * -------------------------------------------------------------
- */
 
 @Composable
 private fun SafetyOverviewItem(
@@ -2131,39 +2760,60 @@ private fun SafetyOverviewItem(
 ) {
 
     Card(
-        modifier = modifier.height(200.dp),
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surface,
-            contentColor = MaterialTheme.colorScheme.onSurface
-        ),
-        elevation = CardDefaults.cardElevation(
-            defaultElevation = 0.dp
-        )
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(12.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(
-                space = 10.dp,
-                alignment = Alignment.CenterVertically
+        modifier =
+            modifier.height(
+                200.dp
+            ),
+
+        shape =
+            RoundedCornerShape(
+                16.dp
+            ),
+
+        colors =
+            CardDefaults.cardColors(
+                containerColor =
+                    MaterialTheme.colorScheme.surface,
+
+                contentColor =
+                    MaterialTheme.colorScheme.onSurface
+            ),
+
+        elevation =
+            CardDefaults.cardElevation(
+                defaultElevation =
+                    0.dp
             )
-            ) {
+    ) {
 
+        Column(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .padding(
+                        12.dp
+                    ),
 
+            horizontalAlignment =
+                Alignment.CenterHorizontally,
+
+            verticalArrangement =
+                Arrangement.spacedBy(
+                    space =
+                        10.dp,
+
+                    alignment =
+                        Alignment.CenterVertically
+                )
+        ) {
 
             Text(
                 text =
                     icon,
 
                 fontSize =
-                    30.sp,
-
-                )
-
-
+                    30.sp
+            )
 
             Text(
                 text =
@@ -2182,7 +2832,6 @@ private fun SafetyOverviewItem(
                     TextAlign.Center
             )
 
-
             Text(
                 text =
                     mainValue,
@@ -2199,26 +2848,30 @@ private fun SafetyOverviewItem(
                 textAlign =
                     TextAlign.Center
             )
+
             Text(
-                text = description,
-                color = MaterialTheme.colorScheme.onSurface,
-                fontSize = 12.sp,
-                textAlign = TextAlign.Center,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis
+                text =
+                    description,
 
+                color =
+                    MaterialTheme.colorScheme.onSurface,
+
+                fontSize =
+                    12.sp,
+
+                textAlign =
+                    TextAlign.Center,
+
+                maxLines =
+                    2,
+
+                overflow =
+                    TextOverflow.Ellipsis
             )
-
         }
     }
 }
 
-
-/*
- * -------------------------------------------------------------
- * SAFETY OVERVIEW DIVIDER
- * -------------------------------------------------------------
- */
 
 @Composable
 private fun SafetyOverviewDivider(
@@ -2245,23 +2898,12 @@ private fun SafetyOverviewDivider(
 }
 
 
-/*
- * -------------------------------------------------------------
- * DASHBOARD WIDE CARD
- * -------------------------------------------------------------
- */
-
 @Composable
 private fun DashboardWideCard(
     title: String,
     subtitle: String,
     onClick: () -> Unit
 ) {
-
-//    val darkGreen =
-//        Color(
-//            0xFF063D24
-//        )
 
     Card(
         modifier =
@@ -2275,6 +2917,7 @@ private fun DashboardWideCard(
             CardDefaults.cardColors(
                 containerColor =
                     MaterialTheme.colorScheme.surface,
+
                 contentColor =
                     MaterialTheme.colorScheme.onSurface
             ),
@@ -2309,7 +2952,7 @@ private fun DashboardWideCard(
                         title,
 
                     color =
-                         MaterialTheme.colorScheme.onSurface,
+                        MaterialTheme.colorScheme.onSurface,
 
                     fontWeight =
                         FontWeight.Bold,
@@ -2346,12 +2989,6 @@ private fun DashboardWideCard(
 }
 
 
-/*
- * -------------------------------------------------------------
- * FORMAT CURRENT LOCATION
- * -------------------------------------------------------------
- */
-
 private fun formatExplorerLocation(
     location: OtoLocation
 ): String {
@@ -2382,12 +3019,6 @@ private fun formatExplorerLocation(
 }
 
 
-/*
- * -------------------------------------------------------------
- * FORMAT ROUTE DISTANCE
- * -------------------------------------------------------------
- */
-
 private fun formatRouteDistance(
     distanceMeters: Double
 ): String {
@@ -2403,12 +3034,6 @@ private fun formatRouteDistance(
     )
 }
 
-
-/*
- * -------------------------------------------------------------
- * FORMAT ROUTE DURATION
- * -------------------------------------------------------------
- */
 
 private fun formatRouteDuration(
     durationSeconds: Double
@@ -2448,64 +3073,134 @@ private fun formatRouteDuration(
         }
     }
 }
-// Add resolve functional to real name of area location
+
+
+private fun formatCheckInTime(
+    timeMillis: Long
+): String {
+
+    val formatter =
+        SimpleDateFormat(
+            "MMM d, yyyy 'at' h:mm a",
+            Locale.getDefault()
+        )
+
+    return formatter.format(
+        Date(
+            timeMillis
+        )
+    )
+}
+
+
+private const val KEY_LAST_CHECK_IN_TIME =
+    "last_check_in_time"
+
+private const val KEY_LAST_CHECK_IN_PHONE =
+    "last_check_in_phone"
+
+private const val EXTRA_CHECK_IN_TIME =
+    "check_in_time"
+
+
 private suspend fun resolveAreaName(
     context: android.content.Context,
     location: OtoLocation
 ): String {
-    val fallback = String.format(
-        Locale.US,
-        "%.4f, %.4f",
-        location.latitude,
-        location.longitude
-    )
+
+    val fallback =
+        String.format(
+            Locale.US,
+            "%.4f, %.4f",
+            location.latitude,
+            location.longitude
+        )
 
     if (
         Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU ||
         !Geocoder.isPresent()
     ) {
+
         return fallback
     }
 
     return suspendCancellableCoroutine { continuation ->
+
         try {
-            Geocoder(context, Locale.getDefault()).getFromLocation(
+
+            Geocoder(
+                context,
+                Locale.getDefault()
+            ).getFromLocation(
                 location.latitude,
                 location.longitude,
                 1,
                 object : Geocoder.GeocodeListener {
+
                     override fun onGeocode(
                         addresses: MutableList<android.location.Address>
                     ) {
-                        val address = addresses.firstOrNull()
 
-                        val name = address?.let{
-                            listOfNotNull(
-                                it.locality ?: it.subAdminArea,
-                                it.adminArea
+                        val address =
+                            addresses.firstOrNull()
+
+                        val name =
+                            address
+                                ?.let {
+
+                                    listOfNotNull(
+                                        it.locality
+                                            ?: it.subAdminArea,
+
+                                        it.adminArea
+                                    )
+                                        .distinct()
+                                        .joinToString(
+                                            " , "
+                                        )
+                                        .takeIf(
+                                            String::isNotBlank
+                                        )
+                                }
+                                ?: fallback
+
+                        if (
+                            continuation.isActive
+                        ) {
+
+                            continuation.resume(
+                                name
                             )
-
-                                .distinct()
-                                .joinToString (" , ")
-                                .takeIf (String::isNotBlank)
-                        } ?: fallback
-
-                        if (continuation.isActive) {
-                            continuation.resume(name)
                         }
-
                     }
 
-                    override fun onError(errorMessage: String?) {
-                       if (continuation.isActive) {
-                           continuation.resume(fallback)
-                       }
+                    override fun onError(
+                        errorMessage: String?
+                    ) {
+
+                        if (
+                            continuation.isActive
+                        ) {
+
+                            continuation.resume(
+                                fallback
+                            )
+                        }
                     }
                 }
             )
-        } catch (_: Exception) {
-            if (continuation.isActive) {
-                continuation.resume(fallback)
+
+        } catch (
+            _: Exception
+        ) {
+
+            if (
+                continuation.isActive
+            ) {
+
+                continuation.resume(
+                    fallback
+                )
             }
         }
     }

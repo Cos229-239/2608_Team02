@@ -30,6 +30,15 @@ class PlanTripViewModel(
     var notes by mutableStateOf("")
         private set
 
+    /*
+     * Optional trusted contact information.
+     */
+    var trustedContactName by mutableStateOf("")
+        private set
+
+    var trustedContactPhone by mutableStateOf("")
+        private set
+
     var isRoundTrip by mutableStateOf(true)
         private set
 
@@ -77,6 +86,65 @@ class PlanTripViewModel(
 
     fun updateNotes(value: String) {
         notes = value
+    }
+
+    /*
+     * Updates the optional trusted contact name.
+     */
+    fun updateTrustedContactName(value: String) {
+        trustedContactName = value
+    }
+
+    /*
+     * Updates the optional trusted contact phone number.
+     */
+    fun updateTrustedContactPhone(value: String) {
+        trustedContactPhone = value
+    }
+
+    /*
+     * Removes the trusted contact without deleting the trip.
+     *
+     * This removal is saved immediately.
+     *
+     * The user does NOT need to press UPDATE TRIP after
+     * removing the trusted contact.
+     */
+    fun clearTrustedContact() {
+
+        /*
+         * Clear the editable form values.
+         */
+        trustedContactName = ""
+        trustedContactPhone = ""
+
+        /*
+         * If a trip has already been saved, immediately
+         * update that saved TripPlan as well.
+         */
+        savedTrip =
+            savedTrip
+                ?.copy(
+                    trustedContactName = null,
+                    trustedContactPhone = null
+                )
+
+        /*
+         * Remove the trusted contact from persistent
+         * trip storage immediately.
+         *
+         * This prevents the contact from returning if
+         * the user backs out without pressing UPDATE TRIP.
+         */
+        preferences
+            .edit()
+            .remove(
+                KEY_TRUSTED_CONTACT_NAME
+            )
+            .remove(
+                KEY_TRUSTED_CONTACT_PHONE
+            )
+            .apply()
     }
 
     fun updateRoundTrip(value: Boolean) {
@@ -168,6 +236,26 @@ class PlanTripViewModel(
             return false
         }
 
+        /*
+         * Trusted contact is optional.
+         *
+         * Blank values are saved as null so trips can still
+         * be created without a trusted contact.
+         */
+        val savedTrustedContactName =
+            trustedContactName
+                .trim()
+                .ifBlank {
+                    null
+                }
+
+        val savedTrustedContactPhone =
+            trustedContactPhone
+                .trim()
+                .ifBlank {
+                    null
+                }
+
         val trip =
             TripPlan(
                 startingPointName = start.name,
@@ -183,7 +271,13 @@ class PlanTripViewModel(
                 departureDateMillis = departure,
                 returnDateMillis = returnDateMillis,
 
-                notes = notes
+                notes = notes,
+
+                trustedContactName =
+                    savedTrustedContactName,
+
+                trustedContactPhone =
+                    savedTrustedContactPhone
             )
 
         savedTrip = trip
@@ -235,6 +329,14 @@ class PlanTripViewModel(
                 KEY_NOTES,
                 trip.notes
             )
+            .putString(
+                KEY_TRUSTED_CONTACT_NAME,
+                trip.trustedContactName
+            )
+            .putString(
+                KEY_TRUSTED_CONTACT_PHONE,
+                trip.trustedContactPhone
+            )
             .apply()
 
         saveError = null
@@ -258,6 +360,9 @@ class PlanTripViewModel(
         startingPoint = ""
         destination = ""
         notes = ""
+
+        trustedContactName = ""
+        trustedContactPhone = ""
 
         isRoundTrip = true
 
@@ -344,6 +449,18 @@ class PlanTripViewModel(
                 ""
             ).orEmpty()
 
+        val savedTrustedContactName =
+            preferences.getString(
+                KEY_TRUSTED_CONTACT_NAME,
+                null
+            )
+
+        val savedTrustedContactPhone =
+            preferences.getString(
+                KEY_TRUSTED_CONTACT_PHONE,
+                null
+            )
+
         if (
             startLatitude == null ||
             startLongitude == null ||
@@ -391,7 +508,13 @@ class PlanTripViewModel(
                     },
 
                 notes =
-                    savedNotes
+                    savedNotes,
+
+                trustedContactName =
+                    savedTrustedContactName,
+
+                trustedContactPhone =
+                    savedTrustedContactPhone
             )
 
         savedTrip = trip
@@ -404,6 +527,14 @@ class PlanTripViewModel(
 
         notes =
             trip.notes
+
+        trustedContactName =
+            trip.trustedContactName
+                .orEmpty()
+
+        trustedContactPhone =
+            trip.trustedContactPhone
+                .orEmpty()
 
         isRoundTrip =
             trip.isRoundTrip
@@ -473,6 +604,12 @@ class PlanTripViewModel(
 
         private const val KEY_NOTES =
             "notes"
+
+        private const val KEY_TRUSTED_CONTACT_NAME =
+            "trusted_contact_name"
+
+        private const val KEY_TRUSTED_CONTACT_PHONE =
+            "trusted_contact_phone"
 
         private const val NO_RETURN_DATE =
             -1L
