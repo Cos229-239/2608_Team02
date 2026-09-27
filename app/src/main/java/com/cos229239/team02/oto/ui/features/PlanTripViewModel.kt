@@ -104,10 +104,47 @@ class PlanTripViewModel(
 
     /*
      * Removes the trusted contact without deleting the trip.
+     *
+     * This removal is saved immediately.
+     *
+     * The user does NOT need to press UPDATE TRIP after
+     * removing the trusted contact.
      */
     fun clearTrustedContact() {
+
+        /*
+         * Clear the editable form values.
+         */
         trustedContactName = ""
         trustedContactPhone = ""
+
+        /*
+         * If a trip has already been saved, immediately
+         * update that saved TripPlan as well.
+         */
+        savedTrip =
+            savedTrip
+                ?.copy(
+                    trustedContactName = null,
+                    trustedContactPhone = null
+                )
+
+        /*
+         * Remove the trusted contact from persistent
+         * trip storage immediately.
+         *
+         * This prevents the contact from returning if
+         * the user backs out without pressing UPDATE TRIP.
+         */
+        preferences
+            .edit()
+            .remove(
+                KEY_TRUSTED_CONTACT_NAME
+            )
+            .remove(
+                KEY_TRUSTED_CONTACT_PHONE
+            )
+            .apply()
     }
 
     fun updateRoundTrip(value: Boolean) {

@@ -855,7 +855,7 @@ fun PlanTripScreen(
                                     "EDIT",
 
                                 color =
-                                    darkGreen
+                                    MaterialTheme.colorScheme.primary
                             )
                         }
 

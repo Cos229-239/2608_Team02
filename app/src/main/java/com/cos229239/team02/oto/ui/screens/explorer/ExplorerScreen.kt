@@ -1,14 +1,23 @@
 package com.cos229239.team02.oto.ui.screens.explorer
 
-
 import android.Manifest
+import android.app.Activity
+import android.app.PendingIntent
+import android.content.ActivityNotFoundException
+import android.content.BroadcastReceiver
 import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
 import android.content.pm.PackageManager
+import android.location.Geocoder
+import android.net.Uri
+import android.os.Build
 import android.telephony.SmsManager
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -18,6 +27,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -31,6 +41,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -65,14 +76,10 @@ import com.cos229239.team02.oto.ui.theme.OtoCrisisRed
 import com.cos229239.team02.oto.ui.theme.OtoExplorerGreen
 import com.cos229239.team02.oto.ui.theme.OtoExplorerGreenDark
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.suspendCancellableCoroutine
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
-import android.location.Geocoder
-import android.os.Build
-import androidx.compose.foundation.isSystemInDarkTheme
-import androidx.compose.foundation.layout.heightIn
-import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlin.coroutines.resume
 
 @Composable
@@ -222,9 +229,6 @@ fun ExplorerScreen(
         )
     }
 
-    /*
-     * Holds an error message if the SMS cannot be sent.
-     */
     var checkInMessageError by remember {
 
         mutableStateOf<String?>(
@@ -232,9 +236,36 @@ fun ExplorerScreen(
         )
     }
 
-    /*
-     * Records the newest successful check-in locally.
-     */
+    var checkInMessageStatus by remember {
+
+        mutableStateOf<String?>(
+            null
+        )
+    }
+
+    var isCheckInSending by remember {
+
+        mutableStateOf(
+            false
+        )
+    }
+
+    val smsSentAction =
+        remember(
+            context
+        ) {
+
+            "${context.packageName}.OTO_SMS_SENT"
+        }
+
+    val smsDeliveredAction =
+        remember(
+            context
+        ) {
+
+            "${context.packageName}.OTO_SMS_DELIVERED"
+        }
+
     fun recordCheckIn(
         checkInTime: Long
     ) {
@@ -262,16 +293,264 @@ fun ExplorerScreen(
             .apply()
     }
 
-    /*
-     * Sends the trusted contact an SMS.
-     *
-     * The local timestamp is recorded after Android
-     * accepts the SMS send request.
-     */
-    fun sendCheckInMessage() {
+    fun buildCheckInMessage(
+        checkInTime: Long
+    ): String {
+
+        return "OTO check-in: Your traveler checked in ${
+            formatCheckInTime(
+                checkInTime
+            )
+        }."
+    }
+
+    fun openMessagingFallback(
+        checkInTime: Long
+    ) {
 
         if (
             !hasTrustedContact
+        ) {
+
+            return
+        }
+
+        val message =
+            buildCheckInMessage(
+                checkInTime
+            )
+
+        try {
+
+            val messageIntent =
+                Intent(
+                    Intent.ACTION_SENDTO
+                ).apply {
+
+                    data =
+                        Uri.fromParts(
+                            "smsto",
+                            trustedContactPhone,
+                            null
+                        )
+
+                    putExtra(
+                        "sms_body",
+                        message
+                    )
+                }
+
+            context.startActivity(
+                messageIntent
+            )
+
+            isCheckInSending =
+                false
+
+            checkInMessageError =
+                null
+
+            checkInMessageStatus =
+                "Message opened in your messaging app. Send it there to complete the check-in."
+
+        } catch (
+            exception: ActivityNotFoundException
+        ) {
+
+            isCheckInSending =
+                false
+
+            checkInMessageStatus =
+                null
+
+            checkInMessageError =
+                "No messaging app is available on this device."
+
+        } catch (
+            exception: Exception
+        ) {
+
+            isCheckInSending =
+                false
+
+            checkInMessageStatus =
+                null
+
+            checkInMessageError =
+                "Unable to open the messaging app."
+        }
+    }
+
+    DisposableEffect(
+        context,
+        trustedContactPhone
+    ) {
+
+        val sentReceiver =
+            object : BroadcastReceiver() {
+
+                override fun onReceive(
+                    receiverContext: Context?,
+                    intent: Intent?
+                ) {
+
+                    val checkInTime =
+                        intent
+                            ?.getLongExtra(
+                                EXTRA_CHECK_IN_TIME,
+                                0L
+                            )
+                            ?: 0L
+
+                    isCheckInSending =
+                        false
+
+                    when (
+                        resultCode
+                    ) {
+
+                        Activity.RESULT_OK -> {
+
+                            if (
+                                checkInTime > 0L
+                            ) {
+
+                                recordCheckIn(
+                                    checkInTime
+                                )
+                            }
+
+                            checkInMessageError =
+                                null
+
+                            checkInMessageStatus =
+                                "SMS sent."
+                        }
+
+                        SmsManager.RESULT_ERROR_NO_SERVICE -> {
+
+                            checkInMessageStatus =
+                                null
+
+                            checkInMessageError =
+                                "SMS could not be sent because there is no mobile service."
+                        }
+
+                        SmsManager.RESULT_ERROR_RADIO_OFF -> {
+
+                            checkInMessageStatus =
+                                null
+
+                            checkInMessageError =
+                                "SMS could not be sent because the mobile radio is turned off."
+                        }
+
+                        SmsManager.RESULT_ERROR_NULL_PDU -> {
+
+                            checkInMessageStatus =
+                                null
+
+                            checkInMessageError =
+                                "SMS could not be created by this device."
+                        }
+
+                        SmsManager.RESULT_ERROR_GENERIC_FAILURE -> {
+
+                            checkInMessageStatus =
+                                null
+
+                            checkInMessageError =
+                                "The SMS failed to send."
+                        }
+
+                        else -> {
+
+                            checkInMessageStatus =
+                                null
+
+                            checkInMessageError =
+                                "The SMS could not be sent."
+                        }
+                    }
+                }
+            }
+
+        val deliveredReceiver =
+            object : BroadcastReceiver() {
+
+                override fun onReceive(
+                    receiverContext: Context?,
+                    intent: Intent?
+                ) {
+
+                    if (
+                        resultCode ==
+                        Activity.RESULT_OK
+                    ) {
+
+                        checkInMessageError =
+                            null
+
+                        checkInMessageStatus =
+                            "SMS delivery confirmed."
+
+                    } else {
+
+                        checkInMessageStatus =
+                            "SMS was sent, but delivery was not confirmed."
+                    }
+                }
+            }
+
+        ContextCompat.registerReceiver(
+            context,
+            sentReceiver,
+            IntentFilter(
+                smsSentAction
+            ),
+            ContextCompat.RECEIVER_NOT_EXPORTED
+        )
+
+        ContextCompat.registerReceiver(
+            context,
+            deliveredReceiver,
+            IntentFilter(
+                smsDeliveredAction
+            ),
+            ContextCompat.RECEIVER_NOT_EXPORTED
+        )
+
+        onDispose {
+
+            try {
+
+                context.unregisterReceiver(
+                    sentReceiver
+                )
+
+            } catch (
+                exception: Exception
+            ) {
+            }
+
+            try {
+
+                context.unregisterReceiver(
+                    deliveredReceiver
+                )
+
+            } catch (
+                exception: Exception
+            ) {
+            }
+        }
+    }
+
+    fun sendCheckInMessage() {
+
+        if (
+            !hasTrustedContact ||
+            isCheckInSending
         ) {
 
             return
@@ -281,13 +560,68 @@ fun ExplorerScreen(
             System.currentTimeMillis()
 
         val message =
-            "OTO check-in: Your traveler checked in at ${
-                formatCheckInTime(
-                    checkInTime
-                )
-            }."
+            buildCheckInMessage(
+                checkInTime
+            )
 
         try {
+
+            isCheckInSending =
+                true
+
+            checkInMessageError =
+                null
+
+            checkInMessageStatus =
+                "Sending check-in..."
+
+            val sentIntent =
+                Intent(
+                    smsSentAction
+                ).apply {
+
+                    setPackage(
+                        context.packageName
+                    )
+
+                    putExtra(
+                        EXTRA_CHECK_IN_TIME,
+                        checkInTime
+                    )
+                }
+
+            val sentPendingIntent =
+                PendingIntent.getBroadcast(
+                    context,
+                    checkInTime.hashCode(),
+                    sentIntent,
+                    PendingIntent.FLAG_UPDATE_CURRENT or
+                            PendingIntent.FLAG_IMMUTABLE
+                )
+
+            val deliveredIntent =
+                Intent(
+                    smsDeliveredAction
+                ).apply {
+
+                    setPackage(
+                        context.packageName
+                    )
+
+                    putExtra(
+                        EXTRA_CHECK_IN_TIME,
+                        checkInTime
+                    )
+                }
+
+            val deliveredPendingIntent =
+                PendingIntent.getBroadcast(
+                    context,
+                    checkInTime.hashCode() + 1,
+                    deliveredIntent,
+                    PendingIntent.FLAG_UPDATE_CURRENT or
+                            PendingIntent.FLAG_IMMUTABLE
+                )
 
             @Suppress("DEPRECATION")
             val smsManager =
@@ -297,20 +631,27 @@ fun ExplorerScreen(
                 trustedContactPhone,
                 null,
                 message,
-                null,
-                null
+                sentPendingIntent,
+                deliveredPendingIntent
             )
 
-            checkInMessageError =
-                null
+        } catch (
+            exception: UnsupportedOperationException
+        ) {
 
-            recordCheckIn(
+            openMessagingFallback(
                 checkInTime
             )
 
         } catch (
             exception: SecurityException
         ) {
+
+            isCheckInSending =
+                false
+
+            checkInMessageStatus =
+                null
 
             checkInMessageError =
                 "SMS permission is required to send a check-in."
@@ -319,6 +660,12 @@ fun ExplorerScreen(
             exception: IllegalArgumentException
         ) {
 
+            isCheckInSending =
+                false
+
+            checkInMessageStatus =
+                null
+
             checkInMessageError =
                 "The trusted contact phone number is not valid."
 
@@ -326,17 +673,17 @@ fun ExplorerScreen(
             exception: Exception
         ) {
 
+            isCheckInSending =
+                false
+
+            checkInMessageStatus =
+                null
+
             checkInMessageError =
                 "Unable to send the check-in message on this device."
         }
     }
 
-    /*
-     * Requests SMS permission when needed.
-     *
-     * If permission is granted, the same check-in
-     * continues automatically.
-     */
     val smsPermissionLauncher =
         rememberLauncherForActivityResult(
             contract =
@@ -352,19 +699,41 @@ fun ExplorerScreen(
 
             } else {
 
+                isCheckInSending =
+                    false
+
+                checkInMessageStatus =
+                    null
+
                 checkInMessageError =
                     "SMS permission was denied. OTO could not send the check-in."
             }
         }
 
-    /*
-     * Main action used by the CHECK IN button.
-     */
     fun checkIn() {
 
         if (
-            !hasTrustedContact
+            !hasTrustedContact ||
+            isCheckInSending
         ) {
+
+            return
+        }
+
+        val supportsDirectSms =
+            context
+                .packageManager
+                .hasSystemFeature(
+                    PackageManager.FEATURE_TELEPHONY_MESSAGING
+                )
+
+        if (
+            !supportsDirectSms
+        ) {
+
+            openMessagingFallback(
+                System.currentTimeMillis()
+            )
 
             return
         }
@@ -390,21 +759,12 @@ fun ExplorerScreen(
         }
     }
 
-    /*
-     * Active hazard reports.
-     */
     val activeHazardReports =
         hazardReportViewModel
             .activeHazardReports
 
     val activeHazardCount =
         activeHazardReports.size
-
-    /*
-     * ---------------------------------------------------------
-     * ROUTE NAVIGATION
-     * ---------------------------------------------------------
-     */
 
     val routeClient =
         remember {
@@ -446,10 +806,6 @@ fun ExplorerScreen(
         )
     }
 
-    /*
-     * Retrieve route geometry whenever
-     * the saved trip changes.
-     */
     LaunchedEffect(
         savedTrip?.startingLatitude,
         savedTrip?.startingLongitude,
@@ -526,12 +882,6 @@ fun ExplorerScreen(
             false
     }
 
-    /*
-     * ---------------------------------------------------------
-     * LOCATION
-     * ---------------------------------------------------------
-     */
-
     val locationRepository =
         remember(
             context
@@ -548,19 +898,6 @@ fun ExplorerScreen(
             null
         )
     }
-
-    /*
-     * ---------------------------------------------------------
-     * SAFETY AREA SELECTION
-     * ---------------------------------------------------------
-     *
-     * Team update:
-     *
-     * If a trip exists, use the trip destination
-     * for weather and safety information.
-     *
-     * Otherwise use the user's current location.
-     */
 
     val destinationLatitude =
         savedTrip
@@ -685,12 +1022,6 @@ fun ExplorerScreen(
         )
     }
 
-    /*
-     * ---------------------------------------------------------
-     * REQUEST FRESH LOCATION
-     * ---------------------------------------------------------
-     */
-
     fun loadCurrentLocation(
         focusOnMap: Boolean = false
     ) {
@@ -735,12 +1066,6 @@ fun ExplorerScreen(
         }
     }
 
-    /*
-     * ---------------------------------------------------------
-     * LOCATION PERMISSION
-     * ---------------------------------------------------------
-     */
-
     val locationPermissionLauncher =
         rememberLauncherForActivityResult(
             contract =
@@ -777,12 +1102,6 @@ fun ExplorerScreen(
             focusAfterPermission =
                 false
         }
-
-    /*
-     * ---------------------------------------------------------
-     * REQUEST LOCATION
-     * ---------------------------------------------------------
-     */
 
     fun requestLocation(
         focusOnMap: Boolean = false
@@ -829,12 +1148,6 @@ fun ExplorerScreen(
         }
     }
 
-    /*
-     * ---------------------------------------------------------
-     * INITIAL LOCATION
-     * ---------------------------------------------------------
-     */
-
     LaunchedEffect(
         hasLocationPermission
     ) {
@@ -859,12 +1172,6 @@ fun ExplorerScreen(
             }
         }
     }
-
-    /*
-     * ---------------------------------------------------------
-     * CONTINUOUS LOCATION UPDATES
-     * ---------------------------------------------------------
-     */
 
     LaunchedEffect(
         hasLocationPermission
@@ -892,12 +1199,6 @@ fun ExplorerScreen(
             }
     }
 
-    /*
-     * ---------------------------------------------------------
-     * SCREEN
-     * ---------------------------------------------------------
-     */
-
     Column(
         modifier =
             Modifier
@@ -907,12 +1208,6 @@ fun ExplorerScreen(
                 )
     ) {
 
-        /*
-         * -----------------------------------------------------
-         * HEADER
-         * -----------------------------------------------------
-         */
-
         OtoTopAppBar(
             title =
                 "EXPLORER MODE",
@@ -920,12 +1215,6 @@ fun ExplorerScreen(
             onBackClick =
                 onBackClick
         )
-
-        /*
-         * -----------------------------------------------------
-         * MAP
-         * -----------------------------------------------------
-         */
 
         Box(
             modifier =
@@ -970,23 +1259,8 @@ fun ExplorerScreen(
                 selectedRouteIndex =
                     selectedRouteIndex,
 
-                /*
-                 * -------------------------------------------------
-                 * ACTIVE HAZARDS
-                 * -------------------------------------------------
-                 */
-
                 hazardReports =
                     activeHazardReports,
-
-                /*
-                 * -------------------------------------------------
-                 * MAP POPUP -> FIELD REPORTS
-                 * -------------------------------------------------
-                 *
-                 * Save only the reports represented by
-                 * the selected marker before navigating.
-                 */
 
                 onViewHazardReportsClick = { selectedReports ->
 
@@ -1009,12 +1283,6 @@ fun ExplorerScreen(
                 locationFocusRequest =
                     locationFocusRequest
             )
-
-            /*
-             * -------------------------------------------------
-             * CURRENT LOCATION CARD
-             * -------------------------------------------------
-             */
 
             if (
                 savedTrip == null
@@ -1152,12 +1420,6 @@ fun ExplorerScreen(
                     }
                 }
             }
-
-            /*
-             * -------------------------------------------------
-             * EXPANDED ACTIVE TRIP
-             * -------------------------------------------------
-             */
 
             if (
                 savedTrip != null &&
@@ -1374,12 +1636,6 @@ fun ExplorerScreen(
                 }
             }
 
-            /*
-             * -------------------------------------------------
-             * MINIMIZED ACTIVE TRIP
-             * -------------------------------------------------
-             */
-
             if (
                 savedTrip != null &&
                 !isTripCardExpanded
@@ -1516,12 +1772,6 @@ fun ExplorerScreen(
             }
         }
 
-        /*
-         * -----------------------------------------------------
-         * SCROLLABLE DASHBOARD
-         * -----------------------------------------------------
-         */
-
         Column(
             modifier =
                 Modifier
@@ -1536,12 +1786,6 @@ fun ExplorerScreen(
                         16.dp
                     )
         ) {
-
-            /*
-             * -------------------------------------------------
-             * QUICK ACTIONS
-             * -------------------------------------------------
-             */
 
             Row(
                 modifier =
@@ -1631,12 +1875,6 @@ fun ExplorerScreen(
                     )
             )
 
-            /*
-             * -------------------------------------------------
-             * SAFETY OVERVIEW
-             * -------------------------------------------------
-             */
-
             SafetyOverviewCard(
                 uiState =
                     safetyState,
@@ -1661,12 +1899,6 @@ fun ExplorerScreen(
                     )
             )
 
-            /*
-             * -------------------------------------------------
-             * REPORT HAZARD / ROUTE CHANGE
-             * -------------------------------------------------
-             */
-
             DashboardWideCard(
                 title =
                     "⚠️  REPORT HAZARD / ROUTE CHANGE",
@@ -1684,17 +1916,6 @@ fun ExplorerScreen(
                         12.dp
                     )
             )
-
-            /*
-             * -------------------------------------------------
-             * CHECK-IN
-             * -------------------------------------------------
-             *
-             * Uses the trusted contact saved in Plan Trip.
-             *
-             * The check-in timestamp is stored locally and
-             * OTO sends an SMS when permission is available.
-             */
 
             Card(
                 modifier =
@@ -1740,10 +1961,6 @@ fun ExplorerScreen(
                             )
                     )
 
-                    /*
-                     * If no trusted contact has been saved,
-                     * return the user to Plan Trip.
-                     */
                     if (
                         !hasTrustedContact
                     ) {
@@ -1788,10 +2005,6 @@ fun ExplorerScreen(
 
                     } else {
 
-                        /*
-                         * Display the trusted contact saved
-                         * with the current trip.
-                         */
                         Text(
                             text =
                                 trustedContactName,
@@ -1818,16 +2031,13 @@ fun ExplorerScreen(
                                 )
                         )
 
-                        /*
-                         * Display the latest local check-in.
-                         */
                         if (
                             lastCheckInTime != null
                         ) {
 
                             Text(
                                 text =
-                                    "✓ Checked in at ${
+                                    "✓ Checked in ${
                                         formatCheckInTime(
                                             lastCheckInTime!!
                                         )
@@ -1861,15 +2071,14 @@ fun ExplorerScreen(
                                 )
                         )
 
-                        /*
-                         * Sends the trusted contact an SMS and
-                         * records the local check-in time.
-                         */
                         Button(
                             onClick = {
 
                                 checkIn()
                             },
+
+                            enabled =
+                                !isCheckInSending,
 
                             modifier =
                                 Modifier.fillMaxWidth(),
@@ -1886,23 +2095,48 @@ fun ExplorerScreen(
 
                             Text(
                                 text =
-                                    if (
-                                        lastCheckInTime == null
-                                    ) {
+                                    when {
 
-                                        "CHECK IN"
+                                        isCheckInSending -> {
 
-                                    } else {
+                                            "SENDING..."
+                                        }
 
-                                        "CHECK IN AGAIN"
+                                        lastCheckInTime == null -> {
+
+                                            "CHECK IN"
+                                        }
+
+                                        else -> {
+
+                                            "CHECK IN AGAIN"
+                                        }
                                     }
                             )
                         }
 
-                        /*
-                         * Display SMS errors without reporting
-                         * a successful local check-in.
-                         */
+                        checkInMessageStatus
+                            ?.let { status ->
+
+                                Spacer(
+                                    modifier =
+                                        Modifier.height(
+                                            8.dp
+                                        )
+                                )
+
+                                Text(
+                                    text =
+                                        status,
+
+                                    color =
+                                        MaterialTheme.colorScheme.primary,
+
+                                    style =
+                                        MaterialTheme.typography.bodySmall
+                                )
+                            }
+
                         checkInMessageError
                             ?.let { error ->
 
@@ -1934,14 +2168,6 @@ fun ExplorerScreen(
                         12.dp
                     )
             )
-
-            /*
-             * -------------------------------------------------
-             * FIELD REPORTS
-             * -------------------------------------------------
-             *
-             * Dashboard path always shows ALL active reports.
-             */
 
             DashboardWideCard(
                 title =
@@ -1981,12 +2207,6 @@ fun ExplorerScreen(
     }
 }
 
-
-/*
- * -------------------------------------------------------------
- * SMALL EXPLORER ACTION CARD
- * -------------------------------------------------------------
- */
 
 @Composable
 private fun ExplorerActionCard(
@@ -2051,11 +2271,6 @@ private fun ExplorerActionCard(
                     30.sp
             )
 
-            /*
-             * Spacer was removed by the newer dev
-             * version to improve card alignment.
-             */
-
             Text(
                 text =
                     title,
@@ -2114,17 +2329,6 @@ private fun ExplorerActionCard(
 }
 
 
-/*
- * -------------------------------------------------------------
- * SAFETY OVERVIEW
- * -------------------------------------------------------------
- *
- * Combines:
- *
- * - Team's live NWS / NPS safety state
- * - Our local hazard report count
- */
-
 @Composable
 private fun SafetyOverviewCard(
     uiState: AreaSafetyUIState,
@@ -2133,12 +2337,6 @@ private fun SafetyOverviewCard(
     onWeatherClick: () -> Unit,
     onReportHazardClick: () -> Unit
 ) {
-
-    /*
-     * ---------------------------------------------------------
-     * SOURCE STATUS
-     * ---------------------------------------------------------
-     */
 
     val forecast =
         uiState.forecast
@@ -2167,12 +2365,6 @@ private fun SafetyOverviewCard(
                 npsStatus?.message
                     ?: "Not Loaded"
         }
-
-    /*
-     * ---------------------------------------------------------
-     * PARK SUMMARY
-     * ---------------------------------------------------------
-     */
 
     Card(
         modifier =
@@ -2209,12 +2401,6 @@ private fun SafetyOverviewCard(
                     10.dp
                 )
         ) {
-
-            /*
-             * -------------------------------------------------
-             * HEADER
-             * -------------------------------------------------
-             */
 
             Row(
                 modifier =
@@ -2261,12 +2447,6 @@ private fun SafetyOverviewCard(
                 )
             }
 
-            /*
-             * -------------------------------------------------
-             * AREA NAME
-             * -------------------------------------------------
-             */
-
             if (
                 uiState.areaName.isNotBlank()
             ) {
@@ -2286,12 +2466,6 @@ private fun SafetyOverviewCard(
                 )
             }
 
-            /*
-             * -------------------------------------------------
-             * LOADING
-             * -------------------------------------------------
-             */
-
             if (
                 uiState.isLoading
             ) {
@@ -2301,12 +2475,6 @@ private fun SafetyOverviewCard(
                         OtoExplorerGreen
                 )
             }
-
-            /*
-             * -------------------------------------------------
-             * LIVE SOURCE SUMMARIES
-             * -------------------------------------------------
-             */
 
             Text(
                 text =
@@ -2365,14 +2533,6 @@ private fun SafetyOverviewCard(
                 )
             }
         }
-
-        /*
-         * -------------------------------------------------
-         * SUMMARY CONTENT
-         * -------------------------------------------------
-         *
-         * Weather now has its own click action.
-         */
 
         Column(
             modifier =
@@ -2439,10 +2599,6 @@ private fun SafetyOverviewCard(
                                     onWeatherClick
                             )
                 )
-
-                /*
-                 * Our locally submitted community hazards.
-                 */
 
                 SafetyOverviewItem(
                     title =
@@ -2540,11 +2696,6 @@ private fun SafetyOverviewCard(
                             )
                 )
 
-                /*
-                 * Dividers are intentionally not used here
-                 * because they caused alignment problems.
-                 */
-
                 SafetyOverviewItem(
                     title =
                         "AIR QUALITY",
@@ -2578,12 +2729,6 @@ private fun SafetyOverviewCard(
         }
     }
 
-    /*
-     * -------------------------------------------------
-     * SOURCE WARNING
-     * -------------------------------------------------
-     */
-
     if (
         uiState.hasUnavailableSources
     ) {
@@ -2604,12 +2749,6 @@ private fun SafetyOverviewCard(
     }
 }
 
-
-/*
- * -------------------------------------------------------------
- * SAFETY OVERVIEW ITEM
- * -------------------------------------------------------------
- */
 
 @Composable
 private fun SafetyOverviewItem(
@@ -2734,12 +2873,6 @@ private fun SafetyOverviewItem(
 }
 
 
-/*
- * -------------------------------------------------------------
- * SAFETY OVERVIEW DIVIDER
- * -------------------------------------------------------------
- */
-
 @Composable
 private fun SafetyOverviewDivider(
     color: Color
@@ -2764,12 +2897,6 @@ private fun SafetyOverviewDivider(
     )
 }
 
-
-/*
- * -------------------------------------------------------------
- * DASHBOARD WIDE CARD
- * -------------------------------------------------------------
- */
 
 @Composable
 private fun DashboardWideCard(
@@ -2862,12 +2989,6 @@ private fun DashboardWideCard(
 }
 
 
-/*
- * -------------------------------------------------------------
- * FORMAT CURRENT LOCATION
- * -------------------------------------------------------------
- */
-
 private fun formatExplorerLocation(
     location: OtoLocation
 ): String {
@@ -2898,12 +3019,6 @@ private fun formatExplorerLocation(
 }
 
 
-/*
- * -------------------------------------------------------------
- * FORMAT ROUTE DISTANCE
- * -------------------------------------------------------------
- */
-
 private fun formatRouteDistance(
     distanceMeters: Double
 ): String {
@@ -2919,12 +3034,6 @@ private fun formatRouteDistance(
     )
 }
 
-
-/*
- * -------------------------------------------------------------
- * FORMAT ROUTE DURATION
- * -------------------------------------------------------------
- */
 
 private fun formatRouteDuration(
     durationSeconds: Double
@@ -2966,19 +3075,13 @@ private fun formatRouteDuration(
 }
 
 
-/*
- * -------------------------------------------------------------
- * FORMAT CHECK-IN TIME
- * -------------------------------------------------------------
- */
-
 private fun formatCheckInTime(
     timeMillis: Long
 ): String {
 
     val formatter =
         SimpleDateFormat(
-            "h:mm a",
+            "MMM d, yyyy 'at' h:mm a",
             Locale.getDefault()
         )
 
@@ -2990,27 +3093,16 @@ private fun formatCheckInTime(
 }
 
 
-/*
- * -------------------------------------------------------------
- * CHECK-IN PREFERENCE KEYS
- * -------------------------------------------------------------
- */
-
 private const val KEY_LAST_CHECK_IN_TIME =
     "last_check_in_time"
 
 private const val KEY_LAST_CHECK_IN_PHONE =
     "last_check_in_phone"
 
+private const val EXTRA_CHECK_IN_TIME =
+    "check_in_time"
 
-/*
- * -------------------------------------------------------------
- * RESOLVE LOCATION NAME
- * -------------------------------------------------------------
- *
- * Converts the user's coordinates into a readable
- * city / state style location when possible.
- */
+
 private suspend fun resolveAreaName(
     context: android.content.Context,
     location: OtoLocation
